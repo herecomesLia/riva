@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter
 
 from riva.api.auth import router as auth_router
 from riva.api.career_profile import router as career_profile_router
@@ -9,17 +9,17 @@ from riva.api.users import router as users_router
 router = APIRouter()
 router.include_router(
     auth_router,
-    responses=error_responses(status.HTTP_500_INTERNAL_SERVER_ERROR),
+    responses=error_responses(Exception),
 )
 router.include_router(
     health_router,
-    responses=error_responses(status.HTTP_500_INTERNAL_SERVER_ERROR),
+    responses=error_responses(Exception),
 )
 router.include_router(
     users_router,
-    responses=error_responses(status.HTTP_500_INTERNAL_SERVER_ERROR),
+    responses=error_responses(Exception),
 )
 router.include_router(
     career_profile_router,
-    responses=error_responses(status.HTTP_500_INTERNAL_SERVER_ERROR),
+    responses=error_responses(Exception),
 )

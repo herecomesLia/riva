@@ -8,11 +8,10 @@ describe("normalizeRequestError", () => {
     const error = new AxiosError("Request failed", "ERR_BAD_REQUEST", undefined, undefined, {
       data: {
         error: {
-          code: "authentication.invalid_credentials",
+          code: "auth.invalid_credentials",
           message: "Invalid credentials",
           issues: [{ location: ["body", "email"], message: "Invalid email" }],
         },
-        requestId: "request-1",
       },
       status: 401,
       statusText: "Unauthorized",
@@ -26,8 +25,7 @@ describe("normalizeRequestError", () => {
     expect(normalized).toMatchObject({
       message: "Invalid credentials",
       status: 401,
-      code: "authentication.invalid_credentials",
-      requestId: "request-1",
+      code: "auth.invalid_credentials",
       issues: [{ location: ["body", "email"], message: "Invalid email" }],
     })
   })
@@ -48,7 +46,6 @@ describe("normalizeRequestError", () => {
       message: "Bad gateway",
       status: 502,
       code: null,
-      requestId: null,
       issues: null,
     })
   })

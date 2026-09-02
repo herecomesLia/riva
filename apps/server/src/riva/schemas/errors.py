@@ -1,3 +1,4 @@
+from riva.errors import ErrorCode
 from riva.schemas.base import ResponseModel
 
 
@@ -7,11 +8,10 @@ class ErrorIssue(ResponseModel):
 
 
 class ErrorBody(ResponseModel):
-    code: str
+    code: ErrorCode
     message: str
     issues: list[ErrorIssue] | None = None
 
 
 class ErrorResponse(ResponseModel):
     error: ErrorBody
-    request_id: str

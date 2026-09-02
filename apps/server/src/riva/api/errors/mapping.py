@@ -1,10 +1,12 @@
 from dataclasses import dataclass
+from typing import ClassVar
 
-from fastapi.exceptions import RequestValidationError
+from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from starlette import status
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from riva.db.errors import DatabaseUnavailableError
+from riva.errors import ErrorCode
 from riva.services.errors import (
     CareerProfileAlreadyExistsError,
     CareerProfileNotFoundError,
@@ -17,144 +19,110 @@ from riva.services.errors import (
 
 
 class APIRequestError(Exception):
-    pass
+    code: ClassVar[ErrorCode]
+    message: ClassVar[str]
+
+    def __init__(self) -> None:
+        super().__init__(self.message)
 
 
 class AuthRequiredError(APIRequestError):
-    pass
+    code = ErrorCode.AUTH_NOT_AUTHENTICATED
+    message = "Authentication is required."
 
 
 class CsrfFailedError(APIRequestError):
-    pass
+    code = ErrorCode.REQUEST_CSRF_FAILED
+    message = "CSRF validation failed."
 
 
 class APINotImplementedError(APIRequestError):
-    pass
+    code = ErrorCode.REQUEST_NOT_IMPLEMENTED
+    message = "This operation is not implemented."
 
 
 @dataclass(frozen=True)
-class ErrorSpec:
+class HttpErrorPolicy:
     status_code: int
-    code: str
-    message: str
     clear_session_cookie: bool = False
 
 
-def resolve_error(exc: Exception) -> ErrorSpec:
-    match exc:
-        case UsernameTakenError():
-            return ErrorSpec(
-                status_code=status.HTTP_409_CONFLICT,
-                code="auth.username_taken",
-                message="Username is already registered.",
-            )
+@dataclass(frozen=True)
+class ErrorDetails:
+    code: ErrorCode
+    message: str
 
-        case InvalidCredentialsError():
-            return ErrorSpec(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                code="auth.invalid_credentials",
-                message="Invalid username or password.",
-            )
 
-        case InvalidSessionError():
-            return ErrorSpec(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                code="auth.invalid_session",
-                message="Session is invalid.",
-                clear_session_cookie=True,
-            )
+HTTP_ERROR_POLICIES: dict[type[Exception], HttpErrorPolicy] = {
+    InvalidCredentialsError: HttpErrorPolicy(status.HTTP_401_UNAUTHORIZED),
+    InvalidSessionError: HttpErrorPolicy(
+        status.HTTP_401_UNAUTHORIZED,
+        clear_session_cookie=True,
+    ),
+    SessionExpiredError: HttpErrorPolicy(
+        status.HTTP_401_UNAUTHORIZED,
+        clear_session_cookie=True,
+    ),
+    UsernameTakenError: HttpErrorPolicy(status.HTTP_409_CONFLICT),
+    CareerProfileNotFoundError: HttpErrorPolicy(status.HTTP_404_NOT_FOUND),
+    CareerProfileAlreadyExistsError: HttpErrorPolicy(status.HTTP_409_CONFLICT),
+    CareerProfileSkillMismatchError: HttpErrorPolicy(
+        status.HTTP_422_UNPROCESSABLE_CONTENT
+    ),
+    AuthRequiredError: HttpErrorPolicy(status.HTTP_401_UNAUTHORIZED),
+    CsrfFailedError: HttpErrorPolicy(status.HTTP_403_FORBIDDEN),
+    APINotImplementedError: HttpErrorPolicy(status.HTTP_501_NOT_IMPLEMENTED),
+    DatabaseUnavailableError: HttpErrorPolicy(status.HTTP_503_SERVICE_UNAVAILABLE),
+    RequestValidationError: HttpErrorPolicy(status.HTTP_422_UNPROCESSABLE_CONTENT),
+    ResponseValidationError: HttpErrorPolicy(status.HTTP_500_INTERNAL_SERVER_ERROR),
+    Exception: HttpErrorPolicy(status.HTTP_500_INTERNAL_SERVER_ERROR),
+}
 
-        case SessionExpiredError():
-            return ErrorSpec(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                code="auth.session_expired",
-                message="Session has expired.",
-                clear_session_cookie=True,
-            )
+FRAMEWORK_ERROR_DETAILS: dict[type[Exception], ErrorDetails] = {
+    RequestValidationError: ErrorDetails(
+        ErrorCode.REQUEST_VALIDATION_FAILED,
+        "Request validation failed.",
+    ),
+    ResponseValidationError: ErrorDetails(
+        ErrorCode.SERVER_INTERNAL_ERROR,
+        "An internal server error occurred.",
+    ),
+    Exception: ErrorDetails(
+        ErrorCode.SERVER_INTERNAL_ERROR,
+        "An internal server error occurred.",
+    ),
+}
 
-        case AuthRequiredError():
-            return ErrorSpec(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                code="auth.not_authenticated",
-                message="Authentication is required.",
-            )
 
-        case CsrfFailedError():
-            return ErrorSpec(
-                status_code=status.HTTP_403_FORBIDDEN,
-                code="request.csrf_failed",
-                message="CSRF validation failed.",
-            )
+def resolve_http_policy(error: Exception | type[Exception]) -> HttpErrorPolicy:
+    if isinstance(error, StarletteHTTPException):
+        return HttpErrorPolicy(error.status_code)
 
-        case APINotImplementedError():
-            return ErrorSpec(
-                status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                code="request.not_implemented",
-                message="This operation is not implemented.",
-            )
+    error_type = error if isinstance(error, type) else type(error)
+    return HTTP_ERROR_POLICIES.get(error_type, HTTP_ERROR_POLICIES[Exception])
 
-        case DatabaseUnavailableError():
-            return ErrorSpec(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                code="dependency.database_unavailable",
-                message="Database is temporarily unavailable.",
-            )
 
-        case RequestValidationError():
-            return ErrorSpec(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                code="request.validation_failed",
-                message="Request validation failed.",
-            )
+def resolve_error_details(error: Exception | type[Exception]) -> ErrorDetails:
+    code = getattr(error, "code", None)
+    message = getattr(error, "message", None)
+    if isinstance(code, ErrorCode) and isinstance(message, str):
+        return ErrorDetails(code, message)
 
-        case StarletteHTTPException(status_code=status.HTTP_404_NOT_FOUND):
-            return ErrorSpec(
-                status_code=status.HTTP_404_NOT_FOUND,
-                code="request.not_found",
-                message="The requested endpoint was not found.",
+    if isinstance(error, StarletteHTTPException):
+        if error.status_code == status.HTTP_404_NOT_FOUND:
+            return ErrorDetails(
+                ErrorCode.REQUEST_NOT_FOUND,
+                "The requested endpoint was not found.",
             )
+        if error.status_code == status.HTTP_405_METHOD_NOT_ALLOWED:
+            return ErrorDetails(
+                ErrorCode.REQUEST_METHOD_NOT_ALLOWED,
+                "The HTTP method is not allowed for this endpoint.",
+            )
+        return ErrorDetails(ErrorCode.REQUEST_HTTP_ERROR, "Request failed.")
 
-        case StarletteHTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED):
-            return ErrorSpec(
-                status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
-                code="request.method_not_allowed",
-                message="The HTTP method is not allowed for this endpoint.",
-            )
-
-        case StarletteHTTPException(status_code=status_code):
-            return ErrorSpec(
-                status_code=status_code,
-                code="request.http_error",
-                message="Request failed.",
-            )
-
-        case CareerProfileNotFoundError():
-            return ErrorSpec(
-                status_code=status.HTTP_404_NOT_FOUND,
-                code="career_profile.not_found",
-                message="Career profile was not found.",
-            )
-
-        case CareerProfileAlreadyExistsError():
-            return ErrorSpec(
-                status_code=status.HTTP_409_CONFLICT,
-                code="career_profile.already_exists",
-                message="Career profile already exists.",
-            )
-
-        case CareerProfileSkillMismatchError():
-            return ErrorSpec(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                code="career_profile.skill_mismatch",
-                message=(
-                    "Work experience skills must exist in the career profile "
-                    "skills list."
-                ),
-            )
-
-        case _:
-            return ErrorSpec(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                code="server.internal_error",
-                message="An internal server error occurred.",
-            )
+    error_type = error if isinstance(error, type) else type(error)
+    return FRAMEWORK_ERROR_DETAILS.get(
+        error_type,
+        FRAMEWORK_ERROR_DETAILS[Exception],
+    )

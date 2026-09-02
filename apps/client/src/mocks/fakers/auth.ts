@@ -1,5 +1,6 @@
 import { ApiError } from "@/api/error"
 import type {
+  ErrorCode,
   ErrorResponse,
   LoginCredentials,
   RegisterCredentials,
@@ -7,12 +8,9 @@ import type {
 } from "@/api/generated/models"
 import { authUserFixture } from "@/mocks/fixtures/auth"
 
-const requestId = "mock-auth-request-id"
-
-function authError(status: number, code: string, message: string): ApiError {
+function authError(status: number, code: ErrorCode, message: string): ApiError {
   const response: ErrorResponse = {
     error: { code, message },
-    requestId,
   }
   return new ApiError(status, response, message)
 }

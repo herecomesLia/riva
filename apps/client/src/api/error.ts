@@ -1,11 +1,11 @@
 import { isAxiosError } from "axios"
 
+import { ErrorCode } from "@/api/generated/models"
 import type { ErrorIssue, ErrorResponse } from "@/api/generated/models"
 
 export class ApiError extends Error {
   readonly status: number
-  readonly code: string | null
-  readonly requestId: string | null
+  readonly code: ErrorCode | null
   readonly issues: ErrorIssue[] | null
 
   constructor(status: number, response: ErrorResponse | null, message: string) {
@@ -13,7 +13,6 @@ export class ApiError extends Error {
     this.name = "ApiError"
     this.status = status
     this.code = response?.error.code ?? null
-    this.requestId = response?.requestId ?? null
     this.issues = response?.error.issues ?? null
   }
 }
@@ -38,9 +37,7 @@ function isErrorResponse(value: unknown): value is ErrorResponse {
 
   const error = response.error as Record<string, unknown>
   return (
-    typeof error.code === "string" &&
-    typeof error.message === "string" &&
-    typeof response.requestId === "string"
+    Object.values(ErrorCode).includes(error.code as ErrorCode) && typeof error.message === "string"
   )
 }
 

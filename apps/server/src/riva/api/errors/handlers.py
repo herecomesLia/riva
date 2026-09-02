@@ -7,10 +7,14 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from riva.api.cookies import delete_session_cookie
-from riva.api.errors.mapping import APIRequestError, ErrorSpec, resolve_error
+from riva.api.errors.mapping import (
+    APIRequestError,
+    resolve_error_details,
+    resolve_http_policy,
+)
 from riva.db.errors import DatabaseUnavailableError
+from riva.errors import AppError
 from riva.schemas.errors import ErrorBody, ErrorIssue, ErrorResponse
-from riva.services.errors import ApplicationError
 
 REQUEST_ID_HEADER = "X-Request-ID"
 
@@ -21,23 +25,23 @@ def _get_request_id(request: Request) -> str:
 
 def _build_error_response(
     request: Request,
-    spec: ErrorSpec,
+    exc: Exception,
     *,
     issues: list[ErrorIssue] | None = None,
     headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
-    structlog.contextvars.bind_contextvars(error_code=spec.code)
-    request_id = _get_request_id(request)
+    details = resolve_error_details(exc)
+    policy = resolve_http_policy(exc)
+    structlog.contextvars.bind_contextvars(error_code=details.code.value)
 
     response = JSONResponse(
-        status_code=spec.status_code,
+        status_code=policy.status_code,
         content=ErrorResponse(
             error=ErrorBody(
-                code=spec.code,
-                message=spec.message,
+                code=details.code,
+                message=details.message,
                 issues=issues,
             ),
-            request_id=request_id,
         ).model_dump(
             mode="json",
             by_alias=True,
@@ -45,16 +49,16 @@ def _build_error_response(
         ),
         headers=dict(headers) if headers is not None else None,
     )
-    if spec.clear_session_cookie:
+    if policy.clear_session_cookie:
         delete_session_cookie(response, request.app.state.settings)
     return response
 
 
 async def mapped_error_handler(
     request: Request,
-    exc: ApplicationError | APIRequestError,
+    exc: AppError | APIRequestError,
 ) -> JSONResponse:
-    return _build_error_response(request, resolve_error(exc))
+    return _build_error_response(request, exc)
 
 
 async def database_unavailable_error_handler(
@@ -68,7 +72,7 @@ async def database_unavailable_error_handler(
         method=request.method,
         path=request.url.path,
     )
-    return _build_error_response(request, resolve_error(exc))
+    return _build_error_response(request, exc)
 
 
 async def request_validation_error_handler(
@@ -77,7 +81,7 @@ async def request_validation_error_handler(
 ) -> JSONResponse:
     return _build_error_response(
         request,
-        resolve_error(exc),
+        exc,
         issues=_validation_issues(exc),
     )
 
@@ -88,7 +92,7 @@ async def http_exception_handler(
 ) -> JSONResponse:
     return _build_error_response(
         request,
-        resolve_error(exc),
+        exc,
         headers=exc.headers,
     )
 
@@ -114,7 +118,7 @@ async def response_validation_error_handler(
     exc: ResponseValidationError,
 ) -> JSONResponse:
     _log_response_validation_error(request, exc)
-    return _build_error_response(request, resolve_error(exc))
+    return _build_error_response(request, exc)
 
 
 async def unexpected_error_handler(
@@ -125,7 +129,7 @@ async def unexpected_error_handler(
     # ServerErrorMiddleware sends this response outside CorrelationIdMiddleware.
     return _build_error_response(
         request,
-        resolve_error(exc),
+        exc,
         headers={REQUEST_ID_HEADER: request_id},
     )
 
@@ -144,7 +148,7 @@ def _validation_issues(exc: RequestValidationError) -> list[ErrorIssue]:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    app.add_exception_handler(ApplicationError, mapped_error_handler)
+    app.add_exception_handler(AppError, mapped_error_handler)
     app.add_exception_handler(APIRequestError, mapped_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     app.add_exception_handler(

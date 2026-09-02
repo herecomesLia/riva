@@ -1,12 +1,15 @@
 import structlog
 from fastapi import APIRouter, Request, Response, status
+from fastapi.exceptions import RequestValidationError
 
 from riva.api.cookies import delete_session_cookie, set_session_cookie
 from riva.api.deps import UserServiceDep, csrf_guard
+from riva.api.errors import CsrfFailedError
 from riva.api.errors.openapi import error_responses
 from riva.models import User
 from riva.schemas.auth import LoginCredentials, RegisterCredentials
 from riva.schemas.users import UserResponse
+from riva.services.errors import InvalidCredentialsError, UsernameTakenError
 
 logger = structlog.get_logger("riva.auth")
 
@@ -14,7 +17,7 @@ router = APIRouter(
     prefix="/auth",
     tags=["auth"],
     dependencies=[csrf_guard],
-    responses=error_responses(status.HTTP_403_FORBIDDEN),
+    responses=error_responses(CsrfFailedError),
 )
 
 
@@ -24,8 +27,8 @@ router = APIRouter(
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
     responses=error_responses(
-        status.HTTP_409_CONFLICT,
-        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        UsernameTakenError,
+        RequestValidationError,
     ),
 )
 async def register(
@@ -47,8 +50,8 @@ async def register(
     operation_id="login",
     response_model=UserResponse,
     responses=error_responses(
-        status.HTTP_401_UNAUTHORIZED,
-        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        InvalidCredentialsError,
+        RequestValidationError,
     ),
 )
 async def login(

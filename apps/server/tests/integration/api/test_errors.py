@@ -77,12 +77,11 @@ async def test_method_not_allowed_returns_standard_error_response(
     )
 
 
-async def test_server_generates_request_id(client: AsyncClient) -> None:
+async def test_server_generates_request_id_header(client: AsyncClient) -> None:
     response = await client.get("/api/not-exist")
 
-    body = response.json()
-    assert body["requestId"]
-    assert response.headers["X-Request-ID"] == body["requestId"]
+    assert response.headers["X-Request-ID"]
+    assert "requestId" not in response.json()
 
 
 async def test_valid_client_request_id_is_preserved(client: AsyncClient) -> None:
@@ -93,5 +92,5 @@ async def test_valid_client_request_id_is_preserved(client: AsyncClient) -> None
         headers={"X-Request-ID": request_id},
     )
 
-    assert response.json()["requestId"] == request_id
     assert response.headers["X-Request-ID"] == request_id
+    assert "requestId" not in response.json()

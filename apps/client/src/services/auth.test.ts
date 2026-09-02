@@ -28,7 +28,6 @@ describe("auth service", () => {
         401,
         {
           error: { code: "auth.not_authenticated", message: "Authentication is required." },
-          requestId: "request-1",
         },
         "Request failed",
       ),

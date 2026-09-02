@@ -16,7 +16,6 @@ async function handle<T>(operation: () => Promise<T>, respond: (result: T) => Re
         message: error.message,
         ...(error.issues ? { issues: error.issues } : {}),
       },
-      requestId: error.requestId ?? "mock-auth-request-id",
     }
     return HttpResponse.json(response, { status: error.status })
   }

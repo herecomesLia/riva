@@ -1,6 +1,8 @@
 from fastapi import APIRouter, status
+from fastapi.exceptions import RequestValidationError
 
 from riva.api.deps import CareerProfileServiceDep, CurrentUserDep, csrf_guard
+from riva.api.errors import AuthRequiredError, CsrfFailedError
 from riva.api.errors.openapi import error_responses
 from riva.models.career_profile import CareerProfile
 from riva.schemas.career_profile import (
@@ -8,14 +10,23 @@ from riva.schemas.career_profile import (
     CreateCareerProfileRequest,
     UpdateCareerProfileRequest,
 )
+from riva.services.errors import (
+    CareerProfileAlreadyExistsError,
+    CareerProfileNotFoundError,
+    CareerProfileSkillMismatchError,
+    InvalidSessionError,
+    SessionExpiredError,
+)
 
 router = APIRouter(
     prefix="/career-profile",
     tags=["career_profile"],
     dependencies=[csrf_guard],
     responses=error_responses(
-        status.HTTP_401_UNAUTHORIZED,
-        status.HTTP_403_FORBIDDEN,
+        AuthRequiredError,
+        InvalidSessionError,
+        SessionExpiredError,
+        CsrfFailedError,
     ),
 )
 
@@ -24,7 +35,7 @@ router = APIRouter(
     "",
     operation_id="get-career-profile",
     response_model=CareerProfileResponse,
-    responses=error_responses(status.HTTP_404_NOT_FOUND),
+    responses=error_responses(CareerProfileNotFoundError),
 )
 async def get_career_profile(
     current_user: CurrentUserDep,
@@ -39,8 +50,9 @@ async def get_career_profile(
     response_model=CareerProfileResponse,
     status_code=status.HTTP_201_CREATED,
     responses=error_responses(
-        status.HTTP_409_CONFLICT,
-        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        CareerProfileAlreadyExistsError,
+        CareerProfileSkillMismatchError,
+        RequestValidationError,
     ),
 )
 async def create_career_profile(
@@ -62,8 +74,9 @@ async def create_career_profile(
     operation_id="update-career-profile",
     response_model=CareerProfileResponse,
     responses=error_responses(
-        status.HTTP_404_NOT_FOUND,
-        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        CareerProfileNotFoundError,
+        CareerProfileSkillMismatchError,
+        RequestValidationError,
     ),
 )
 async def update_career_profile(

@@ -10,6 +10,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from riva.core.app import create_app
+from riva.errors import ErrorCode
 from tests.support.settings import make_test_settings
 
 ERROR_RESPONSE_REF = "#/components/schemas/ErrorResponse"
@@ -82,6 +83,26 @@ def test_error_responses_use_public_error_schema() -> None:
                     f"{method.upper()} {path} -> {status_code} must reference "
                     f"{expected_ref}"
                 )
+
+
+def test_openapi_exposes_error_codes_and_endpoint_error_semantics() -> None:
+    schema = create_app(make_test_settings()).openapi()
+
+    assert set(schema["components"]["schemas"]["ErrorCode"]["enum"]) == {
+        code.value for code in ErrorCode
+    }
+
+    conflict = schema["paths"]["/api/auth/register"]["post"]["responses"]["409"]
+    assert "auth.username_taken" in conflict["description"]
+    assert set(conflict["content"]["application/json"]["examples"]) == {
+        "auth.username_taken"
+    }
+
+    validation = schema["paths"]["/api/career-profile"]["post"]["responses"]["422"]
+    assert set(validation["content"]["application/json"]["examples"]) == {
+        "career_profile.skill_mismatch",
+        "request.validation_failed",
+    }
 
 
 def test_validated_operations_declare_public_422_error() -> None:

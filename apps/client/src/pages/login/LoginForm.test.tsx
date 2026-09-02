@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ApiError, TransportError } from "@/api/error"
+import type { ErrorCode } from "@/api/generated/models"
 import { useAuth } from "@/hooks/use-auth"
 import { i18n } from "@/i18n/i18n"
 import { LoginForm } from "@/pages/login/LoginForm"
@@ -15,12 +16,11 @@ vi.mock("@/hooks/use-auth", () => ({
 
 const loginMock = vi.fn()
 
-function apiError(status: number, code: string, message: string) {
+function apiError(status: number, code: ErrorCode, message: string) {
   return new ApiError(
     status,
     {
       error: { code, message },
-      requestId: "request-1",
     },
     "Request failed",
   )

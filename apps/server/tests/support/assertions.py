@@ -15,8 +15,6 @@ def assert_error_response(
     body = response.json()
     assert body["error"]["code"] == code
     assert body["error"]["message"] == message
-
-    request_id = body["requestId"]
-    assert request_id
-    assert response.headers["X-Request-ID"] == request_id
+    assert "requestId" not in body
+    assert response.headers["X-Request-ID"]
     return body

@@ -4,10 +4,11 @@
  * Riva API
  * OpenAPI spec version: 0.1.0
  */
+import type { ErrorCode } from "./errorCode"
 import type { ErrorIssue } from "./errorIssue"
 
 export interface ErrorBody {
-  code: string
+  code: ErrorCode
   message: string
   issues?: ErrorIssue[] | null
 }

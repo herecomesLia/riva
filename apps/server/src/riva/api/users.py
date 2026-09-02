@@ -1,18 +1,26 @@
 from fastapi import APIRouter, status
+from fastapi.exceptions import RequestValidationError
 
 from riva.api.deps import CurrentUserDep, UserServiceDep, csrf_guard
-from riva.api.errors import APINotImplementedError
+from riva.api.errors import (
+    APINotImplementedError,
+    AuthRequiredError,
+    CsrfFailedError,
+)
 from riva.api.errors.openapi import error_responses
 from riva.models import User
 from riva.schemas.users import UpdateCurrentUserRequest, UserResponse
+from riva.services.errors import InvalidSessionError, SessionExpiredError
 
 router = APIRouter(
     prefix="/users",
     tags=["users"],
     dependencies=[csrf_guard],
     responses=error_responses(
-        status.HTTP_401_UNAUTHORIZED,
-        status.HTTP_403_FORBIDDEN,
+        AuthRequiredError,
+        InvalidSessionError,
+        SessionExpiredError,
+        CsrfFailedError,
     ),
 )
 
@@ -30,7 +38,7 @@ async def get_current_user(current_user: CurrentUserDep) -> User:
     "/me",
     operation_id="update-current-user",
     response_model=UserResponse,
-    responses=error_responses(status.HTTP_422_UNPROCESSABLE_CONTENT),
+    responses=error_responses(RequestValidationError),
 )
 async def update_current_user(
     payload: UpdateCurrentUserRequest,
@@ -49,7 +57,7 @@ async def update_current_user(
     "/me/avatar",
     operation_id="set-user-avatar",
     status_code=status.HTTP_501_NOT_IMPLEMENTED,
-    responses=error_responses(status.HTTP_501_NOT_IMPLEMENTED),
+    responses=error_responses(APINotImplementedError),
 )
 async def set_current_user_avatar(current_user: CurrentUserDep) -> None:
     raise APINotImplementedError()
@@ -59,7 +67,7 @@ async def set_current_user_avatar(current_user: CurrentUserDep) -> None:
     "/me/avatar",
     operation_id="delete-user-avatar",
     status_code=status.HTTP_501_NOT_IMPLEMENTED,
-    responses=error_responses(status.HTTP_501_NOT_IMPLEMENTED),
+    responses=error_responses(APINotImplementedError),
 )
 async def delete_current_user_avatar(current_user: CurrentUserDep) -> None:
     raise APINotImplementedError()

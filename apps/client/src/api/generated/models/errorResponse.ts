@@ -8,5 +8,4 @@ import type { ErrorBody } from "./errorBody"
 
 export interface ErrorResponse {
   error: ErrorBody
-  requestId: string
 }
