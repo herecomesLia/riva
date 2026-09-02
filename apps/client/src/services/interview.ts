@@ -17,23 +17,30 @@ import type {
   InterviewTrainingEntryParameters,
   InterviewTrainingEntryPreparationResponse,
 } from "@/models/training-entry"
+import { getProfile } from "@/services/profile"
 
 function realApiUnavailable(): never {
   throw new Error("Real interview API is not implemented.")
 }
 
-export function getInterviewPage(): Promise<InterviewPageResponse> {
-  return env.mock ? interviewMockService.getInterviewPage() : realApiUnavailable()
+export async function getInterviewPage(): Promise<InterviewPageResponse> {
+  return env.mock ? interviewMockService.getInterviewPage(await getProfile()) : realApiUnavailable()
 }
 
-export function startInterview(input: StartInterviewInput): Promise<InterviewMutationResponse> {
-  return env.mock ? interviewMockService.startInterview(input) : realApiUnavailable()
+export async function startInterview(
+  input: StartInterviewInput,
+): Promise<InterviewMutationResponse> {
+  return env.mock
+    ? interviewMockService.startInterview(input, await getProfile())
+    : realApiUnavailable()
 }
 
-export function prepareInterviewTrainingEntry(
+export async function prepareInterviewTrainingEntry(
   input: InterviewTrainingEntryParameters,
 ): Promise<InterviewTrainingEntryPreparationResponse> {
-  return env.mock ? interviewMockService.prepareInterviewTrainingEntry(input) : realApiUnavailable()
+  return env.mock
+    ? interviewMockService.prepareInterviewTrainingEntry(input, await getProfile())
+    : realApiUnavailable()
 }
 
 export function beginInterviewQuestions(

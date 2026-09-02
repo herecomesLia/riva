@@ -7,7 +7,7 @@ import {
   createInterviewSetupResponseMock,
   interviewSetupResponseMock,
 } from "@/mocks/data/interview"
-import { createProfileMockSnapshot } from "@/mocks/data/profile"
+import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 import { createRolesMockResponse } from "@/mocks/data/roles"
 import type { InterviewConfiguration, InterviewSetupResponse } from "@/models/interview"
 import { renderWithProviders } from "@/test/render"
@@ -88,7 +88,7 @@ describe("InterviewView", () => {
       false,
       createInterviewSetupResponseMock(
         createRolesMockResponse("multipleRolesReady"),
-        createProfileMockSnapshot(),
+        careerProfileFixture,
       ),
     )
 

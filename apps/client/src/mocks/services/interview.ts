@@ -1,3 +1,4 @@
+import type { CareerProfileResponse } from "@/api/generated/models"
 import {
   candidateQuestionsPromptMock,
   createCandidateQuestionExchange,
@@ -18,13 +19,16 @@ import {
   type MockInterviewAgentPlan,
 } from "@/mocks/data/interview"
 import {
+  careerProfileFixture,
+  incompleteCareerProfileFixture,
+} from "@/mocks/fixtures/career-profile"
+import {
   clearCompletedInterviewSessions,
   getCompletedInterviewSession,
   listCompletedInterviewSessions,
   saveCompletedInterviewSession,
 } from "@/mocks/repositories/interview"
 import { saveTrainingRecordSnapshot } from "@/mocks/repositories/training-records"
-import { getProfileMockSnapshot } from "@/mocks/services/profile"
 import { getRolesMockSnapshot } from "@/mocks/services/roles"
 import { resetTrainingRecordsMockState } from "@/mocks/services/training-records"
 import { createMockInterviewRecordSnapshot } from "@/mocks/training-record-snapshots"
@@ -85,6 +89,7 @@ type PlanCursor = {
 }
 
 let session = createInterviewMockResponse().session
+let currentCareerProfile: CareerProfileResponse | null = structuredClone(careerProfileFixture)
 let preparedConfiguration: InterviewPageResponse["setup"]["defaultConfiguration"] | null = null
 let selectedAgentScenario: InterviewAgentMockScenario = "singleFollowUp"
 let activePlan: MockInterviewAgentPlan = createInterviewAgentPlanMock({
@@ -112,9 +117,10 @@ function getPersistedSessionSequence() {
   }, 0)
 }
 
-function getSnapshot(): InterviewPageResponse {
+function getSnapshot(profile?: CareerProfileResponse | null): InterviewPageResponse {
+  if (profile !== undefined) currentCareerProfile = copy(profile)
   const rolesSnapshot = getRolesMockSnapshot()
-  const setup = createInterviewSetupResponseMock(rolesSnapshot, getProfileMockSnapshot())
+  const setup = createInterviewSetupResponseMock(rolesSnapshot, currentCareerProfile)
   return copy({
     setup:
       preparedConfiguration === null
@@ -294,6 +300,9 @@ export function resetInterviewMockState(
     clearCompletedInterviewSessions()
   }
   resetTrainingRecordsMockState()
+  currentCareerProfile = copy(
+    scenario === "prerequisiteNotMet" ? incompleteCareerProfileFixture : careerProfileFixture,
+  )
   session = createInterviewMockResponse(scenario).session
   preparedConfiguration = null
   selectedAgentScenario = controller.agentScenario ?? "singleFollowUp"
@@ -325,17 +334,20 @@ export function resetInterviewMockState(
   }
 }
 
-export async function getInterviewPage(): Promise<InterviewPageResponse> {
+export async function getInterviewPage(
+  profile?: CareerProfileResponse | null,
+): Promise<InterviewPageResponse> {
   await consumeOperation("getInterviewPage")
-  return getSnapshot()
+  return getSnapshot(profile)
 }
 
 export async function prepareInterviewTrainingEntry(
   input: InterviewTrainingEntryParameters,
+  profile?: CareerProfileResponse | null,
 ): Promise<InterviewTrainingEntryPreparationResponse> {
   await consumeOperation("prepareInterviewTrainingEntry", 0)
   const rolesSnapshot = getRolesMockSnapshot()
-  const snapshot = getSnapshot()
+  const snapshot = getSnapshot(profile)
   const roleAvailability = resolveTrainingEntryRoleAvailability(
     rolesSnapshot.roles,
     snapshot.setup.targetRoles.map(({ id }) => id),
@@ -351,11 +363,11 @@ export async function prepareInterviewTrainingEntry(
 
 export async function startInterview(
   input: StartInterviewInput,
+  profile?: CareerProfileResponse | null,
 ): Promise<InterviewMutationResponse> {
   await consumeOperation("startInterview")
   const rolesSnapshot = getRolesMockSnapshot()
-  const profileSnapshot = getProfileMockSnapshot()
-  const setup = createInterviewSetupResponseMock(rolesSnapshot, profileSnapshot)
+  const setup = getSnapshot(profile).setup
   const targetRole = rolesSnapshot.roles.find(({ id }) => id === input.targetRoleId)
   if (targetRole === undefined) throw new Error("Interview target role does not exist.")
   if (targetRole.status === "archived") {
@@ -371,10 +383,10 @@ export async function startInterview(
   if (targetRole.jobDescription.status !== "ready") {
     throw new Error("Interview target role job description is not ready.")
   }
-  const profileComplete =
-    profileSnapshot.profile?.status === "active" &&
-    profileSnapshot.profile.completeness.percentage === 100
-  if (!profileComplete) {
+  if (
+    setup.availability.status === "blocked" &&
+    setup.availability.reason === "profileIncomplete"
+  ) {
     throw new Error("Interview prerequisite is not met: profileIncomplete.")
   }
   if (!supportedRounds.includes(input.round)) {

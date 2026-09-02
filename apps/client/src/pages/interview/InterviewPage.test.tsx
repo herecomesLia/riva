@@ -7,7 +7,7 @@ import {
   createInterviewMockResponse,
   createInterviewSetupResponseMock,
 } from "@/mocks/data/interview"
-import { createProfileMockSnapshot } from "@/mocks/data/profile"
+import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 import { createRolesMockResponse } from "@/mocks/data/roles"
 import type { InterviewConfiguration, InterviewPageResponse } from "@/models/interview"
 import {
@@ -68,7 +68,7 @@ function createMultipleReadyRolesResponse(): InterviewPageResponse {
   return {
     setup: createInterviewSetupResponseMock(
       createRolesMockResponse("multipleRolesReady"),
-      createProfileMockSnapshot(),
+      careerProfileFixture,
     ),
     session: null,
   }
@@ -304,7 +304,7 @@ describe("InterviewPage", () => {
     const response: InterviewPageResponse = {
       setup: createInterviewSetupResponseMock(
         createRolesMockResponse("multipleRolesJdMissing"),
-        createProfileMockSnapshot(),
+        careerProfileFixture,
       ),
       session: null,
     }

@@ -1,10 +1,11 @@
+import type { CareerProfileResponse } from "@/api/generated/models"
+import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 import type {
   InterviewCandidateQuestionExchangeResponse,
   InterviewSetupResponse,
 } from "@/models/interview"
 import type { RolesPageResponse } from "@/models/roles"
 
-import { profileResponseMock, type JobProfileSnapshot } from "../profile"
 import { createRolesMockResponse } from "../roles"
 import { supportedInterviewRoundsByTargetRoleId } from "./question-catalog"
 
@@ -19,7 +20,7 @@ export const interviewSetupConfigurationMock = {
 
 export function createInterviewSetupResponseMock(
   rolesResponse: RolesPageResponse,
-  profileSnapshot: JobProfileSnapshot,
+  profile: CareerProfileResponse | null,
 ): InterviewSetupResponse {
   const domainRoles = rolesResponse.roles.filter(({ status }) => status !== "archived")
   const trainableRoles = domainRoles.filter(
@@ -46,8 +47,11 @@ export function createInterviewSetupResponseMock(
     ? interviewSetupConfigurationMock.defaultRound
     : (defaultInterviewRole?.supportedRounds[0] ?? interviewSetupConfigurationMock.defaultRound)
   const profileComplete =
-    profileSnapshot.profile?.status === "active" &&
-    profileSnapshot.profile.completeness.percentage === 100
+    profile !== null &&
+    profile.education.length > 0 &&
+    profile.workExperiences.length > 0 &&
+    profile.projects.length > 0 &&
+    profile.skills.length > 0
   const availability: InterviewSetupResponse["availability"] =
     !profileComplete && domainRoles.length > 0
       ? { status: "blocked", reason: "profileIncomplete" }
@@ -71,7 +75,7 @@ export function createInterviewSetupResponseMock(
 
 export const interviewSetupResponseMock = createInterviewSetupResponseMock(
   createRolesMockResponse("multipleRoles"),
-  profileResponseMock,
+  careerProfileFixture,
 )
 
 export const interviewOpeningMessageMock =

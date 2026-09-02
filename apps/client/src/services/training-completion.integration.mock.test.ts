@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 import { resetInterviewMockState } from "@/mocks/services/interview"
 import { resetPracticeMockState } from "@/mocks/services/practice"
-import { resetProfileMockState } from "@/mocks/services/profile"
 import { resetRolesMockState } from "@/mocks/services/roles"
 import { resetTrainingRecordsMockState } from "@/mocks/services/training-records"
 import {
@@ -16,6 +16,7 @@ import {
 } from "@/services/interview"
 import { getDashboardData } from "@/services/dashboard"
 import { endPracticeSession, getPracticePage, requestEndPracticeSession } from "@/services/practice"
+import { getProfile } from "@/services/profile"
 import { getRolesPage, updateTargetRole } from "@/services/roles"
 import {
   getMockInterviewRecord,
@@ -24,10 +25,12 @@ import {
   listTrainingRecords,
 } from "@/services/training-records"
 
+vi.mock("@/services/profile", () => ({ getProfile: vi.fn() }))
+
 beforeEach(() => {
   vi.useFakeTimers()
   resetRolesMockState()
-  resetProfileMockState()
+  vi.mocked(getProfile).mockResolvedValue(structuredClone(careerProfileFixture))
   resetInterviewMockState("setupReady", {
     agentScenario: "noFollowUps",
     defaultDelayMs: 0,

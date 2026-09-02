@@ -40,6 +40,11 @@ export const careerProfileFixture = {
   updatedAt: "2025-01-15T08:00:00Z",
 } satisfies CareerProfileResponse
 
+export const incompleteCareerProfileFixture = {
+  ...careerProfileFixture,
+  projects: [],
+} satisfies CareerProfileResponse
+
 export const resumeImportedCareerProfileFixture = {
   education: [
     {

@@ -7,7 +7,7 @@ import {
   createInterviewSetupResponseMock,
   interviewOpeningMessageMock,
 } from "@/mocks/data/interview"
-import { createProfileMockSnapshot } from "@/mocks/data/profile"
+import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 import { createRolesMockResponse } from "@/mocks/data/roles"
 import type {
   GetInterviewReviewResponse,
@@ -35,13 +35,13 @@ export function createInterviewSetupStoryFixture(
   if (scenario === "multipleRolesReady") {
     return createInterviewSetupResponseMock(
       createRolesMockResponse("multipleRolesReady"),
-      createProfileMockSnapshot(),
+      careerProfileFixture,
     )
   }
   if (scenario === "jobDescriptionMissing") {
     return createInterviewSetupResponseMock(
       createRolesMockResponse("multipleRolesJdMissing"),
-      createProfileMockSnapshot(),
+      careerProfileFixture,
     )
   }
   return structuredClone(createInterviewMockResponse(scenario).setup)

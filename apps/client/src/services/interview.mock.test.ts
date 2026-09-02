@@ -7,6 +7,10 @@ import {
   type InterviewAgentMockScenario,
 } from "@/mocks/data/interview"
 import {
+  careerProfileFixture,
+  incompleteCareerProfileFixture,
+} from "@/mocks/fixtures/career-profile"
+import {
   beginInterviewQuestions,
   endInterview,
   finishInterview,
@@ -28,7 +32,6 @@ import {
   saveJobDescription,
   updateTargetRole,
 } from "@/mocks/services/roles"
-import { getProfileMockSnapshot, resetProfileMockState } from "@/mocks/services/profile"
 import type {
   GetInterviewReviewResponse,
   InterviewCandidateQuestionsSessionResponse,
@@ -60,7 +63,6 @@ function createPlan(
 
 beforeEach(() => {
   resetRolesMockState()
-  resetProfileMockState()
   resetScenario()
 })
 
@@ -1098,14 +1100,22 @@ describe("interview mock reset boundaries", () => {
 
   it("tracks profile completeness and whether any catalog role has a ready JD", async () => {
     resetRolesMockState("roleWithParsedJobDescription")
-    resetProfileMockState("partial")
-    expect((await getInterviewPage()).setup.availability).toEqual({
+    expect((await getInterviewPage(null)).setup.availability).toEqual({
       status: "blocked",
       reason: "profileIncomplete",
     })
 
-    resetProfileMockState()
-    expect((await getInterviewPage()).setup.availability).toEqual({ status: "available" })
+    expect((await getInterviewPage(incompleteCareerProfileFixture)).setup.availability).toEqual({
+      status: "blocked",
+      reason: "profileIncomplete",
+    })
+    await expect(startInterview(defaultInterviewConfigurationMock)).rejects.toThrow(
+      "Interview prerequisite is not met: profileIncomplete.",
+    )
+
+    expect((await getInterviewPage(careerProfileFixture)).setup.availability).toEqual({
+      status: "available",
+    })
 
     resetRolesMockState("singleRoleWithoutJobDescription")
     expect((await getInterviewPage()).setup.availability).toEqual({
@@ -1257,8 +1267,7 @@ describe("interview mock reset boundaries", () => {
 
   it("does not let returned setup mutations contaminate roles, profile, or later responses", async () => {
     const originalRoles = getRolesMockSnapshot()
-    const originalProfile = getProfileMockSnapshot()
-    const first = await getInterviewPage()
+    const first = await getInterviewPage(careerProfileFixture)
     first.setup.targetRoles[0]!.title = "污染后的岗位"
     first.setup.targetRoles.splice(0)
     first.setup.defaultConfiguration.targetRoleId = null
@@ -1268,7 +1277,6 @@ describe("interview mock reset boundaries", () => {
     }
 
     expect(getRolesMockSnapshot()).toEqual(originalRoles)
-    expect(getProfileMockSnapshot()).toEqual(originalProfile)
     expect(await getInterviewPage()).toMatchObject({
       setup: {
         availability: { status: "available" },
@@ -1347,12 +1355,14 @@ describe("interview history training entry", () => {
     })
 
     resetRolesMockState("multipleRolesReady")
-    resetProfileMockState("partial")
     resetScenario()
-    const blocked = await prepareInterviewTrainingEntry({
-      targetRoleId: "role_frontend_bytedance",
-      round: "technical",
-    })
+    const blocked = await prepareInterviewTrainingEntry(
+      {
+        targetRoleId: "role_frontend_bytedance",
+        round: "technical",
+      },
+      incompleteCareerProfileFixture,
+    )
     expect(blocked.resolution).toMatchObject({
       status: "roleUnavailable",
       reason: "targetRolePrerequisiteUnavailable",

@@ -1,3 +1,7 @@
+import {
+  careerProfileFixture,
+  incompleteCareerProfileFixture,
+} from "@/mocks/fixtures/career-profile"
 import type {
   CompletedInterviewQuestionResponse,
   GetInterviewReviewResponse,
@@ -12,7 +16,6 @@ import type {
   InterviewSessionReviewResponse,
 } from "@/models/interview"
 
-import { createProfileMockSnapshot, profileResponseMock } from "../profile"
 import { createRolesMockResponse } from "../roles"
 import { createInterviewAgentPlanMock, type InterviewAgentMockScenario } from "./agent-plans"
 import { getInterviewMockAnswer } from "./question-catalog"
@@ -167,7 +170,7 @@ export function createInterviewMockResponse(
     return {
       setup: createInterviewSetupResponseMock(
         createRolesMockResponse("noRoles"),
-        profileResponseMock,
+        careerProfileFixture,
       ),
       session: null,
     }
@@ -185,7 +188,7 @@ export function createInterviewMockResponse(
     return {
       setup: createInterviewSetupResponseMock(
         createRolesMockResponse("multipleRoles"),
-        createProfileMockSnapshot("partial"),
+        incompleteCareerProfileFixture,
       ),
       session: null,
     }
