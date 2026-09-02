@@ -1,9 +1,115 @@
-import type {
-  JobProfile,
-  JobProfileSnapshot,
-  ResumeFile,
-  ResumeRecognition,
-} from "@/models/profile"
+import type { ResumeImportInput } from "@/models/profile"
+
+export type ProfileStatus =
+  "draft" | "uploadingResume" | "parsingResume" | "recognitionFailed" | "active"
+export type ProfileSource = "resumeExtracted" | "userEdited" | "userAdded"
+export type ResumeProcessingStatus = "uploaded" | "parsing" | "succeeded" | "failed"
+export type ProfileSection = "education" | "workExperience" | "projectExperience" | "skills"
+export type ResumeFile = {
+  id: string
+  fileName: string
+  mimeType: string
+  fileSize: number
+  uploadedAt: string
+  parsedAt: string | null
+  processingStatus: ResumeProcessingStatus
+  failureReason: string | null
+}
+export type EducationExperience = {
+  id: string
+  school: string
+  degree: string | null
+  major: string | null
+  startDate: string | null
+  endDate: string | null
+  isCurrent: boolean
+  source: ProfileSource
+}
+export type EmploymentType = "fullTime" | "partTime" | "internship" | "contract" | "freelance"
+export type WorkExperience = {
+  id: string
+  company: string
+  title: string
+  employmentType: EmploymentType
+  location: string | null
+  startDate: string | null
+  endDate: string | null
+  isCurrent: boolean
+  responsibilities: string[]
+  achievements: string[]
+  skillIds: string[]
+  source: ProfileSource
+}
+export type ProjectExperience = {
+  id: string
+  name: string
+  role: string | null
+  startDate: string | null
+  endDate: string | null
+  responsibilities: string[]
+  achievements: string[]
+  technologyStack: string[]
+  projectUrl: string | null
+  source: ProfileSource
+}
+export type ProfileSkill = { id: string; name: string; source: ProfileSource }
+export type JobProfile = {
+  profileId: string
+  status: ProfileStatus
+  completeness: { percentage: number; missingSections: ProfileSection[] }
+  updatedAt: string
+  version: number
+  resume: ResumeFile | null
+  education: EducationExperience[]
+  workExperiences: WorkExperience[]
+  projectExperiences: ProjectExperience[]
+  skills: ProfileSkill[]
+}
+export type ResumeRecognition = {
+  resumeId: string
+  processingStatus: ResumeProcessingStatus
+  completedAt: string | null
+  failureReason: string | null
+}
+export type ResumeUpdate = {
+  id: string
+  resume: ResumeFile
+  createdAt: string
+  status: "uploading" | "parsing" | "succeeded" | "failed"
+  changeSummary: { changedItems: number; missingItems: number; newItems: number } | null
+  failureReason: string | null
+  preservesManualChanges: boolean
+}
+export type JobProfileSnapshot = {
+  profile: JobProfile | null
+  recognition: ResumeRecognition | null
+  resumeUpdate: ResumeUpdate | null
+}
+export type ProfileSectionValueMap = {
+  education: EducationExperience[]
+  workExperience: WorkExperience[]
+  projectExperience: ProjectExperience[]
+  skills: ProfileSkill[]
+}
+type SaveStandardProfileSectionInput = {
+  [Section in ProfileSection]: {
+    profileId: string
+    version: number
+    section: Section
+    values: ProfileSectionValueMap[Section]
+  }
+}[Exclude<ProfileSection, "workExperience">]
+export type NewProfileSkillInput = { clientId: string; name: string }
+type SaveWorkExperienceSectionInput = {
+  profileId: string
+  version: number
+  section: "workExperience"
+  values: WorkExperience[]
+  skillsToCreate: NewProfileSkillInput[]
+}
+export type SaveProfileSectionInput =
+  SaveStandardProfileSectionInput | SaveWorkExperienceSectionInput
+export type ResumeUploadInput = ResumeImportInput
 
 function createResume(overrides: Partial<ResumeFile> = {}): ResumeFile {
   return {

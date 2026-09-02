@@ -22,17 +22,16 @@ export function EmptySection() {
 export function DateRange({
   className,
   endDate,
-  isCurrent,
   startDate,
 }: {
   className?: string
   endDate: string | null
-  isCurrent: boolean
-  startDate: string | null
+  startDate: string
 }) {
   const { i18n, t } = useTranslation()
   const start = formatMonth(startDate, i18n.language, "—")
-  const end = isCurrent ? t("profile.field.present") : formatMonth(endDate, i18n.language, "—")
+  const end =
+    endDate === null ? t("profile.field.present") : formatMonth(endDate, i18n.language, "—")
 
   return (
     <span className={cn("text-sm text-muted-foreground", className)}>

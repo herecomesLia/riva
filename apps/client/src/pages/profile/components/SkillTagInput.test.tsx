@@ -1,41 +1,26 @@
 import { screen } from "@testing-library/react"
-import { useState } from "react"
 import userEvent from "@testing-library/user-event"
+import { useState } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
-import { profileResponseMock } from "@/mocks/data/profile"
-import type { ProfileSkill } from "@/models/profile"
 import { renderWithProviders } from "@/test/render"
 
 import { SkillTagInput } from "./SkillTagInput"
 
-function StatefulSkillTagInput({
-  onDraftSkillsChange,
-  onSelectedSkillIdsChange,
-}: {
-  onDraftSkillsChange: (skills: unknown[]) => void
-  onSelectedSkillIdsChange: (ids: string[]) => void
-}) {
-  const [draftSkills, setDraftSkills] = useState<ProfileSkill[]>([])
-  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([])
-
+function StatefulSkillTagInput({ onChange }: { onChange: (skills: string[]) => void }) {
+  const [skills, setSkills] = useState<string[]>([])
   return (
     <SkillTagInput
-      availableSkills={[]}
-      description="Select from existing skills, or enter a new skill."
-      draftSkills={draftSkills}
+      availableSkills={["React", "TypeScript"]}
+      description="Select or enter a skill."
       label="Related skills"
-      onDraftSkillsChange={(skills) => {
-        setDraftSkills(skills)
-        onDraftSkillsChange(skills)
+      onSelectedSkillsChange={(next) => {
+        setSkills(next)
+        onChange(next)
       }}
-      onSelectedSkillIdsChange={(ids) => {
-        setSelectedSkillIds(ids)
-        onSelectedSkillIdsChange(ids)
-      }}
-      selectedSkillIds={selectedSkillIds}
+      selectedSkills={skills}
     />
   )
 }
@@ -45,94 +30,61 @@ describe("SkillTagInput", () => {
     await i18n.changeLanguage(defaultLanguage)
   })
 
-  it("adds existing skills by name and never exposes their ids", async () => {
+  it("adds an existing skill by its canonical name", async () => {
     const user = userEvent.setup()
-    const onSelectedSkillIdsChange = vi.fn()
-    renderWithProviders(
-      <SkillTagInput
-        availableSkills={profileResponseMock.profile!.skills}
-        description="Select from existing skills, or enter a new skill."
-        draftSkills={[]}
-        label="Related skills"
-        onDraftSkillsChange={vi.fn()}
-        onSelectedSkillIdsChange={onSelectedSkillIdsChange}
-        selectedSkillIds={[]}
-      />,
-      { router: false },
-    )
-
-    await user.type(
-      screen.getByRole("combobox", { name: i18n.t("profile.editor.skillInputPlaceholder") }),
-      "React",
-    )
-    await user.keyboard("{Enter}")
-
-    expect(onSelectedSkillIdsChange).toHaveBeenCalledWith(["skill_react"])
-    expect(screen.queryByText("skill_react")).not.toBeInTheDocument()
-  })
-
-  it("creates one reusable temporary skill without removing it on Backspace", async () => {
-    const user = userEvent.setup()
-    const onDraftSkillsChange = vi.fn()
-    const onSelectedSkillIdsChange = vi.fn()
-    renderWithProviders(
-      <StatefulSkillTagInput
-        onDraftSkillsChange={onDraftSkillsChange}
-        onSelectedSkillIdsChange={onSelectedSkillIdsChange}
-      />,
-      { router: false },
-    )
-
+    const onChange = vi.fn()
+    renderWithProviders(<StatefulSkillTagInput onChange={onChange} />, { router: false })
     const input = screen.getByRole("combobox", {
       name: i18n.t("profile.editor.skillInputPlaceholder"),
     })
+
+    await user.type(input, "react")
+    await user.keyboard("{Enter}")
+
+    expect(onChange).toHaveBeenCalledWith(["React"])
+    expect(screen.getByText("React")).toBeInTheDocument()
+  })
+
+  it("adds a new skill directly and keeps it on Backspace", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    renderWithProviders(<StatefulSkillTagInput onChange={onChange} />, { router: false })
+    const input = screen.getByRole("combobox", {
+      name: i18n.t("profile.editor.skillInputPlaceholder"),
+    })
+
     await user.type(input, "Accessibility")
     await user.keyboard("{Enter}")
 
-    expect(onDraftSkillsChange).toHaveBeenCalledWith([
-      expect.objectContaining({
-        id: expect.stringMatching(/^draft_skill_/),
-        name: "Accessibility",
-      }),
-    ])
-    expect(onSelectedSkillIdsChange).toHaveBeenCalledWith([expect.stringMatching(/^draft_skill_/)])
-
+    expect(onChange).toHaveBeenCalledWith(["Accessibility"])
     await user.keyboard("{Backspace}")
-    expect(onSelectedSkillIdsChange).toHaveBeenCalledOnce()
+    expect(onChange).toHaveBeenCalledOnce()
     expect(screen.getByText("Accessibility")).toBeInTheDocument()
   })
 
-  it("shows a field error without changing selected skills when the input is duplicated", async () => {
+  it("reports a duplicate without changing selected skills", async () => {
     const user = userEvent.setup()
-    const onSelectedSkillIdsChange = vi.fn()
+    const onChange = vi.fn()
     renderWithProviders(
       <SkillTagInput
-        availableSkills={profileResponseMock.profile!.skills}
-        description="Select from existing skills, or enter a new skill."
-        draftSkills={[]}
+        availableSkills={["React", "TypeScript"]}
+        description="Select or enter a skill."
         label="Related skills"
-        onDraftSkillsChange={vi.fn()}
-        onSelectedSkillIdsChange={onSelectedSkillIdsChange}
-        selectedSkillIds={["skill_react"]}
+        onSelectedSkillsChange={onChange}
+        selectedSkills={["React"]}
       />,
       { router: false },
     )
-
     const input = screen.getByRole("combobox", {
       name: i18n.t("profile.editor.skillInputPlaceholder"),
     })
+
     await user.type(input, " react ")
     await user.keyboard("{Enter}")
 
-    const error = screen.getByRole("alert")
-    expect(error).toHaveTextContent(i18n.t("profile.editor.validation.duplicateSkill"))
-    expect(screen.getByText("Related skills")).toHaveClass("text-foreground")
-    expect(input).toHaveAttribute("aria-invalid", "true")
-    expect(input).toHaveAttribute("aria-describedby", error.id)
-    expect(onSelectedSkillIdsChange).not.toHaveBeenCalled()
-
-    await user.type(input, "TypeScript")
-    expect(error).toHaveAttribute("aria-hidden", "true")
-    expect(input).not.toHaveAttribute("aria-invalid", "true")
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      i18n.t("profile.editor.validation.duplicateSkill"),
+    )
+    expect(onChange).not.toHaveBeenCalled()
   })
 })

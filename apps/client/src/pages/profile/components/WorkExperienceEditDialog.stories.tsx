@@ -1,7 +1,7 @@
 import preview from "#storybook/preview"
 import { screen } from "storybook/test"
 
-import { profileResponseMock } from "@/mocks/data/profile"
+import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 
 import { ProfileSectionEditDialog } from "./ProfileSectionEditDialog"
 import { createProfileEditDialogArgs } from "./profile-edit-dialog-story-helpers"
@@ -13,7 +13,7 @@ const meta = preview.meta({
 
 export const Default = meta.story({ args: createProfileEditDialogArgs("workExperience") })
 
-const structuredBulletsProfile = structuredClone(profileResponseMock.profile!)
+const structuredBulletsProfile = structuredClone(careerProfileFixture)
 structuredBulletsProfile.workExperiences[0]!.responsibilities = [
   "负责前端架构设计",
   "维护公共组件库",

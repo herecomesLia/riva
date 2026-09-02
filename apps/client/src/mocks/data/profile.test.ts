@@ -5,7 +5,11 @@ import {
   type ProfileMockScenario,
   profileResponseMock,
 } from "@/mocks/data/profile"
-import type { JobProfileSnapshot, ProfileStatus, ResumeProcessingStatus } from "@/models/profile"
+import type {
+  JobProfileSnapshot,
+  ProfileStatus,
+  ResumeProcessingStatus,
+} from "@/mocks/data/profile"
 
 const scenarios: ProfileMockScenario[] = [
   "complete",

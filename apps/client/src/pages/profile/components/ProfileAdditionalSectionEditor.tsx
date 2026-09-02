@@ -4,19 +4,19 @@ import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
 
+import type { CareerProfileResponse, UpdateCareerProfileRequest } from "@/api/generated/models"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { DialogFooter } from "@/components/ui/dialog"
 import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { skillSchema } from "@/schemas/profile"
-import type { JobProfile, SaveProfileSectionInput } from "@/models/profile"
 
 type ProfileAdditionalSectionEditorProps = {
   onCancel: () => void
   onDirtyChange: (isDirty: boolean) => void
-  onSave: (input: SaveProfileSectionInput) => Promise<void>
-  profile: JobProfile
+  onSave: (input: UpdateCareerProfileRequest) => Promise<void>
+  profile: CareerProfileResponse
   section: "skills"
 }
 
@@ -108,7 +108,10 @@ export function ProfileAdditionalSectionEditor({
   const [validationError, setValidationError] = useState<string | null>(null)
   const form = useForm({
     defaultValues: {
-      items: structuredClone(profile.skills).map(({ source: _source, ...item }) => item),
+      items: structuredClone(profile.skills).map((name) => ({
+        clientId: createTemporaryId(),
+        name,
+      })),
     },
     validators: { onSubmit: z.object({ items: z.array(skillSchema) }) },
     onSubmit: async ({ value }: { value: any }) => {
@@ -121,14 +124,14 @@ export function ProfileAdditionalSectionEditor({
       }
 
       try {
+        const skills = value.items.map((item: { name: string }) => item.name.trim())
+        const allowedSkills = new Set(skills)
         await onSave({
-          profileId: profile.profileId,
-          section,
-          values: value.items.map(({ source: _source, ...item }: any) => ({
-            ...item,
-            name: item.name.trim(),
+          skills,
+          workExperiences: profile.workExperiences.map((experience) => ({
+            ...experience,
+            skills: experience.skills?.filter((skill) => allowedSkills.has(skill)),
           })),
-          version: profile.version,
         })
       } catch {
         setSaveError(true)
@@ -138,7 +141,10 @@ export function ProfileAdditionalSectionEditor({
 
   function addItem() {
     const items = form.state.values.items ?? []
-    form.setFieldValue("items" as never, [...items, { id: createTemporaryId(), name: "" }] as never)
+    form.setFieldValue(
+      "items" as never,
+      [...items, { clientId: createTemporaryId(), name: "" }] as never,
+    )
   }
 
   return (
@@ -187,8 +193,8 @@ function SkillFields({ form, onAdd }: { form: any; onAdd: () => void }) {
             {items.map((item, index) => (
               <div
                 className="grid min-w-0 gap-3 rounded-xl border p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
-                data-testid={`profile-editor-item-${item.id}`}
-                key={item.id}
+                data-testid={`profile-editor-item-${item.clientId}`}
+                key={item.clientId}
               >
                 <TextField
                   form={form}
@@ -201,7 +207,7 @@ function SkillFields({ form, onAdd }: { form: any; onAdd: () => void }) {
                   onClick={() => {
                     form.setFieldValue(
                       "items" as never,
-                      items.filter((candidate) => candidate.id !== item.id) as never,
+                      items.filter((candidate) => candidate.clientId !== item.clientId) as never,
                     )
                   }}
                   type="button"

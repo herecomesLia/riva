@@ -20,67 +20,46 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { normalizeSkillName, parseSkillNames } from "@/models/profile-text"
-import type { ProfileSkill } from "@/models/profile"
 
 type SkillTagInputProps = {
-  availableSkills: ProfileSkill[]
+  availableSkills: string[]
   description: string
-  draftSkills: ProfileSkill[]
   label: string
-  onDraftSkillsChange: (skills: ProfileSkill[]) => void
-  onSelectedSkillIdsChange: (ids: string[]) => void
-  selectedSkillIds: string[]
-}
-
-function createDraftSkill(name: string): ProfileSkill {
-  return { id: `draft_skill_${crypto.randomUUID()}`, name, source: "userAdded" }
+  onSelectedSkillsChange: (skills: string[]) => void
+  selectedSkills: string[]
 }
 
 export function SkillTagInput({
   availableSkills,
   description,
-  draftSkills,
   label,
-  onDraftSkillsChange,
-  onSelectedSkillIdsChange,
-  selectedSkillIds,
+  onSelectedSkillsChange,
+  selectedSkills,
 }: SkillTagInputProps) {
   const { t } = useTranslation()
   const [hasDuplicate, setHasDuplicate] = useState(false)
   const [inputValue, setInputValue] = useState("")
-  const allSkills = [...availableSkills, ...draftSkills]
-  const selectedSkills = selectedSkillIds
-    .map((id) => allSkills.find((skill) => skill.id === id))
-    .filter((skill): skill is ProfileSkill => Boolean(skill))
-  const candidates = allSkills.filter((skill) => !selectedSkillIds.includes(skill.id))
+  const selectedNames = new Set(selectedSkills.map(normalizeSkillName))
+  const candidates = availableSkills.filter(
+    (skill) => !selectedNames.has(normalizeSkillName(skill)),
+  )
 
   function addSkillsByName(names: string[]) {
-    const selectedNames = new Set(selectedSkills.map((skill) => normalizeSkillName(skill.name)))
     if (names.some((name) => selectedNames.has(normalizeSkillName(name)))) {
       setHasDuplicate(true)
       return false
     }
 
-    const nextDraftSkills = [...draftSkills]
-    const nextSelectedSkillIds = [...selectedSkillIds]
-
+    const nextSkills = [...selectedSkills]
     names.forEach((name) => {
       const normalizedName = normalizeSkillName(name)
       if (!normalizedName) return
 
-      const existing = [...availableSkills, ...nextDraftSkills].find(
-        (skill) => normalizeSkillName(skill.name) === normalizedName,
-      )
-      const skill = existing ?? createDraftSkill(name.trim().replace(/\s+/g, " "))
-
-      if (!existing) nextDraftSkills.push(skill)
-      if (!nextSelectedSkillIds.includes(skill.id)) nextSelectedSkillIds.push(skill.id)
+      const existing = availableSkills.find((skill) => normalizeSkillName(skill) === normalizedName)
+      nextSkills.push(existing ?? name.trim().replace(/\s+/g, " "))
     })
 
-    if (nextDraftSkills.length !== draftSkills.length) onDraftSkillsChange(nextDraftSkills)
-    if (nextSelectedSkillIds.length !== selectedSkillIds.length) {
-      onSelectedSkillIdsChange(nextSelectedSkillIds)
-    }
+    if (nextSkills.length !== selectedSkills.length) onSelectedSkillsChange(nextSkills)
     setHasDuplicate(false)
     return true
   }
@@ -95,14 +74,14 @@ export function SkillTagInput({
       <FieldDescription>{description}</FieldDescription>
       <div className="flex flex-wrap gap-2">
         {selectedSkills.map((skill) => (
-          <Badge className="h-7 bg-sky-100 text-primary dark:bg-sky-950" key={skill.id}>
-            {skill.name}
+          <Badge className="h-7 bg-sky-100 text-primary dark:bg-sky-950" key={skill}>
+            {skill}
             <Button
-              aria-label={t("profile.editor.removeSkill", { name: skill.name })}
+              aria-label={t("profile.editor.removeSkill", { name: skill })}
               className="-mr-1 size-4 rounded-full p-0"
               onClick={() => {
                 setHasDuplicate(false)
-                onSelectedSkillIdsChange(selectedSkillIds.filter((id) => id !== skill.id))
+                onSelectedSkillsChange(selectedSkills.filter((name) => name !== skill))
               }}
               size="icon-xs"
               type="button"
@@ -113,12 +92,12 @@ export function SkillTagInput({
           </Badge>
         ))}
       </div>
-      <Combobox<ProfileSkill>
+      <Combobox<string>
         items={candidates}
-        itemToStringLabel={(skill) => skill.name}
+        itemToStringLabel={(skill) => skill}
         onInputValueChange={setInputValue}
-        onValueChange={(skill: ProfileSkill | null) => {
-          if (skill && addSkillsByName([skill.name])) setInputValue("")
+        onValueChange={(skill) => {
+          if (skill && addSkillsByName([skill])) setInputValue("")
         }}
         value={null}
       >
@@ -142,9 +121,9 @@ export function SkillTagInput({
           <ComboboxList>
             <ComboboxEmpty>{t("profile.editor.skillNotFound")}</ComboboxEmpty>
             {candidates.map((skill) => (
-              <ComboboxItem key={skill.id} value={skill}>
+              <ComboboxItem key={skill} value={skill}>
                 <CodeXmlIcon />
-                {skill.name}
+                {skill}
               </ComboboxItem>
             ))}
           </ComboboxList>

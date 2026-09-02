@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { profileResponseMock } from "@/mocks/data/profile"
-import { resetProfileMockState } from "@/mocks/services/profile"
 import {
   createManualJobProfile,
   getJobProfile,
@@ -13,7 +12,8 @@ import {
   startUpdatedResumeRecognition,
   uploadInitialResume,
   uploadUpdatedResume,
-} from "@/services/profile"
+  resetProfileMockState,
+} from "@/mocks/services/profile"
 
 describe("profile mock service", () => {
   beforeEach(() => {

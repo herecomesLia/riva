@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import type { ResumeUpdate } from "@/models/profile"
+import type { ResumeImportInput } from "@/models/profile"
 
 export function ResumeImportForm({
   embedded = false,
@@ -24,7 +24,7 @@ export function ResumeImportForm({
 }: {
   embedded?: boolean
   isSubmitting: boolean
-  onSubmit: (input: { file?: File; text?: string }) => Promise<void>
+  onSubmit: (input: ResumeImportInput) => Promise<void>
   title: string
 }) {
   const { t } = useTranslation()
@@ -120,58 +120,5 @@ export function ResumeImportForm({
       <CardContent className="flex flex-col gap-5">{fields}</CardContent>
       <CardFooter>{submit}</CardFooter>
     </Card>
-  )
-}
-
-export function ResumeUpdateSummary({ resumeUpdate }: { resumeUpdate: ResumeUpdate }) {
-  const { t } = useTranslation()
-  const summary = resumeUpdate.changeSummary
-
-  const content =
-    resumeUpdate.status === "parsing" || resumeUpdate.status === "uploading" ? (
-      <Alert>
-        <LoaderCircleIcon />
-        <AlertDescription>{t("profile.import.processing")}</AlertDescription>
-      </Alert>
-    ) : resumeUpdate.status === "failed" ? (
-      <Alert variant="destructive">
-        <AlertCircleIcon />
-        <AlertDescription>
-          {resumeUpdate.failureReason ?? t("profile.import.failed")}
-        </AlertDescription>
-      </Alert>
-    ) : resumeUpdate.status === "succeeded" ? (
-      <>
-        <Alert>
-          <FileTextIcon />
-          <AlertDescription>{t("profile.import.manualChangesProtected")}</AlertDescription>
-        </Alert>
-        {summary && (
-          <dl className="grid gap-3 text-sm sm:grid-cols-3">
-            <div>
-              <dt className="text-muted-foreground">{t("profile.import.newItems")}</dt>
-              <dd className="text-lg font-medium">{summary.newItems}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">{t("profile.import.changedItems")}</dt>
-              <dd className="text-lg font-medium">{summary.changedItems}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">{t("profile.import.missingItems")}</dt>
-              <dd className="text-lg font-medium">{summary.missingItems}</dd>
-            </div>
-          </dl>
-        )}
-      </>
-    ) : null
-
-  return (
-    <section className="flex flex-col gap-4" data-testid="profile-resume-update-summary">
-      <div className="flex flex-col gap-1">
-        <h3 className="font-medium">{t("profile.import.updateTitle")}</h3>
-        <p className="text-sm text-muted-foreground">{t("profile.import.updateDescription")}</p>
-      </div>
-      <div className="flex flex-col gap-4">{content}</div>
-    </section>
   )
 }

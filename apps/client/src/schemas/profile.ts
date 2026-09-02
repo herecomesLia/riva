@@ -1,18 +1,15 @@
 import { z } from "zod"
 
-import {
-  normalizeBulletItems,
-  normalizeSkillIds,
-  normalizeTechnologyStack,
-} from "@/models/profile-text"
+import type { EmploymentType } from "@/api/generated/models"
+import { normalizeBulletItems, normalizeTechnologyStack } from "@/models/profile-text"
 
 export const profileEmploymentTypes = [
-  "fullTime",
-  "partTime",
+  "full-time",
+  "part-time",
   "internship",
   "contract",
   "freelance",
-] as const
+] as const satisfies readonly EmploymentType[]
 const requiredText = z.string().trim().min(1, "required")
 export const profileOptionalTextSchema = z.string()
 const optionalText = profileOptionalTextSchema
@@ -22,10 +19,10 @@ const bulletItemsSchema = z
   .default([])
   .transform(normalizeBulletItems)
   .pipe(z.array(bulletItemSchema))
-const skillIdsSchema = z
+const skillsSchema = z
   .array(z.string())
   .default([])
-  .transform(normalizeSkillIds)
+  .transform(normalizeTechnologyStack)
   .pipe(z.array(requiredText))
 const technologyStackSchema = z
   .array(z.string())
@@ -49,34 +46,34 @@ const dateRangeSchema = z
   })
 
 export const educationItemSchema = dateRangeSchema.extend({
+  clientId: requiredText,
   degree: optionalText,
-  id: requiredText,
   major: optionalText,
   school: requiredText,
 })
 
 export const workItemSchema = dateRangeSchema.extend({
   achievements: bulletItemsSchema,
+  clientId: requiredText,
   company: requiredText,
-  employmentType: z.enum(profileEmploymentTypes, "employmentType"),
-  id: requiredText,
+  employmentType: z.union([z.enum(profileEmploymentTypes), z.literal("")]),
   location: optionalText,
   responsibilities: bulletItemsSchema,
-  skillIds: skillIdsSchema,
+  skills: skillsSchema,
   title: requiredText,
 })
 
 export const projectItemSchema = dateRangeSchema.extend({
   achievements: bulletItemsSchema,
-  id: requiredText,
+  clientId: requiredText,
+  description: bulletItemsSchema,
   name: requiredText,
-  projectUrl: optionalText.refine((value) => !value || URL.canParse(value), "url"),
-  responsibilities: bulletItemsSchema,
   role: optionalText,
-  technologyStack: technologyStackSchema,
+  techStack: technologyStackSchema,
+  url: optionalText.refine((value) => !value || URL.canParse(value), "url"),
 })
 
 export const skillSchema = z.object({
-  id: requiredText,
+  clientId: requiredText,
   name: requiredText,
 })

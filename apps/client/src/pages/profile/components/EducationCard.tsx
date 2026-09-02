@@ -1,7 +1,7 @@
 import { CalendarDaysIcon, GraduationCapIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import type { JobProfile } from "@/models/profile"
+import type { EducationEntryResponse } from "@/api/generated/models"
 
 import { ProfileItemCarousel } from "./ProfileItemCarousel"
 import { ProfileSectionCard } from "./ProfileSectionCard"
@@ -9,7 +9,7 @@ import { EmptySection } from "./profile-section-shared"
 import { formatMonth } from "./profile-formatters"
 
 export type EducationCardProps = {
-  education: JobProfile["education"]
+  education: EducationEntryResponse[]
   onEdit: () => void
 }
 
@@ -27,7 +27,7 @@ export function EducationCard({ education, onEdit }: EducationCardProps) {
         <EmptySection />
       ) : (
         <ProfileItemCarousel
-          getItemKey={(item) => item.id}
+          getItemKey={(item) => `${item.school}-${item.startDate}-${item.endDate ?? "present"}`}
           itemCardClassName="border-border bg-card py-4"
           items={education}
           renderItem={(item) => {
@@ -48,11 +48,7 @@ export function EducationCard({ education, onEdit }: EducationCardProps) {
                     </p>
                   )}
                   <div className="mt-2">
-                    <EducationDateRange
-                      endDate={item.endDate}
-                      isCurrent={item.isCurrent}
-                      startDate={item.startDate}
-                    />
+                    <EducationDateRange endDate={item.endDate} startDate={item.startDate} />
                   </div>
                 </div>
               </div>
@@ -65,18 +61,11 @@ export function EducationCard({ education, onEdit }: EducationCardProps) {
   )
 }
 
-function EducationDateRange({
-  endDate,
-  isCurrent,
-  startDate,
-}: {
-  endDate: string | null
-  isCurrent: boolean
-  startDate: string | null
-}) {
+function EducationDateRange({ endDate, startDate }: { endDate: string | null; startDate: string }) {
   const { i18n, t } = useTranslation()
   const start = formatMonth(startDate, i18n.language, "—")
-  const end = isCurrent ? t("profile.field.present") : formatMonth(endDate, i18n.language, "—")
+  const end =
+    endDate === null ? t("profile.field.present") : formatMonth(endDate, i18n.language, "—")
 
   return (
     <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">

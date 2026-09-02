@@ -13,7 +13,7 @@ const schemas: Array<[string, any, Record<string, unknown>]> = [
     educationItemSchema,
     {
       degree: "",
-      id: "education_1",
+      clientId: "education_1",
       major: "",
       school: "Riva University",
     },
@@ -25,11 +25,11 @@ const schemas: Array<[string, any, Record<string, unknown>]> = [
       achievements: [],
       company: "Riva",
       endDate: "",
-      employmentType: "fullTime",
-      id: "work_1",
+      employmentType: "full-time",
+      clientId: "work_1",
       location: "",
       responsibilities: [],
-      skillIds: [],
+      skills: [],
       title: "Engineer",
     },
   ],
@@ -38,12 +38,12 @@ const schemas: Array<[string, any, Record<string, unknown>]> = [
     projectItemSchema,
     {
       achievements: [],
-      id: "project_1",
+      clientId: "project_1",
       name: "Riva project",
-      projectUrl: "",
-      responsibilities: [],
+      url: "",
+      description: [],
       role: "",
-      technologyStack: [],
+      techStack: [],
     },
   ],
 ]
@@ -106,12 +106,12 @@ describe("work experience schema", () => {
       achievements: ["  Improved performance  ", "Improved performance"],
       company: "Riva",
       endDate: "",
-      employmentType: "fullTime",
-      id: "work_1",
+      employmentType: "full-time",
+      clientId: "work_1",
       isCurrent: true,
       location: "",
       responsibilities: ["  Built the platform  ", "Built the platform"],
-      skillIds: ["skill_react", "skill_react"],
+      skills: ["React", "react"],
       startDate: "2024-01",
       title: "Engineer",
     })
@@ -121,7 +121,7 @@ describe("work experience schema", () => {
         data: expect.objectContaining({
           achievements: ["Improved performance"],
           responsibilities: ["Built the platform"],
-          skillIds: ["skill_react"],
+          skills: ["React"],
         }),
         success: true,
       }),
@@ -133,12 +133,12 @@ describe("work experience schema", () => {
       achievements: [],
       company: "Riva",
       endDate: "",
-      employmentType: "fullTime",
-      id: "work_1",
+      employmentType: "",
+      clientId: "work_1",
       isCurrent: true,
       location: "",
       responsibilities: ["   "],
-      skillIds: [],
+      skills: [],
       startDate: "2024-01",
       title: "Engineer",
     })
@@ -157,13 +157,13 @@ describe("project experience schema", () => {
     const result = projectItemSchema.safeParse({
       achievements: ["  Improved project adoption  ", "Improved project adoption"],
       endDate: "",
-      id: "project_1",
+      clientId: "project_1",
       isCurrent: true,
       name: "Riva project",
-      projectUrl: "https://riva.example.com",
-      responsibilities: ["  Built the project workspace  ", "Built the project workspace", "  "],
+      url: "https://riva.example.com",
+      description: ["  Built the project workspace  ", "Built the project workspace", "  "],
       role: "",
-      technologyStack: [" React ", "react", "TypeScript"],
+      techStack: [" React ", "react", "TypeScript"],
       startDate: "2024-01",
     })
 
@@ -171,8 +171,8 @@ describe("project experience schema", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           achievements: ["Improved project adoption"],
-          responsibilities: ["Built the project workspace"],
-          technologyStack: ["React", "TypeScript"],
+          description: ["Built the project workspace"],
+          techStack: ["React", "TypeScript"],
         }),
         success: true,
       }),
@@ -183,14 +183,14 @@ describe("project experience schema", () => {
 describe("skill schema", () => {
   it("requires and trims a skill name", () => {
     const result = skillSchema.safeParse({
-      id: "skill_react",
+      clientId: "skill_react",
       name: "  React  ",
     })
 
-    expect(result).toEqual({ success: true, data: { id: "skill_react", name: "React" } })
+    expect(result).toEqual({ success: true, data: { clientId: "skill_react", name: "React" } })
   })
 
   it("rejects an empty skill name", () => {
-    expect(skillSchema.safeParse({ id: "skill_react", name: "   " }).success).toBe(false)
+    expect(skillSchema.safeParse({ clientId: "skill_react", name: "   " }).success).toBe(false)
   })
 })

@@ -2,10 +2,9 @@ import type {
   InterviewCandidateQuestionExchangeResponse,
   InterviewSetupResponse,
 } from "@/models/interview"
-import type { JobProfileSnapshot } from "@/models/profile"
 import type { RolesPageResponse } from "@/models/roles"
 
-import { profileResponseMock } from "../profile"
+import { profileResponseMock, type JobProfileSnapshot } from "../profile"
 import { createRolesMockResponse } from "../roles"
 import { supportedInterviewRoundsByTargetRoleId } from "./question-catalog"
 

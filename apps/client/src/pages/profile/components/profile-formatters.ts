@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next"
 
-import type { EmploymentType } from "@/models/profile"
+import type { EmploymentType } from "@/api/generated/models"
 
 export function formatDate(value: string, language: string) {
   return new Intl.DateTimeFormat(language, { dateStyle: "medium" }).format(new Date(value))

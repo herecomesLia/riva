@@ -1,6 +1,7 @@
 import preview from "#storybook/preview"
 
-import { profileResponseMock } from "@/mocks/data/profile"
+import type { CareerProfileResponse } from "@/api/generated/models"
+import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 
 import { ProfileSectionEditDialog } from "./ProfileSectionEditDialog"
 import { createProfileEditDialogArgs } from "./profile-edit-dialog-story-helpers"
@@ -17,9 +18,8 @@ export const English = meta.story({
   globals: { locale: "en" },
 })
 
-const currentEducation = structuredClone(profileResponseMock.profile!)
+const currentEducation: CareerProfileResponse = structuredClone(careerProfileFixture)
 currentEducation.education[0]!.endDate = null
-currentEducation.education[0]!.isCurrent = true
 
 export const Present = meta.story({
   args: createProfileEditDialogArgs("education", currentEducation),

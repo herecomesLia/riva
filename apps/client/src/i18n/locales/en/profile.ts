@@ -97,14 +97,15 @@ export const profile = {
     achievements: "Achievements",
     projectDescription: "Project description",
     projectAchievements: "Project outcomes",
-    technologyStack: "Technology stack",
+    techStack: "Technology stack",
     skills: "Related skills",
     employmentTypes: "Employment types",
+    notProvided: "Not provided",
     skillName: "Skill name",
   },
   employmentType: {
-    fullTime: "Full time",
-    partTime: "Part time",
+    "full-time": "Full time",
+    "part-time": "Part time",
     internship: "Internship",
     contract: "Contract",
     freelance: "Freelance",
@@ -147,7 +148,7 @@ export const profile = {
     skillInputDescription: "Enter a skill name and press Enter to add it.",
     projectDescriptionHint: "Each item will be shown as a separate project description point.",
     projectAchievementsHint: "Each item will be shown as a separate project outcome.",
-    technologyStackDescription:
+    techStackDescription:
       "Enter a technology and press Enter. The technology stack belongs only to this project.",
     technologyInputPlaceholder: "Enter a technology…",
     skillInputPlaceholder: "Search or enter a skill…",
@@ -182,6 +183,6 @@ export const profile = {
     title: "Title",
     projectName: "Project name",
     projectRole: "Role",
-    projectUrl: "Project URL",
+    url: "Project URL",
   },
 } as const

@@ -9,7 +9,7 @@ import {
   careerProfileFixture,
   resumeImportedCareerProfileFixture,
 } from "@/mocks/fixtures/career-profile"
-import type { ResumeUploadInput } from "@/models/profile"
+import type { ResumeImportInput } from "@/models/profile"
 
 const createdAt = "2025-01-15T08:00:00Z"
 const updatedAt = "2025-02-01T08:00:00Z"
@@ -86,7 +86,7 @@ export function createCareerProfileFaker(initialProfile: CareerProfileResponse |
       return structuredClone(profile)
     },
 
-    async importResume(input: ResumeUploadInput): Promise<CareerProfileResponse> {
+    async importResume(input: ResumeImportInput): Promise<CareerProfileResponse> {
       if (!input.file && !input.text?.trim()) {
         throw new Error("A resume file or pasted resume text is required.")
       }

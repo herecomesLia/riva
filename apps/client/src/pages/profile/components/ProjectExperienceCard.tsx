@@ -10,8 +10,8 @@ import {
 import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
+import type { ProjectEntryResponse } from "@/api/generated/models"
 import { cn } from "@/lib/utils"
-import type { JobProfile } from "@/models/profile"
 
 import { ProfileSectionCard } from "./ProfileSectionCard"
 import { ProfileSkillBadge } from "./ProfileSkillBadge"
@@ -19,12 +19,12 @@ import { DateRange, DetailList, EmptySection } from "./profile-section-shared"
 
 export type ProjectExperienceCardProps = {
   onEdit: () => void
-  projects: JobProfile["projectExperiences"]
+  projects: ProjectEntryResponse[]
 }
 
 type ProjectDetail = {
   content: ReactNode
-  key: "description" | "achievements" | "technologyStack"
+  key: "description" | "achievements" | "techStack"
 }
 
 export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCardProps) {
@@ -38,13 +38,13 @@ export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCar
         <ol className="relative flex flex-col gap-6">
           {projects.map((project, index) => {
             const details: ProjectDetail[] = [
-              ...(project.responsibilities.length > 0
+              ...((project.description?.length ?? 0) > 0
                 ? [
                     {
                       content: (
                         <DetailList
                           icon={NotebookPenIcon}
-                          items={project.responsibilities}
+                          items={project.description ?? []}
                           title={t("profile.field.projectDescription")}
                         />
                       ),
@@ -52,13 +52,13 @@ export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCar
                     },
                   ]
                 : []),
-              ...(project.achievements.length > 0
+              ...((project.achievements?.length ?? 0) > 0
                 ? [
                     {
                       content: (
                         <DetailList
                           icon={ChartColumnIncreasingIcon}
-                          items={project.achievements}
+                          items={project.achievements ?? []}
                           title={t("profile.field.projectAchievements")}
                         />
                       ),
@@ -66,7 +66,7 @@ export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCar
                     },
                   ]
                 : []),
-              ...(project.technologyStack.length > 0
+              ...((project.techStack?.length ?? 0) > 0
                 ? [
                     {
                       content: (
@@ -76,13 +76,13 @@ export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCar
                               aria-hidden="true"
                               className="size-4 shrink-0 text-primary"
                             />
-                            {t("profile.field.technologyStack")}
+                            {t("profile.field.techStack")}
                           </h4>
                           <div
                             className="flex flex-wrap gap-2"
                             data-testid="project-experience-technologies"
                           >
-                            {project.technologyStack.map((technology) => (
+                            {project.techStack?.map((technology) => (
                               <ProfileSkillBadge
                                 key={technology}
                                 name={technology}
@@ -92,14 +92,17 @@ export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCar
                           </div>
                         </div>
                       ),
-                      key: "technologyStack" as const,
+                      key: "techStack" as const,
                     },
                   ]
                 : []),
             ]
 
             return (
-              <li className="relative pl-7 sm:pl-10" key={project.id}>
+              <li
+                className="relative pl-7 sm:pl-10"
+                key={`${project.name}-${project.startDate}-${index}`}
+              >
                 {index < projects.length - 1 && (
                   <span
                     aria-hidden="true"
@@ -113,7 +116,7 @@ export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCar
                 />
                 <article
                   className="overflow-hidden rounded-xl border bg-card"
-                  data-testid={`project-experience-item-${project.id}`}
+                  data-testid={`project-experience-item-${index}`}
                 >
                   <header className="flex items-start gap-3 p-4 sm:gap-4 sm:p-5">
                     <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary sm:size-12">
@@ -135,17 +138,13 @@ export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCar
                         )}
                         <span className="inline-flex items-center gap-1.5">
                           <CalendarDaysIcon aria-hidden="true" className="size-4 shrink-0" />
-                          <DateRange
-                            endDate={project.endDate}
-                            isCurrent={project.endDate === null}
-                            startDate={project.startDate}
-                          />
+                          <DateRange endDate={project.endDate} startDate={project.startDate} />
                         </span>
                       </div>
-                      {project.projectUrl && (
+                      {project.url && (
                         <a
                           className="mt-2 inline-flex max-w-full items-center gap-1.5 break-all text-sm text-primary underline-offset-4 hover:underline"
-                          href={project.projectUrl}
+                          href={project.url}
                           rel="noreferrer"
                           target="_blank"
                         >
@@ -163,7 +162,7 @@ export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCar
                         details.length === 3 &&
                           "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(13rem,0.75fr)]",
                       )}
-                      data-testid={`project-experience-details-${project.id}`}
+                      data-testid={`project-experience-details-${index}`}
                     >
                       {details.map((detail, detailIndex) => (
                         <div

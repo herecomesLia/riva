@@ -12,7 +12,8 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import type { ProfileSection } from "@/models/profile"
+
+export type ProfileSection = "education" | "workExperience" | "projectExperience" | "skills"
 
 type ProfileSectionCardProps = {
   children: ReactNode

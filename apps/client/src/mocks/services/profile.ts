@@ -1,21 +1,19 @@
 import {
   createProfileMockSnapshot,
   profileResponseMock,
+  type JobProfile,
+  type JobProfileSnapshot,
+  type NewProfileSkillInput,
   type ProfileMockScenario,
+  type ProfileSource,
+  type ResumeFile,
+  type ResumeRecognition,
+  type ResumeUpdate,
+  type ResumeUploadInput,
+  type SaveProfileSectionInput,
 } from "@/mocks/data/profile"
 import { waitForMockDelay } from "@/mocks/utils"
 import { normalizeSkillIds, normalizeSkillName } from "@/models/profile-text"
-import type {
-  JobProfile,
-  JobProfileSnapshot,
-  NewProfileSkillInput,
-  ProfileSource,
-  ResumeFile,
-  ResumeRecognition,
-  ResumeUpdate,
-  ResumeUploadInput,
-  SaveProfileSectionInput,
-} from "@/models/profile"
 
 function copy<T>(value: T): T {
   return structuredClone(value)

@@ -1,8 +1,8 @@
 import { CalendarClockIcon, UploadIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
+import type { CareerProfileResponse } from "@/api/generated/models"
 import { Button } from "@/components/ui/button"
-import type { JobProfile } from "@/models/profile"
 
 import { ProfileCompletenessRing } from "./ProfileCompletenessRing"
 import { formatDate } from "./profile-formatters"
@@ -13,7 +13,7 @@ export function ProfileHeader({
   profile,
 }: {
   onOpenResume: () => void
-  profile: JobProfile
+  profile: CareerProfileResponse
 }) {
   const { i18n, t } = useTranslation()
 
@@ -28,7 +28,7 @@ export function ProfileHeader({
       </div>
 
       <div className="justify-self-center lg:pr-6">
-        <ProfileCompletenessRing value={profile.completeness.percentage} />
+        <ProfileCompletenessRing value={getProfileCompleteness(profile)} />
       </div>
 
       <Button
@@ -37,8 +37,16 @@ export function ProfileHeader({
         size="lg"
       >
         <UploadIcon data-icon="inline-start" />
-        {profile.resume ? t("profile.actions.updateResume") : t("profile.actions.uploadResume")}
+        {t("profile.actions.updateResume")}
       </Button>
     </header>
+  )
+}
+
+function getProfileCompleteness(profile: CareerProfileResponse) {
+  return (
+    [profile.education, profile.workExperiences, profile.projects, profile.skills].filter(
+      (section) => section.length > 0,
+    ).length * 25
   )
 }

@@ -1,4 +1,4 @@
-import type { JobProfile } from "@/models/profile"
+import type { CareerProfileResponse } from "@/api/generated/models"
 
 import { EducationCard } from "./EducationCard"
 import { ProjectExperienceCard } from "./ProjectExperienceCard"
@@ -8,7 +8,7 @@ import { WorkExperienceCard } from "./WorkExperienceCard"
 
 type ProfileSectionsProps = {
   onStartEditing: (section: EditableProfileSection) => void
-  profile: JobProfile
+  profile: CareerProfileResponse
 }
 
 export function ProfileSections({ onStartEditing, profile }: ProfileSectionsProps) {
@@ -24,11 +24,10 @@ export function ProfileSections({ onStartEditing, profile }: ProfileSectionsProp
       <WorkExperienceCard
         experiences={profile.workExperiences}
         onEdit={() => onStartEditing("workExperience")}
-        skills={profile.skills}
       />
       <ProjectExperienceCard
         onEdit={() => onStartEditing("projectExperience")}
-        projects={profile.projectExperiences}
+        projects={profile.projects}
       />
     </div>
   )

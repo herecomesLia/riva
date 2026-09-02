@@ -4,6 +4,14 @@ import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
 
+import type {
+  CareerProfileResponse,
+  EducationEntryRequest,
+  EmploymentType,
+  ProjectEntryRequest,
+  UpdateCareerProfileRequest,
+  WorkExperienceEntryRequest,
+} from "@/api/generated/models"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -18,24 +26,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  normalizeBulletItems,
-  normalizeSkillIds,
-  normalizeTechnologyStack,
-} from "@/models/profile-text"
+import { normalizeBulletItems, normalizeTechnologyStack } from "@/models/profile-text"
 import {
   educationItemSchema,
   profileEmploymentTypes as employmentTypes,
   projectItemSchema,
   workItemSchema,
 } from "@/schemas/profile"
-import type {
-  EmploymentType,
-  JobProfile,
-  ProfileSkill,
-  SaveProfileSectionInput,
-  WorkExperience,
-} from "@/models/profile"
 import { BulletListEditor } from "./BulletListEditor"
 import type { EditableExperienceSection } from "./ProfileSectionEditDialog"
 import { SkillTagInput } from "./SkillTagInput"
@@ -44,14 +41,14 @@ import { TechnologyStackInput } from "./TechnologyStackInput"
 type ProfileSectionEditorProps = {
   onCancel: () => void
   onDirtyChange: (isDirty: boolean) => void
-  onSave: (input: SaveProfileSectionInput) => Promise<void>
-  profile: JobProfile
+  onSave: (input: UpdateCareerProfileRequest) => Promise<void>
+  profile: CareerProfileResponse
   section: EditableExperienceSection
 }
 
 type EditorItem = Record<string, unknown> & {
+  clientId: string
   endDate: string
-  id: string
   isCurrent: boolean
   startDate: string
 }
@@ -253,13 +250,17 @@ function EmploymentTypeField({ form, index }: { form: any; index: number }) {
         return (
           <Field invalid={invalid}>
             <FieldLabel htmlFor={field.name}>{t("profile.field.employmentTypes")}</FieldLabel>
-            <Select onValueChange={field.handleChange} value={field.state.value}>
+            <Select
+              onValueChange={(value) => field.handleChange(value === "none" ? "" : value)}
+              value={field.state.value || "none"}
+            >
               <FieldControl>
                 <SelectTrigger id={field.name} onBlur={field.handleBlur}>
                   <SelectValue />
                 </SelectTrigger>
               </FieldControl>
               <SelectContent>
+                <SelectItem value="none">{t("profile.field.notProvided")}</SelectItem>
                 {employmentTypes.map((type) => (
                   <SelectItem key={type} value={type}>
                     {t(`profile.employmentType.${type}`)}
@@ -289,7 +290,6 @@ export function ProfileSectionEditor({
   const { t } = useTranslation()
   const [saveError, setSaveError] = useState(false)
   const [hasSubmitted, setHasSubmitted] = useState(false)
-  const [draftSkills, setDraftSkills] = useState<ProfileSkill[]>([])
   const form = useForm({
     defaultValues: createDraft(profile, section) as any,
     validators: {
@@ -300,30 +300,20 @@ export function ProfileSectionEditor({
 
       try {
         const values = normalizeSectionValues(section, value)
-        const isWorkExperienceSection = section === "workExperience"
-        const workExperiences = values as WorkExperience[]
-        const skillsToCreate = isWorkExperienceSection
-          ? draftSkills
-              .filter((skill) => workExperiences.some((item) => item.skillIds.includes(skill.id)))
-              .map(({ id, name }) => ({ clientId: id, name }))
-          : []
-
-        await onSave(
-          isWorkExperienceSection
-            ? {
-                profileId: profile.profileId,
-                section,
-                skillsToCreate,
-                values,
-                version: profile.version,
-              }
-            : {
-                profileId: profile.profileId,
-                section,
-                values,
-                version: profile.version,
-              },
-        )
+        if (section === "education") {
+          await onSave({ education: values as EducationEntryRequest[] })
+        } else if (section === "projectExperience") {
+          await onSave({ projects: values as ProjectEntryRequest[] })
+        } else {
+          const workExperiences = values as WorkExperienceEntryRequest[]
+          const nextSkills = [...profile.skills]
+          workExperiences.forEach((experience) => {
+            experience.skills?.forEach((skill) => {
+              if (!nextSkills.includes(skill)) nextSkills.push(skill)
+            })
+          })
+          await onSave({ skills: nextSkills, workExperiences })
+        }
       } catch {
         setSaveError(true)
       }
@@ -358,18 +348,16 @@ export function ProfileSectionEditor({
                   <ExperienceFieldGroup
                     form={form}
                     index={index}
-                    itemId={item.id}
-                    key={item.id}
+                    itemId={item.clientId}
+                    key={item.clientId}
                     onDelete={() => {
                       form.setFieldValue(
                         "items" as never,
-                        items.filter((candidate) => candidate.id !== item.id) as never,
+                        items.filter((candidate) => candidate.clientId !== item.clientId) as never,
                       )
                     }}
                     hasSubmitted={hasSubmitted}
                     profile={profile}
-                    draftSkills={draftSkills}
-                    onDraftSkillsChange={setDraftSkills}
                     section={section}
                   />
                 ))}
@@ -399,8 +387,6 @@ function ExperienceFieldGroup({
   index,
   itemId,
   onDelete,
-  draftSkills,
-  onDraftSkillsChange,
   profile,
   section,
 }: {
@@ -409,9 +395,7 @@ function ExperienceFieldGroup({
   index: number
   itemId: string
   onDelete: () => void
-  draftSkills: ProfileSkill[]
-  onDraftSkillsChange: (skills: ProfileSkill[]) => void
-  profile: JobProfile
+  profile: CareerProfileResponse
   section: EditableExperienceSection
 }) {
   const { t } = useTranslation()
@@ -480,16 +464,14 @@ function ExperienceFieldGroup({
               />
             )}
           </form.Field>
-          <form.Field name={`items.${index}.skillIds`}>
+          <form.Field name={`items.${index}.skills`}>
             {(field: any) => (
               <SkillTagInput
                 availableSkills={profile.skills}
                 description={t("profile.editor.skillInputDescription")}
-                draftSkills={draftSkills}
                 label={t("profile.field.skills")}
-                onDraftSkillsChange={onDraftSkillsChange}
-                onSelectedSkillIdsChange={field.handleChange}
-                selectedSkillIds={field.state.value ?? []}
+                onSelectedSkillsChange={field.handleChange}
+                selectedSkills={field.state.value ?? []}
               />
             )}
           </form.Field>
@@ -509,7 +491,7 @@ function ExperienceFieldGroup({
             name="role"
           />
           {dateFields}
-          <form.Field name={`items.${index}.responsibilities`}>
+          <form.Field name={`items.${index}.description`}>
             {(field: any) => (
               <BulletListEditor
                 description={t("profile.editor.projectDescriptionHint")}
@@ -529,17 +511,17 @@ function ExperienceFieldGroup({
               />
             )}
           </form.Field>
-          <form.Field name={`items.${index}.technologyStack`}>
+          <form.Field name={`items.${index}.techStack`}>
             {(field: any) => (
               <TechnologyStackInput
-                description={t("profile.editor.technologyStackDescription")}
-                label={t("profile.field.technologyStack")}
+                description={t("profile.editor.techStackDescription")}
+                label={t("profile.field.techStack")}
                 onChange={field.handleChange}
                 technologies={field.state.value ?? []}
               />
             )}
           </form.Field>
-          <TextField form={form} index={index} label={fieldLabel("projectUrl")} name="projectUrl" />
+          <TextField form={form} index={index} label={fieldLabel("url")} name="url" />
         </>
       )}
     </FieldGroup>
@@ -565,42 +547,45 @@ function EditorFooter({ form, onCancel }: { form: any; onCancel: () => void }) {
   )
 }
 
-function createDraft(profile: JobProfile, section: EditableExperienceSection) {
+function createDraft(profile: CareerProfileResponse, section: EditableExperienceSection) {
   switch (section) {
     case "education":
       return {
-        items: structuredClone(profile.education).map(({ source: _source, ...item }) => ({
+        items: structuredClone(profile.education).map((item) => ({
           ...item,
+          clientId: createTemporaryId(),
           degree: item.degree ?? "",
           endDate: item.endDate ?? "",
+          isCurrent: item.endDate === null,
           major: item.major ?? "",
-          startDate: item.startDate ?? "",
         })),
       }
     case "workExperience":
       return {
-        items: structuredClone(profile.workExperiences).map(({ source: _source, ...item }) => ({
+        items: structuredClone(profile.workExperiences).map((item) => ({
           ...item,
-          achievements: structuredClone(item.achievements),
+          achievements: structuredClone(item.achievements ?? []),
+          clientId: createTemporaryId(),
           endDate: item.endDate ?? "",
+          employmentType: item.employmentType ?? "",
+          isCurrent: item.endDate === null,
           location: item.location ?? "",
-          responsibilities: structuredClone(item.responsibilities),
-          skillIds: structuredClone(item.skillIds),
-          startDate: item.startDate ?? "",
+          responsibilities: structuredClone(item.responsibilities ?? []),
+          skills: structuredClone(item.skills ?? []),
         })),
       }
     case "projectExperience":
       return {
-        items: structuredClone(profile.projectExperiences).map(({ source: _source, ...item }) => ({
+        items: structuredClone(profile.projects).map((item) => ({
           ...item,
-          achievements: structuredClone(item.achievements),
+          achievements: structuredClone(item.achievements ?? []),
+          clientId: createTemporaryId(),
+          description: structuredClone(item.description ?? []),
           endDate: item.endDate ?? "",
-          projectUrl: item.projectUrl ?? "",
-          responsibilities: structuredClone(item.responsibilities),
-          role: item.role ?? "",
           isCurrent: item.endDate === null,
-          technologyStack: structuredClone(item.technologyStack),
-          startDate: item.startDate ?? "",
+          role: item.role ?? "",
+          techStack: structuredClone(item.techStack ?? []),
+          url: item.url ?? "",
         })),
       }
   }
@@ -619,43 +604,44 @@ function createSectionSchema(section: EditableExperienceSection) {
 
 function normalizeSectionValues(section: EditableExperienceSection, value: any) {
   if (section === "education") {
-    return value.items.map(({ source: _source, ...item }: any) => ({
+    return value.items.map(({ clientId: _clientId, isCurrent, ...item }: any) => ({
       ...item,
       degree: toNullable(item.degree),
-      endDate: item.isCurrent ? null : toNullable(item.endDate),
+      endDate: isCurrent ? null : item.endDate.trim(),
       major: toNullable(item.major),
-      startDate: toNullable(item.startDate),
+      startDate: item.startDate.trim(),
     }))
   }
 
   if (section === "workExperience") {
-    return value.items.map(({ source: _source, ...item }: any) => ({
+    return value.items.map(({ clientId: _clientId, isCurrent, ...item }: any) => ({
       ...item,
       achievements: normalizeBulletItems(item.achievements),
-      endDate: item.isCurrent ? null : toNullable(item.endDate),
+      employmentType: toNullable(item.employmentType) as EmploymentType | null,
+      endDate: isCurrent ? null : item.endDate.trim(),
       location: toNullable(item.location),
       responsibilities: normalizeBulletItems(item.responsibilities),
-      skillIds: normalizeSkillIds(item.skillIds),
-      startDate: toNullable(item.startDate),
+      skills: normalizeTechnologyStack(item.skills),
+      startDate: item.startDate.trim(),
     }))
   }
 
-  return value.items.map(({ isCurrent, source: _source, ...item }: any) => ({
+  return value.items.map(({ clientId: _clientId, isCurrent, ...item }: any) => ({
     ...item,
     achievements: normalizeBulletItems(item.achievements),
+    description: normalizeBulletItems(item.description),
     endDate: isCurrent ? null : toNullable(item.endDate),
-    projectUrl: toNullable(item.projectUrl),
-    responsibilities: normalizeBulletItems(item.responsibilities),
     role: toNullable(item.role),
-    technologyStack: normalizeTechnologyStack(item.technologyStack),
-    startDate: toNullable(item.startDate),
+    startDate: item.startDate.trim(),
+    techStack: normalizeTechnologyStack(item.techStack),
+    url: toNullable(item.url),
   }))
 }
 
 function createNewItem(section: EditableExperienceSection) {
   const base = {
+    clientId: createTemporaryId(),
     endDate: "",
-    id: createTemporaryId(),
     isCurrent: false,
     startDate: "",
   }
@@ -669,10 +655,10 @@ function createNewItem(section: EditableExperienceSection) {
       ...base,
       achievements: [],
       company: "",
-      employmentType: "fullTime" satisfies EmploymentType,
+      employmentType: "",
       location: "",
       responsibilities: [],
-      skillIds: [],
+      skills: [],
       title: "",
     }
   }
@@ -680,10 +666,10 @@ function createNewItem(section: EditableExperienceSection) {
   return {
     ...base,
     achievements: [],
+    description: [],
     name: "",
-    projectUrl: "",
-    responsibilities: [],
     role: "",
-    technologyStack: [],
+    techStack: [],
+    url: "",
   }
 }

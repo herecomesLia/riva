@@ -8,8 +8,8 @@ import {
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
+import type { WorkExperienceEntryResponse } from "@/api/generated/models"
 import { cn } from "@/lib/utils"
-import type { JobProfile } from "@/models/profile"
 
 import { employmentTypeLabel } from "./profile-formatters"
 import { ProfileSectionCard } from "./ProfileSectionCard"
@@ -17,20 +17,12 @@ import { ProfileSkillBadge } from "./ProfileSkillBadge"
 import { DateRange, DetailList, EmptySection } from "./profile-section-shared"
 
 export type WorkExperienceCardProps = {
-  experiences: JobProfile["workExperiences"]
+  experiences: WorkExperienceEntryResponse[]
   onEdit: () => void
-  skills: JobProfile["skills"]
 }
 
-function requireSkillName(skillsById: Map<string, string>, skillId: string) {
-  const name = skillsById.get(skillId)
-  if (!name) throw new Error(`Work experience references an unknown skill: ${skillId}`)
-  return name
-}
-
-export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperienceCardProps) {
+export function WorkExperienceCard({ experiences, onEdit }: WorkExperienceCardProps) {
   const { t } = useTranslation()
-  const skillsById = new Map(skills.map((skill) => [skill.id, skill.name]))
 
   return (
     <ProfileSectionCard onEdit={onEdit} section="workExperience">
@@ -40,35 +32,31 @@ export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperien
         <ol className="relative flex flex-col gap-6">
           {experiences.map((experience, index) => {
             const details = [
-              experience.responsibilities.length > 0 && (
+              (experience.responsibilities?.length ?? 0) > 0 && (
                 <DetailList
                   icon={NotebookPenIcon}
-                  items={experience.responsibilities}
+                  items={experience.responsibilities ?? []}
                   key="responsibilities"
                   title={t("profile.field.responsibilities")}
                 />
               ),
-              experience.achievements.length > 0 && (
+              (experience.achievements?.length ?? 0) > 0 && (
                 <DetailList
                   icon={ChartColumnIncreasingIcon}
-                  items={experience.achievements}
+                  items={experience.achievements ?? []}
                   key="achievements"
                   title={t("profile.field.achievements")}
                 />
               ),
-              experience.skillIds.length > 0 && (
+              (experience.skills?.length ?? 0) > 0 && (
                 <div className="flex flex-col gap-2" key="skills">
                   <h4 className="flex items-center gap-2 text-sm font-medium">
                     <TagsIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />
                     {t("profile.field.skills")}
                   </h4>
                   <div className="flex flex-wrap gap-2" data-testid="work-experience-skills">
-                    {experience.skillIds.map((skillId) => (
-                      <ProfileSkillBadge
-                        key={skillId}
-                        name={requireSkillName(skillsById, skillId)}
-                        showIcon={false}
-                      />
+                    {experience.skills?.map((skill) => (
+                      <ProfileSkillBadge key={skill} name={skill} showIcon={false} />
                     ))}
                   </div>
                 </div>
@@ -76,7 +64,10 @@ export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperien
             ].filter(Boolean)
 
             return (
-              <li className="relative pl-7 sm:pl-10" key={experience.id}>
+              <li
+                className="relative pl-7 sm:pl-10"
+                key={`${experience.company}-${experience.title}-${experience.startDate}-${index}`}
+              >
                 {index < experiences.length - 1 && (
                   <span
                     aria-hidden="true"
@@ -90,7 +81,7 @@ export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperien
                 />
                 <article
                   className="overflow-hidden rounded-xl border bg-card"
-                  data-testid={`work-experience-item-${experience.id}`}
+                  data-testid={`work-experience-item-${index}`}
                 >
                   <header className="flex items-start gap-3 p-4 sm:gap-4 sm:p-5">
                     <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary sm:size-12">
@@ -106,8 +97,12 @@ export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperien
                             <Building2Icon aria-hidden="true" className="size-4 shrink-0" />
                             <span className="break-words">{experience.company}</span>
                           </span>
-                          <span aria-hidden="true">·</span>
-                          <span>{employmentTypeLabel(experience.employmentType, t)}</span>
+                          {experience.employmentType && (
+                            <>
+                              <span aria-hidden="true">·</span>
+                              <span>{employmentTypeLabel(experience.employmentType, t)}</span>
+                            </>
+                          )}
                           {experience.location && (
                             <>
                               <span aria-hidden="true">·</span>
@@ -120,7 +115,6 @@ export function WorkExperienceCard({ experiences, onEdit, skills }: WorkExperien
                           <CalendarDaysIcon aria-hidden="true" className="size-4 shrink-0" />
                           <DateRange
                             endDate={experience.endDate}
-                            isCurrent={experience.isCurrent}
                             startDate={experience.startDate}
                           />
                         </span>

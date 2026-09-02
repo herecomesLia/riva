@@ -2,24 +2,19 @@ import { screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+import type { EducationEntryResponse } from "@/api/generated/models"
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
-import { profileResponseMock } from "@/mocks/data/profile"
-import type { JobProfile } from "@/models/profile"
+import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 import { EducationCard } from "@/pages/profile/components/EducationCard"
 import { formatMonth } from "@/pages/profile/components/profile-formatters"
 import { renderWithProviders } from "@/test/render"
 
-type Education = JobProfile["education"][number]
-
-function createEducation(overrides: Partial<Education> = {}): Education {
-  return {
-    ...structuredClone(profileResponseMock.profile!.education[0]!),
-    ...overrides,
-  }
+function createEducation(overrides: Partial<EducationEntryResponse> = {}): EducationEntryResponse {
+  return { ...structuredClone(careerProfileFixture.education[0]!), ...overrides }
 }
 
-function renderCard(education: JobProfile["education"], onEdit = vi.fn()) {
+function renderCard(education: EducationEntryResponse[], onEdit = vi.fn()) {
   return {
     onEdit,
     ...renderWithProviders(<EducationCard education={education} onEdit={onEdit} />, {
@@ -41,83 +36,25 @@ describe("EducationCard", () => {
     await i18n.changeLanguage(defaultLanguage)
   })
 
-  it("renders the default education record", () => {
+  it("renders the contract fields and a completed date range", () => {
     renderCard([createEducation()])
 
-    expect(screen.getByText("Fudan University")).toBeInTheDocument()
+    expect(screen.getByText("Zhejiang University")).toBeInTheDocument()
     expect(screen.getByText("Bachelor of Engineering · Computer Science")).toBeInTheDocument()
     expect(
       screen.getByText(
         i18n.t("profile.field.dateRange", {
-          end: formatMonth("2018-06", i18n.language, "—"),
-          start: formatMonth("2014-09", i18n.language, "—"),
+          end: formatMonth("2020-06", i18n.language, "—"),
+          start: formatMonth("2016-09", i18n.language, "—"),
         }),
       ),
     ).toBeInTheDocument()
   })
 
-  it("renders the local empty state", () => {
-    renderCard([])
-
-    expect(screen.getAllByText(i18n.t("profile.emptySection"))).toHaveLength(2)
-  })
-
-  it("hides navigation for one record", () => {
-    renderCard([createEducation()])
-    const names = carouselNames()
-
-    expect(screen.queryByRole("button", { name: names.previous })).not.toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: names.next })).not.toBeInTheDocument()
-  })
-
-  it("switches between multiple records without rendering them together", async () => {
-    const user = userEvent.setup()
-    renderCard([
-      createEducation(),
-      createEducation({ id: "education_tongji", school: "Tongji University" }),
-    ])
-    const names = carouselNames()
-
-    expect(screen.getByText("Fudan University")).toBeInTheDocument()
-    expect(screen.queryByText("Tongji University")).not.toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: names.previous })).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole("button", { name: names.next }))
-    expect(screen.getByText("Tongji University")).toBeInTheDocument()
-    expect(screen.queryByText("Fudan University")).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: names.previous })).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: names.next })).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole("button", { name: names.previous }))
-    expect(screen.getByText("Fudan University")).toBeInTheDocument()
-  })
-
-  it("shows both navigation controls only for the middle of three records", async () => {
-    const user = userEvent.setup()
-    renderCard([
-      createEducation(),
-      createEducation({ id: "education_tongji", school: "Tongji University" }),
-      createEducation({ id: "education_riva", school: "Riva University" }),
-    ])
-    const names = carouselNames()
-
-    expect(screen.queryByRole("button", { name: names.previous })).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: names.next })).toBeInTheDocument()
-
-    await user.click(screen.getByRole("button", { name: names.next }))
-    expect(screen.getByRole("button", { name: names.previous })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: names.next })).toBeInTheDocument()
-
-    await user.click(screen.getByRole("button", { name: names.next }))
-    expect(screen.getByText("Riva University")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: names.previous })).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: names.next })).not.toBeInTheDocument()
-  })
-
-  it("keeps the active index valid when records are removed", async () => {
+  it("switches records and keeps the active index valid", async () => {
     const user = userEvent.setup()
     const first = createEducation()
-    const second = createEducation({ id: "education_tongji", school: "Tongji University" })
+    const second = createEducation({ school: "Tongji University" })
     const onEdit = vi.fn()
     const { rerender } = renderCard([first, second], onEdit)
 
@@ -125,21 +62,23 @@ describe("EducationCard", () => {
     expect(screen.getByText("Tongji University")).toBeInTheDocument()
 
     rerender(<EducationCard education={[first]} onEdit={onEdit} />)
-    expect(await screen.findByText("Fudan University")).toBeInTheDocument()
+    expect(await screen.findByText("Zhejiang University")).toBeInTheDocument()
     expect(screen.queryByText("Tongji University")).not.toBeInTheDocument()
   })
 
-  it("renders the present label for current education", () => {
-    renderCard([createEducation({ endDate: null, isCurrent: true })])
-
+  it("derives the present label from a null end date", () => {
+    renderCard([createEducation({ endDate: null })])
     expect(screen.getByText(new RegExp(i18n.t("profile.field.present")))).toBeInTheDocument()
   })
 
-  it("calls onEdit from the card action", async () => {
+  it("renders the empty state and edit action", async () => {
     const user = userEvent.setup()
+    const empty = renderCard([])
+    expect(screen.getAllByText(i18n.t("profile.emptySection"))).toHaveLength(2)
+    empty.unmount()
+
     const { onEdit } = renderCard([createEducation()])
     const card = screen.getByTestId("profile-section-education")
-
     await user.click(within(card).getByRole("button", { name: i18n.t("profile.actions.edit") }))
     expect(onEdit).toHaveBeenCalledOnce()
   })

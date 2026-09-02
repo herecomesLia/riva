@@ -7,10 +7,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import type { JobProfile, ProfileSection, SaveProfileSectionInput } from "@/models/profile"
+import type { CareerProfileResponse, UpdateCareerProfileRequest } from "@/api/generated/models"
 
 import { ProfileAdditionalSectionEditor } from "./ProfileAdditionalSectionEditor"
 import { ProfileSectionEditor } from "./ProfileSectionEditor"
+import type { ProfileSection } from "./ProfileSectionCard"
 
 export type EditableProfileSection = ProfileSection
 export type EditableExperienceSection = Extract<
@@ -21,9 +22,9 @@ export type EditableExperienceSection = Extract<
 type ProfileSectionEditDialogProps = {
   onDirtyChange: (isDirty: boolean) => void
   onOpenChange: (open: boolean) => void
-  onSave: (input: SaveProfileSectionInput) => Promise<void>
+  onSave: (input: UpdateCareerProfileRequest) => Promise<void>
   open: boolean
-  profile: JobProfile
+  profile: CareerProfileResponse
   section: EditableProfileSection | null
 }
 
