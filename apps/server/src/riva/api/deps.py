@@ -11,6 +11,7 @@ from riva.api.errors import AuthRequiredError
 from riva.db import Database
 from riva.models import User
 from riva.services.career_profiles import CareerProfileService
+from riva.services.target_roles import TargetRoleService
 from riva.services.users import UserService
 
 csrf_guard = Depends(csrf_protect)
@@ -65,4 +66,16 @@ async def get_career_profile_service(
 CareerProfileServiceDep = Annotated[
     CareerProfileService,
     Depends(get_career_profile_service),
+]
+
+
+async def get_target_role_service(
+    session: DbSessionDep,
+) -> TargetRoleService:
+    return TargetRoleService(session)
+
+
+TargetRoleServiceDep = Annotated[
+    TargetRoleService,
+    Depends(get_target_role_service),
 ]

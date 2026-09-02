@@ -117,7 +117,7 @@ class TargetRole(Base):
         onupdate=utc_now,
     )
 
-    jd: Mapped[JobDescription | None] = relationship(
+    jd: Mapped[JobDescription] = relationship(
         cascade="all, delete-orphan",
         lazy="selectin",
         uselist=False,
