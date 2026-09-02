@@ -3,7 +3,7 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, text
+from sqlalchemy import DateTime, Enum, ForeignKey, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Uuid
 
@@ -46,7 +46,6 @@ class JobDescription(Base):
         ForeignKey("target_roles.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     responsibilities: Mapped[list[NonBlankStr]] = mapped_column(
         PydanticJSONB(list[NonBlankStr]),
         default=list,
