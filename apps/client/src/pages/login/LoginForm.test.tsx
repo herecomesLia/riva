@@ -16,18 +16,12 @@ vi.mock("@/hooks/use-auth", () => ({
 
 const loginMock = vi.fn()
 
-function apiError(status: number, code: ErrorCode, message: string) {
-  return new ApiError(
-    status,
-    {
-      error: { code, message },
-    },
-    "Request failed",
-  )
+function apiError(code: ErrorCode, message: string) {
+  return new ApiError({ error: { code, message } })
 }
 
 function invalidCredentialsError() {
-  return apiError(401, "auth.invalid_credentials", "Invalid username or password.")
+  return apiError("auth.invalid_credentials", "Invalid username or password.")
 }
 
 function t(key: string) {
@@ -191,7 +185,7 @@ describe("LoginForm", () => {
   it("keeps credentials for a service unavailable error", async () => {
     const user = userEvent.setup()
     loginMock.mockRejectedValue(
-      apiError(503, "dependency.database_unavailable", "Database is temporarily unavailable."),
+      apiError("dependency.database_unavailable", "Database is temporarily unavailable."),
     )
     const { onLoginSuccess } = renderLoginForm()
 

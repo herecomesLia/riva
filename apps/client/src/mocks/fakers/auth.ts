@@ -1,36 +1,34 @@
 import { ApiError } from "@/api/error"
 import type {
   ErrorCode,
-  ErrorResponse,
   LoginCredentials,
   RegisterCredentials,
   UserResponse,
 } from "@/api/generated/models"
 import { authUserFixture } from "@/mocks/fixtures/auth"
 
-function authError(status: number, code: ErrorCode, message: string): ApiError {
-  const response: ErrorResponse = {
-    error: { code, message },
-  }
-  return new ApiError(status, response, message)
+function authError(code: ErrorCode, message: string): ApiError {
+  return new ApiError({ error: { code, message } })
 }
 
-export async function login(credentials: LoginCredentials): Promise<UserResponse> {
-  if (credentials.username === "invalid-user") {
-    throw authError(401, "auth.invalid_credentials", "Invalid username or password.")
-  }
-  return { ...authUserFixture }
-}
+export const authFaker = {
+  async login(credentials: LoginCredentials): Promise<UserResponse> {
+    if (credentials.username === "invalid-user") {
+      throw authError("auth.invalid_credentials", "Invalid username or password.")
+    }
+    return { ...authUserFixture }
+  },
 
-export async function register(credentials: RegisterCredentials): Promise<UserResponse> {
-  if (credentials.username === "taken-user") {
-    throw authError(409, "auth.username_taken", "Username is already registered.")
-  }
-  return { ...authUserFixture }
-}
+  async register(credentials: RegisterCredentials): Promise<UserResponse> {
+    if (credentials.username === "taken-user") {
+      throw authError("auth.username_taken", "Username is already registered.")
+    }
+    return { ...authUserFixture }
+  },
 
-export async function logout(): Promise<void> {}
+  async logout(): Promise<void> {},
 
-export async function getCurrentUser(): Promise<UserResponse> {
-  throw authError(401, "auth.not_authenticated", "Authentication is required.")
+  async getCurrentUser(): Promise<UserResponse> {
+    throw authError("auth.not_authenticated", "Authentication is required.")
+  },
 }

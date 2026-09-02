@@ -83,14 +83,13 @@ export function LoginForm({
   }
 
   function resolveLoginErrorCode(error: unknown): LoginErrorCode {
-    if (
-      error instanceof ApiError &&
-      error.status === 401 &&
-      error.code === "auth.invalid_credentials"
-    ) {
+    if (error instanceof ApiError && error.code === "auth.invalid_credentials") {
       return "invalidCredentials"
     }
-    if ((error instanceof ApiError && error.status === 503) || error instanceof TransportError) {
+    if (
+      (error instanceof ApiError && error.code === "dependency.database_unavailable") ||
+      error instanceof TransportError
+    ) {
       return "serviceUnavailable"
     }
     return "unknown"

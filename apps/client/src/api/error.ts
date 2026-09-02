@@ -4,16 +4,14 @@ import { ErrorCode } from "@/api/generated/models"
 import type { ErrorIssue, ErrorResponse } from "@/api/generated/models"
 
 export class ApiError extends Error {
-  readonly status: number
-  readonly code: ErrorCode | null
+  readonly code: ErrorCode
   readonly issues: ErrorIssue[] | null
 
-  constructor(status: number, response: ErrorResponse | null, message: string) {
-    super(response?.error.message ?? message)
+  constructor(response: ErrorResponse) {
+    super(response.error.message)
     this.name = "ApiError"
-    this.status = status
-    this.code = response?.error.code ?? null
-    this.issues = response?.error.issues ?? null
+    this.code = response.error.code
+    this.issues = response.error.issues ?? null
   }
 }
 
@@ -45,11 +43,9 @@ export function normalizeRequestError(error: unknown): Error {
   if (!isAxiosError(error)) return error instanceof Error ? error : new Error(String(error))
 
   if (error.response) {
-    return new ApiError(
-      error.response.status,
-      isErrorResponse(error.response.data) ? error.response.data : null,
-      error.message,
-    )
+    return isErrorResponse(error.response.data)
+      ? new ApiError(error.response.data)
+      : new Error(error.message)
   }
 
   if (error.code === "ERR_CANCELED") return new TransportError("cancelled", error.message)

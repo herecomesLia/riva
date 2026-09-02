@@ -1,15 +1,16 @@
+import { getCareerProfileMock, getHealthMock } from "@/api/generated/endpoints/index.msw"
 import {
-  getAuthMock,
-  getCareerProfileMock,
-  getHealthMock,
-  getUsersMock,
-} from "@/api/generated/endpoints/index.msw"
+  getDeleteUserAvatarMockHandler,
+  getSetUserAvatarMockHandler,
+  getUpdateCurrentUserMockHandler,
+} from "@/api/generated/endpoints/users/users.msw"
 import { authHandlers } from "@/mocks/handlers/auth"
 
 export const handlers = [
   ...authHandlers,
-  ...getAuthMock(),
   ...getCareerProfileMock(),
   ...getHealthMock(),
-  ...getUsersMock(),
+  getUpdateCurrentUserMockHandler(),
+  getSetUserAvatarMockHandler(),
+  getDeleteUserAvatarMockHandler(),
 ]

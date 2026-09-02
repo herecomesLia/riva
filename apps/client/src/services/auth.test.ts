@@ -22,19 +22,18 @@ describe("auth service", () => {
     })
   })
 
-  it("maps only an unauthenticated response to no restored session", async () => {
-    vi.mocked(getCurrentUser).mockRejectedValue(
-      new ApiError(
-        401,
-        {
-          error: { code: "auth.not_authenticated", message: "Authentication is required." },
-        },
-        "Request failed",
-      ),
-    )
+  it.each(["auth.invalid_session", "auth.not_authenticated", "auth.session_expired"] as const)(
+    "maps %s to no restored session",
+    async (code) => {
+      vi.mocked(getCurrentUser).mockRejectedValue(
+        new ApiError({
+          error: { code, message: "Authentication is required." },
+        }),
+      )
 
-    await expect(restoreCurrentUser()).resolves.toBeNull()
-  })
+      await expect(restoreCurrentUser()).resolves.toBeNull()
+    },
+  )
 
   it("does not hide non-authentication failures during session restoration", async () => {
     const error = new TransportError("network", "Network unavailable")

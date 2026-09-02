@@ -1,40 +1,28 @@
-import { HttpResponse, http } from "msw"
+import {
+  getLoginMockHandler,
+  getLogoutMockHandler,
+  getRegisterMockHandler,
+} from "@/api/generated/endpoints/auth/auth.msw"
+import { getGetCurrentUserMockHandler } from "@/api/generated/endpoints/users/users.msw"
+import type { LoginCredentials, RegisterCredentials } from "@/api/generated/models"
+import { authFaker as rawAuthFaker } from "@/mocks/fakers/auth"
+import { asMswFaker } from "@/mocks/handlers/adapter"
 
-import { ApiError } from "@/api/error"
-import type { ErrorResponse, LoginCredentials, RegisterCredentials } from "@/api/generated/models"
-import { getCurrentUser, login, logout, register } from "@/mocks/fakers/auth"
-
-async function handle<T>(operation: () => Promise<T>, respond: (result: T) => Response) {
-  try {
-    return respond(await operation())
-  } catch (error) {
-    if (!(error instanceof ApiError)) throw error
-
-    const response: ErrorResponse = {
-      error: {
-        code: error.code ?? "request.http_error",
-        message: error.message,
-        ...(error.issues ? { issues: error.issues } : {}),
-      },
-    }
-    return HttpResponse.json(response, { status: error.status })
-  }
-}
+const authFaker = asMswFaker(rawAuthFaker, {
+  "auth.invalid_credentials": 401,
+  "auth.not_authenticated": 401,
+  "auth.username_taken": 409,
+})
 
 export const authHandlers = [
-  http.post("*/api/auth/register", async ({ request }) => {
+  getRegisterMockHandler(async ({ request }) => {
     const credentials = (await request.json()) as RegisterCredentials
-    return handle(
-      () => register(credentials),
-      (user) => HttpResponse.json(user, { status: 201 }),
-    )
+    return authFaker.register(credentials)
   }),
-  http.post("*/api/auth/login", async ({ request }) => {
+  getLoginMockHandler(async ({ request }) => {
     const credentials = (await request.json()) as LoginCredentials
-    return handle(() => login(credentials), HttpResponse.json)
+    return authFaker.login(credentials)
   }),
-  http.post("*/api/auth/logout", () =>
-    handle(logout, () => new HttpResponse(null, { status: 204 })),
-  ),
-  http.get("*/api/users/me", () => handle(getCurrentUser, HttpResponse.json)),
+  getLogoutMockHandler(() => authFaker.logout()),
+  getGetCurrentUserMockHandler(() => authFaker.getCurrentUser()),
 ]

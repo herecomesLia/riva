@@ -25,14 +25,8 @@ function t(key: string) {
   return i18n.t(key)
 }
 
-function apiError(status: number, code: ErrorCode, message: string) {
-  return new ApiError(
-    status,
-    {
-      error: { code, message },
-    },
-    "Request failed",
-  )
+function apiError(code: ErrorCode, message: string) {
+  return new ApiError({ error: { code, message } })
 }
 
 function renderRegisterForm(onRegisterSuccess = vi.fn()) {
@@ -134,7 +128,7 @@ describe("RegisterForm", () => {
 
   it("shows a username-taken error without exposing the server message", async () => {
     registerMock.mockRejectedValue(
-      apiError(409, "auth.username_taken", "Sensitive duplicate-account detail"),
+      apiError("auth.username_taken", "Sensitive duplicate-account detail"),
     )
     renderRegisterForm()
     fillRegisterForm()
@@ -148,7 +142,7 @@ describe("RegisterForm", () => {
 
   it("clears a previous registration error when the username changes", async () => {
     registerMock.mockRejectedValue(
-      apiError(409, "auth.username_taken", "Username is already registered."),
+      apiError("auth.username_taken", "Username is already registered."),
     )
     renderRegisterForm()
     fillRegisterForm()
@@ -163,7 +157,7 @@ describe("RegisterForm", () => {
   })
 
   it.each([
-    apiError(503, "dependency.database_unavailable", "Database unavailable"),
+    apiError("dependency.database_unavailable", "Database unavailable"),
     new TransportError("network", "Network unavailable"),
   ])("shows service unavailable for request availability failures", async (error) => {
     registerMock.mockRejectedValue(error)

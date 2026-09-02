@@ -24,7 +24,6 @@ describe("normalizeRequestError", () => {
     expect(normalized).toBeInstanceOf(ApiError)
     expect(normalized).toMatchObject({
       message: "Invalid credentials",
-      status: 401,
       code: "auth.invalid_credentials",
       issues: [{ location: ["body", "email"], message: "Invalid email" }],
     })
@@ -41,12 +40,10 @@ describe("normalizeRequestError", () => {
 
     const normalized = normalizeRequestError(error)
 
-    expect(normalized).toBeInstanceOf(ApiError)
+    expect(normalized).toBeInstanceOf(Error)
+    expect(normalized).not.toBeInstanceOf(ApiError)
     expect(normalized).toMatchObject({
       message: "Bad gateway",
-      status: 502,
-      code: null,
-      issues: null,
     })
   })
 

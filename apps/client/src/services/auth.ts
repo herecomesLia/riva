@@ -38,7 +38,14 @@ export async function restoreCurrentUser(): Promise<User | null> {
   try {
     return mapUser(await getCurrentUser())
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) return null
+    if (error instanceof ApiError) {
+      switch (error.code) {
+        case "auth.invalid_session":
+        case "auth.not_authenticated":
+        case "auth.session_expired":
+          return null
+      }
+    }
     throw error
   }
 }

@@ -91,10 +91,13 @@ export function RegisterForm({ onRegisterSuccess }: RegisterFormProps) {
   })
 
   function resolveRegisterErrorCode(error: unknown): RegisterErrorCode {
-    if (error instanceof ApiError && error.status === 409 && error.code === "auth.username_taken") {
+    if (error instanceof ApiError && error.code === "auth.username_taken") {
       return "usernameTaken"
     }
-    if ((error instanceof ApiError && error.status === 503) || error instanceof TransportError) {
+    if (
+      (error instanceof ApiError && error.code === "dependency.database_unavailable") ||
+      error instanceof TransportError
+    ) {
       return "serviceUnavailable"
     }
     return "unknown"
