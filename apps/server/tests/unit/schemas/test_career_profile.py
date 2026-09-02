@@ -11,6 +11,8 @@ def _work_experience(*skills: str) -> dict[str, object]:
     return {
         "company": "Example Company",
         "title": "Software Engineer",
+        "start_date": "2022-07",
+        "end_date": None,
         "skills": list(skills),
     }
 

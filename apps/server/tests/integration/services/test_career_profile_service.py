@@ -48,6 +48,7 @@ def _work_experience(*skills: str) -> WorkExperienceEntry:
         achievements=["Improved system reliability"],
         skills=list(skills),
         start_date="2022-07",
+        end_date=None,
     )
 
 
@@ -60,6 +61,7 @@ def _project() -> ProjectEntry:
         tech_stack=["Python"],
         url="https://example.test/project",
         start_date="2023-01",
+        end_date=None,
     )
 
 

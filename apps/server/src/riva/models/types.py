@@ -20,16 +20,13 @@ YearMonth = Annotated[
 
 
 class YearMonthRangeModel(BaseModel):
-    start_date: YearMonth | None = None
-    end_date: YearMonth | None = None
+    start_date: YearMonth
+    # None means the range continues to the present.
+    end_date: YearMonth | None
 
     @model_validator(mode="after")
     def validate_date_range(self) -> Self:
-        if (
-            self.start_date is not None
-            and self.end_date is not None
-            and self.end_date < self.start_date
-        ):
+        if self.end_date is not None and self.end_date < self.start_date:
             raise ValueError("end_date must not be earlier than start_date")
 
         return self

@@ -28,6 +28,18 @@ def test_year_month_range_accepts_valid_range(
     assert result.end_date == end_date
 
 
+@pytest.mark.parametrize("missing_field", ["start_date", "end_date"])
+def test_year_month_range_requires_both_date_fields(missing_field: str) -> None:
+    values: dict[str, str] = {
+        "start_date": "2026-01",
+        "end_date": "2026-02",
+    }
+    values.pop(missing_field)
+
+    with pytest.raises(ValidationError):
+        YearMonthRangeModel.model_validate(values)
+
+
 def test_year_month_range_rejects_end_before_start() -> None:
     with pytest.raises(ValidationError):
         YearMonthRangeModel(start_date="2026-02", end_date="2026-01")

@@ -35,6 +35,7 @@ def _profile_payload(
                 "achievements": ["Improved system reliability"],
                 "skills": experience_skills,
                 "startDate": "2022-07",
+                "endDate": None,
             }
         ],
         "projects": [
@@ -46,6 +47,7 @@ def _profile_payload(
                 "techStack": ["Python"],
                 "url": "https://example.test/project",
                 "startDate": "2023-01",
+                "endDate": None,
             }
         ],
         "skills": profile_skills,

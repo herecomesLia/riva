@@ -7,8 +7,9 @@
 import type { EmploymentType } from "./employmentType"
 
 export interface WorkExperienceEntryRequest {
-  startDate?: string | null
-  endDate?: string | null
+  /** @pattern ^[0-9]{4}-(?:0[1-9]|1[0-2])$ */
+  startDate: string
+  endDate: string | null
   /** @minLength 1 */
   company: string
   /** @minLength 1 */

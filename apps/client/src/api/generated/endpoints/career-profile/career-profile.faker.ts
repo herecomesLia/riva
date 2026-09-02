@@ -14,19 +14,10 @@ export const getGetCareerProfileResponseMock = (
 ): CareerProfileResponse => ({
   education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
     () => ({
-      startDate: faker.helpers.arrayElement([
-        faker.helpers.arrayElement([
-          faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-          null,
-        ]),
-        undefined,
-      ]),
+      startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
       endDate: faker.helpers.arrayElement([
-        faker.helpers.arrayElement([
-          faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-          null,
-        ]),
-        undefined,
+        faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
+        null,
       ]),
       school: faker.string.alpha({ length: { min: 1, max: 20 } }),
       degree: faker.helpers.arrayElement([
@@ -43,13 +34,10 @@ export const getGetCareerProfileResponseMock = (
     { length: faker.number.int({ min: 1, max: 10 }) },
     (_, i) => i + 1,
   ).map(() => ({
-    startDate: faker.helpers.arrayElement([
-      faker.helpers.arrayElement([faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"), null]),
-      undefined,
-    ]),
+    startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
     endDate: faker.helpers.arrayElement([
-      faker.helpers.arrayElement([faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"), null]),
-      undefined,
+      faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
+      null,
     ]),
     company: faker.string.alpha({ length: { min: 1, max: 20 } }),
     title: faker.string.alpha({ length: { min: 1, max: 20 } }),
@@ -82,19 +70,10 @@ export const getGetCareerProfileResponseMock = (
   })),
   projects: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
     () => ({
-      startDate: faker.helpers.arrayElement([
-        faker.helpers.arrayElement([
-          faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-          null,
-        ]),
-        undefined,
-      ]),
+      startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
       endDate: faker.helpers.arrayElement([
-        faker.helpers.arrayElement([
-          faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-          null,
-        ]),
-        undefined,
+        faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
+        null,
       ]),
       name: faker.string.alpha({ length: { min: 1, max: 20 } }),
       role: faker.helpers.arrayElement([
@@ -138,19 +117,10 @@ export const getCreateCareerProfileResponseMock = (
 ): CareerProfileResponse => ({
   education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
     () => ({
-      startDate: faker.helpers.arrayElement([
-        faker.helpers.arrayElement([
-          faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-          null,
-        ]),
-        undefined,
-      ]),
+      startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
       endDate: faker.helpers.arrayElement([
-        faker.helpers.arrayElement([
-          faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-          null,
-        ]),
-        undefined,
+        faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
+        null,
       ]),
       school: faker.string.alpha({ length: { min: 1, max: 20 } }),
       degree: faker.helpers.arrayElement([
@@ -167,13 +137,10 @@ export const getCreateCareerProfileResponseMock = (
     { length: faker.number.int({ min: 1, max: 10 }) },
     (_, i) => i + 1,
   ).map(() => ({
-    startDate: faker.helpers.arrayElement([
-      faker.helpers.arrayElement([faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"), null]),
-      undefined,
-    ]),
+    startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
     endDate: faker.helpers.arrayElement([
-      faker.helpers.arrayElement([faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"), null]),
-      undefined,
+      faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
+      null,
     ]),
     company: faker.string.alpha({ length: { min: 1, max: 20 } }),
     title: faker.string.alpha({ length: { min: 1, max: 20 } }),
@@ -206,19 +173,10 @@ export const getCreateCareerProfileResponseMock = (
   })),
   projects: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
     () => ({
-      startDate: faker.helpers.arrayElement([
-        faker.helpers.arrayElement([
-          faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-          null,
-        ]),
-        undefined,
-      ]),
+      startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
       endDate: faker.helpers.arrayElement([
-        faker.helpers.arrayElement([
-          faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-          null,
-        ]),
-        undefined,
+        faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
+        null,
       ]),
       name: faker.string.alpha({ length: { min: 1, max: 20 } }),
       role: faker.helpers.arrayElement([
@@ -262,19 +220,10 @@ export const getUpdateCareerProfileResponseMock = (
 ): CareerProfileResponse => ({
   education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
     () => ({
-      startDate: faker.helpers.arrayElement([
-        faker.helpers.arrayElement([
-          faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-          null,
-        ]),
-        undefined,
-      ]),
+      startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
       endDate: faker.helpers.arrayElement([
-        faker.helpers.arrayElement([
-          faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-          null,
-        ]),
-        undefined,
+        faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
+        null,
       ]),
       school: faker.string.alpha({ length: { min: 1, max: 20 } }),
       degree: faker.helpers.arrayElement([
@@ -291,13 +240,10 @@ export const getUpdateCareerProfileResponseMock = (
     { length: faker.number.int({ min: 1, max: 10 }) },
     (_, i) => i + 1,
   ).map(() => ({
-    startDate: faker.helpers.arrayElement([
-      faker.helpers.arrayElement([faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"), null]),
-      undefined,
-    ]),
+    startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
     endDate: faker.helpers.arrayElement([
-      faker.helpers.arrayElement([faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"), null]),
-      undefined,
+      faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
+      null,
     ]),
     company: faker.string.alpha({ length: { min: 1, max: 20 } }),
     title: faker.string.alpha({ length: { min: 1, max: 20 } }),
@@ -330,19 +276,10 @@ export const getUpdateCareerProfileResponseMock = (
   })),
   projects: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
     () => ({
-      startDate: faker.helpers.arrayElement([
-        faker.helpers.arrayElement([
-          faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-          null,
-        ]),
-        undefined,
-      ]),
+      startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
       endDate: faker.helpers.arrayElement([
-        faker.helpers.arrayElement([
-          faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-          null,
-        ]),
-        undefined,
+        faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
+        null,
       ]),
       name: faker.string.alpha({ length: { min: 1, max: 20 } }),
       role: faker.helpers.arrayElement([

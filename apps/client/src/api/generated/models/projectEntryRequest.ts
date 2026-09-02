@@ -6,8 +6,9 @@
  */
 
 export interface ProjectEntryRequest {
-  startDate?: string | null
-  endDate?: string | null
+  /** @pattern ^[0-9]{4}-(?:0[1-9]|1[0-2])$ */
+  startDate: string
+  endDate: string | null
   /** @minLength 1 */
   name: string
   role?: string | null
