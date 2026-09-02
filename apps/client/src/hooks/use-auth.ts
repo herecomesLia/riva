@@ -1,3 +1,5 @@
+import { useCallback } from "react"
+
 import * as authService from "@/services/auth"
 import { useAuthStore } from "@/stores/auth"
 
@@ -26,17 +28,17 @@ export function useAuth() {
     return user
   }
 
-  async function restoreCurrentUser() {
-    const user = await authService.restoreCurrentUser()
+  const restoreCurrentUser = useCallback(async () => {
+    const restoredUser = await authService.restoreCurrentUser()
 
-    if (user) {
-      setCurrentUser(user)
-      return user
+    if (restoredUser) {
+      setCurrentUser(restoredUser)
+      return restoredUser
     }
 
     clearCurrentUser()
     return null
-  }
+  }, [clearCurrentUser, setCurrentUser])
 
   return {
     currentUser,
