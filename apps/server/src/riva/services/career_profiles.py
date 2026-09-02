@@ -14,6 +14,7 @@ from riva.services.errors import (
     CareerProfileNotFoundError,
     CareerProfileSkillMismatchError,
 )
+from riva.services.types import UNSET
 
 
 class CareerProfileService:
@@ -70,18 +71,24 @@ class CareerProfileService:
         self,
         user: User,
         *,
-        education: list[EducationEntry] | None = None,
-        work_experiences: list[WorkExperienceEntry] | None = None,
-        projects: list[ProjectEntry] | None = None,
-        skills: list[NonBlankStr] | None = None,
+        education: list[EducationEntry] | UNSET = UNSET,
+        work_experiences: list[WorkExperienceEntry] | UNSET = UNSET,
+        projects: list[ProjectEntry] | UNSET = UNSET,
+        skills: list[NonBlankStr] | UNSET = UNSET,
     ) -> CareerProfile:
         profile = await self.get(user)
+        if (
+            education is UNSET
+            and work_experiences is UNSET
+            and projects is UNSET
+            and skills is UNSET
+        ):
+            return profile
+
         next_work_experiences = (
-            work_experiences
-            if work_experiences is not None
-            else profile.work_experiences
+            profile.work_experiences if work_experiences is UNSET else work_experiences
         )
-        next_skills = skills if skills is not None else profile.skills
+        next_skills = profile.skills if skills is UNSET else skills
         if any(
             skill not in next_skills
             for work_experience in next_work_experiences
@@ -89,13 +96,13 @@ class CareerProfileService:
         ):
             raise CareerProfileSkillMismatchError()
 
-        if education is not None:
+        if education is not UNSET:
             profile.education = education
-        if work_experiences is not None:
+        if work_experiences is not UNSET:
             profile.work_experiences = work_experiences
-        if projects is not None:
+        if projects is not UNSET:
             profile.projects = projects
-        if skills is not None:
+        if skills is not UNSET:
             profile.skills = skills
 
         await self.session.commit()

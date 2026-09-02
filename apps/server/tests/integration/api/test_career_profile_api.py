@@ -150,6 +150,44 @@ async def test_patch_empty_list_clears_only_that_section(
     assert updated["skills"] == initial["skills"]
 
 
+async def test_patch_nested_work_experiences_persists_changes(
+    client: AsyncClient,
+) -> None:
+    await register_user(client)
+    create_response = await client.post(
+        "/api/career-profile",
+        headers=ORIGIN_HEADERS,
+        json=_profile_payload(),
+    )
+    assert create_response.status_code == 201
+
+    work_experiences = [
+        {
+            "company": "Updated Company",
+            "title": "Staff Software Engineer",
+            "employmentType": "contract",
+            "location": "Hybrid",
+            "responsibilities": ["Lead platform improvements"],
+            "achievements": ["Reduced deployment time"],
+            "skills": ["Python"],
+            "startDate": "2024-01",
+            "endDate": None,
+        }
+    ]
+    response = await client.patch(
+        "/api/career-profile",
+        headers=ORIGIN_HEADERS,
+        json={"workExperiences": work_experiences},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["workExperiences"] == work_experiences
+
+    persisted_response = await client.get("/api/career-profile")
+    assert persisted_response.status_code == 200
+    assert persisted_response.json()["workExperiences"] == work_experiences
+
+
 async def test_patch_rejects_skill_mismatch_using_persisted_work_experiences(
     client: AsyncClient,
 ) -> None:

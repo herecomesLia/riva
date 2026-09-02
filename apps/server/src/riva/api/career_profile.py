@@ -84,10 +84,5 @@ async def update_career_profile(
     current_user: CurrentUserDep,
     career_profile_service: CareerProfileServiceDep,
 ) -> CareerProfile:
-    return await career_profile_service.update(
-        current_user,
-        education=payload.education,
-        work_experiences=payload.work_experiences,
-        projects=payload.projects,
-        skills=payload.skills,
-    )
+    changes = {field: getattr(payload, field) for field in payload.model_fields_set}
+    return await career_profile_service.update(current_user, **changes)

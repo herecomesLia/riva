@@ -21,6 +21,7 @@ from riva.services.errors import (
     SessionExpiredError,
     UsernameTakenError,
 )
+from riva.services.types import UNSET
 from riva.utils import utc_now
 
 _password_hasher = PasswordHasher()
@@ -133,9 +134,9 @@ class UserService:
         self,
         user: User,
         *,
-        display_name: str | None = None,
+        display_name: str | UNSET = UNSET,
     ) -> User:
-        if display_name is None or display_name == user.display_name:
+        if display_name is UNSET or display_name == user.display_name:
             return user
 
         user.display_name = display_name

@@ -132,6 +132,16 @@ async def test_get_raises_when_profile_does_not_exist(
         await career_profile_service.get(user)
 
 
+async def test_update_raises_when_profile_does_not_exist(
+    career_profile_service: CareerProfileService,
+    user_service: UserService,
+) -> None:
+    user = await _new_user(user_service)
+
+    with pytest.raises(CareerProfileNotFoundError):
+        await career_profile_service.update(user)
+
+
 async def test_create_rejects_duplicate_profile(
     career_profile_service: CareerProfileService,
     user_service: UserService,
