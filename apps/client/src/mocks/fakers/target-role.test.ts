@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest"
 
 import { createTargetRoleFaker } from "@/mocks/fakers/target-role"
 import { targetRoleFixture, targetRoleListFixture } from "@/mocks/fixtures/target-role"
+import {
+  imageRecognitionFixture,
+  textRecognitionFixture,
+  urlRecognitionFixture,
+} from "@/mocks/fixtures/target-role-recognition"
 
 describe("targetRoleFaker", () => {
   it("keeps CRUD and active-role lifecycle state consistent", async () => {
@@ -68,5 +73,40 @@ describe("targetRoleFaker", () => {
       preferredQualifications: targetRoleFixture.jd.preferredQualifications,
       businessDomains: targetRoleFixture.jd.businessDomains,
     })
+  })
+
+  it.each([
+    ["text", { sourceType: "text" as const, text: "A job posting" }, textRecognitionFixture],
+    [
+      "image",
+      { sourceType: "image" as const, images: [new File(["posting"], "posting.png")] },
+      imageRecognitionFixture,
+    ],
+    [
+      "url",
+      { sourceType: "url" as const, url: "https://example.com/jobs/1" },
+      urlRecognitionFixture,
+    ],
+  ])(
+    "recognizes a %s source into a listed role without changing the active role",
+    async (_sourceType, input, fixture) => {
+      const faker = createTargetRoleFaker(targetRoleListFixture)
+
+      const recognized = await faker.recognize(input)
+      const state = await faker.list()
+
+      expect(recognized).toMatchObject(fixture)
+      expect(state.targetRoles).toContainEqual(recognized)
+      expect(state.activeTargetRoleId).toBe(targetRoleListFixture.activeTargetRoleId)
+    },
+  )
+
+  it("rejects empty text recognition without changing state", async () => {
+    const faker = createTargetRoleFaker(targetRoleListFixture)
+    const before = await faker.list()
+
+    await expect(faker.recognize({ sourceType: "text", text: "   " })).rejects.toThrow()
+
+    expect(await faker.list()).toEqual(before)
   })
 })

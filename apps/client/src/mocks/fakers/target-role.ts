@@ -11,7 +11,13 @@ import type {
   UpdateJobDescriptionRequest,
   UpdateTargetRoleRequest,
 } from "@/api/generated/models"
+import type { RecognizeTargetRoleInput } from "@/models/roles"
 import { targetRoleListFixture } from "@/mocks/fixtures/target-role"
+import {
+  imageRecognitionFixture,
+  textRecognitionFixture,
+  urlRecognitionFixture,
+} from "@/mocks/fixtures/target-role-recognition"
 import { createMockApiError } from "@/mocks/utils"
 
 const emptyJobDescription = {
@@ -96,6 +102,25 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
     return structuredClone(storedRole)
   }
 
+  async function create(input: CreateTargetRoleRequest): Promise<TargetRoleResponse> {
+    const createdAt = nextTimestamp()
+    const role: TargetRoleResponse = {
+      id: nextId(),
+      title: input.title,
+      company: input.company ?? null,
+      recruitmentTrack: input.recruitmentTrack ?? null,
+      location: input.location ?? null,
+      isArchived: false,
+      jd: structuredClone(emptyJobDescription),
+      createdAt,
+      updatedAt: createdAt,
+    }
+
+    const storedRole = structuredClone(role)
+    state = { ...state, targetRoles: [...state.targetRoles, storedRole] }
+    return structuredClone(storedRole)
+  }
+
   return {
     async list(): Promise<TargetRoleListResponse> {
       return {
@@ -108,23 +133,30 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
       }
     },
 
-    async create(input: CreateTargetRoleRequest): Promise<TargetRoleResponse> {
-      const createdAt = nextTimestamp()
-      const role: TargetRoleResponse = {
-        id: nextId(),
-        title: input.title,
-        company: input.company ?? null,
-        recruitmentTrack: input.recruitmentTrack ?? null,
-        location: input.location ?? null,
-        isArchived: false,
-        jd: structuredClone(emptyJobDescription),
-        createdAt,
-        updatedAt: createdAt,
+    create,
+
+    async recognize(input: RecognizeTargetRoleInput): Promise<TargetRoleResponse> {
+      if (input.sourceType === "text") {
+        if (!input.text.trim()) throw new Error("Job posting text is required.")
+        return create(textRecognitionFixture)
+      }
+      if (input.sourceType === "image") {
+        if (input.images.length === 0)
+          throw new Error("At least one job posting image is required.")
+        return create(imageRecognitionFixture)
       }
 
-      const storedRole = structuredClone(role)
-      state = { ...state, targetRoles: [...state.targetRoles, storedRole] }
-      return structuredClone(storedRole)
+      const url = input.url.trim()
+      let parsedUrl: URL
+      try {
+        parsedUrl = new URL(url)
+      } catch {
+        throw new Error("A valid HTTP(S) job posting URL is required.")
+      }
+      if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+        throw new Error("A valid HTTP(S) job posting URL is required.")
+      }
+      return create(urlRecognitionFixture)
     },
 
     async update(roleId: string, input: UpdateTargetRoleRequest): Promise<TargetRoleResponse> {
