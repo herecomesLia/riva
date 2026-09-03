@@ -3,7 +3,6 @@ from http import HTTPStatus
 from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 
-from riva.db.errors import DatabaseUnavailableError
 from riva.schemas import DependencyHealthStatus, HealthResponse, ServiceHealthStatus
 
 router = APIRouter(tags=["health"])
@@ -21,18 +20,22 @@ router = APIRouter(tags=["health"])
     },
 )
 async def health(request: Request) -> HealthResponse | JSONResponse:
-    try:
-        await request.app.state.database.ping()
-    except DatabaseUnavailableError:
+    service_status = ServiceHealthStatus.ok
+    database_status = DependencyHealthStatus.ok
+    if not await request.app.state.database.check_health():
+        service_status = ServiceHealthStatus.unhealthy
+        database_status = DependencyHealthStatus.unavailable
+
+    if service_status != ServiceHealthStatus.ok:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content=HealthResponse(
-                status=ServiceHealthStatus.unhealthy,
-                database=DependencyHealthStatus.unavailable,
+                status=service_status,
+                database=database_status,
             ).model_dump(mode="json"),
         )
 
     return HealthResponse(
-        status=ServiceHealthStatus.ok,
-        database=DependencyHealthStatus.ok,
+        status=service_status,
+        database=database_status,
     )
