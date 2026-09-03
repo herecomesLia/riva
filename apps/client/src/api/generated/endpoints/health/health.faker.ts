@@ -14,5 +14,6 @@ export const getCheckHealthResponseMock = (
 ): HealthResponse => ({
   status: faker.helpers.arrayElement(Object.values(ServiceHealthStatus)),
   database: faker.helpers.arrayElement(Object.values(DependencyHealthStatus)),
+  llm: faker.helpers.arrayElement(Object.values(DependencyHealthStatus)),
   ...overrideResponse,
 })

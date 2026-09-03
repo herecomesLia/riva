@@ -18,3 +18,4 @@ class DependencyHealthStatus(StrEnum):
 class HealthResponse(ResponseModel):
     status: ServiceHealthStatus
     database: DependencyHealthStatus
+    llm: DependencyHealthStatus

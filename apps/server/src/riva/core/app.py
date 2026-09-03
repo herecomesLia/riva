@@ -36,9 +36,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         app.state.llm = llm
 
     logger = structlog.get_logger("riva.app")
-    if not settings.llm.configured:
-        logger.warning("llm.not_configured")
-
     lifecycle_fields = {
         "log_level": settings.log_level.value,
     }
@@ -51,6 +48,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         async with database:
             await database.ping()
             startup_succeeded = True
+
+            if not settings.llm.configured:
+                logger.warning("llm.not_configured")
+            elif await llm.check_health():
+                logger.info("llm.available", model=settings.llm.model)
+            else:
+                logger.warning("llm.unavailable", model=settings.llm.model)
 
             logger.info(
                 "app.start",

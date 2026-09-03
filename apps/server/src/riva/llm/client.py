@@ -1,47 +1,121 @@
+from async_lru import alru_cache
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
+from openai import APIStatusError, AsyncOpenAI
 
 from riva.core.config import LLMSettings
-from riva.llm.errors import LLMUnavailableError
+from riva.llm.errors import LLMError, LLMNotConfiguredError
 
 
 class LLMClient:
     def __init__(self, settings: LLMSettings) -> None:
-        self.settings = settings
+        self._settings = settings
         self._chat_model: BaseChatModel | None = None
+        self._health_client: AsyncOpenAI | None = None
+        self._cached_check_health = alru_cache(
+            maxsize=1, ttl=settings.health_ttl_seconds
+        )(self._check_health)
 
-    def get_chat_model(self) -> BaseChatModel:
-        if not self.settings.configured:
-            raise LLMUnavailableError("LLM is not configured.")
-
-        model = self.settings.model
-        api_key = self.settings.api_key
-        base_url = self.settings.base_url
-        if model is None or api_key is None or base_url is None:
-            raise LLMUnavailableError("LLM configuration is incomplete.")
-
+    @property
+    def chat_model(self) -> BaseChatModel:
         if self._chat_model is None:
-            self._chat_model = ChatOpenAI(
-                model=model,
-                api_key=api_key,
-                base_url=str(base_url),
-                timeout=self.settings.timeout_seconds,
-                max_retries=self.settings.max_retries,
-            )
+            model, api_key, base_url = self._require_configured()
+            try:
+                self._chat_model = ChatOpenAI(
+                    model=model,
+                    api_key=api_key,
+                    base_url=base_url,
+                    timeout=self._settings.timeout_seconds,
+                    max_retries=self._settings.max_retries,
+                )
+            except Exception as exc:
+                raise LLMError("Failed to initialize LLM chat model.") from exc
         return self._chat_model
 
-    async def close(self) -> None:
-        if self._chat_model is None:
-            return
+    async def check_health(self) -> bool:
+        if self._settings.health_ttl_seconds == 0:
+            return await self._check_health()
+        return await self._cached_check_health()
 
-        root_client = getattr(self._chat_model, "root_client", None)
-        root_async_client = getattr(self._chat_model, "root_async_client", None)
+    async def _check_health(self) -> bool:
         try:
-            if root_client is not None:
-                root_client.close()
+            await self.ping()
+        except LLMError:
+            return False
+        return True
+
+    async def close(self) -> None:
+        await self._cached_check_health.cache_close()
+
+        health_client = self._health_client
+        chat_model = self._chat_model
+        self._health_client = None
+        self._chat_model = None
+
+        try:
+            if health_client is not None:
+                await health_client.close()
         finally:
+            if chat_model is not None:
+                root_client = getattr(chat_model, "root_client", None)
+                root_async_client = getattr(chat_model, "root_async_client", None)
+                try:
+                    if root_client is not None:
+                        root_client.close()
+                finally:
+                    if root_async_client is not None:
+                        await root_async_client.close()
+
+    def _require_configured(self) -> tuple[str, str, str]:
+        if not self._settings.configured:
+            raise LLMNotConfiguredError("LLM is not configured.")
+
+        model = self._settings.model
+        api_key = self._settings.api_key
+        base_url = self._settings.base_url
+        if model is None or api_key is None or base_url is None:
+            raise LLMNotConfiguredError("LLM configuration is incomplete.")
+        return model, api_key.get_secret_value(), str(base_url)
+
+    async def ping(self) -> None:
+        if not self._settings.configured:
+            raise LLMNotConfiguredError("LLM is not configured.")
+
+        try:
+            await self._ping_remote()
+        except LLMError:
+            raise
+        except Exception as exc:
+            raise LLMError("LLM ping failed.") from exc
+
+    async def _ping_remote(self) -> None:
+        model, _, _ = self._require_configured()
+        client = self._get_health_client()
+
+        try:
+            await client.models.retrieve(model)
+            return
+        except APIStatusError as exc:
+            if exc.status_code not in {404, 405, 501}:
+                raise
+
+        # Compatibility fallback for providers that expose /models but not /models/{model}.
+        async for available_model in client.models.list():
+            if available_model.id == model:
+                return
+
+        raise LLMError(f"Configured model is unavailable: {model}")
+
+    def _get_health_client(self) -> AsyncOpenAI:
+        if self._health_client is None:
+            _, api_key, base_url = self._require_configured()
             try:
-                if root_async_client is not None:
-                    await root_async_client.close()
-            finally:
-                self._chat_model = None
+                self._health_client = AsyncOpenAI(
+                    api_key=api_key,
+                    base_url=base_url,
+                    timeout=self._settings.health_timeout_seconds,
+                    max_retries=0,
+                )
+            except Exception as exc:
+                raise LLMError("Failed to initialize LLM health client.") from exc
+        return self._health_client

@@ -10,4 +10,5 @@ import type { ServiceHealthStatus } from "./serviceHealthStatus"
 export interface HealthResponse {
   status: ServiceHealthStatus
   database: DependencyHealthStatus
+  llm: DependencyHealthStatus
 }

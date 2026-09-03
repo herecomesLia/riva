@@ -1,3 +1,4 @@
+import asyncio
 from http import HTTPStatus
 
 from fastapi import APIRouter, Request, status
@@ -20,22 +21,36 @@ router = APIRouter(tags=["health"])
     },
 )
 async def health(request: Request) -> HealthResponse | JSONResponse:
-    service_status = ServiceHealthStatus.ok
-    database_status = DependencyHealthStatus.ok
-    if not await request.app.state.database.check_health():
-        service_status = ServiceHealthStatus.unhealthy
-        database_status = DependencyHealthStatus.unavailable
+    database_available, llm_available = await asyncio.gather(
+        request.app.state.database.check_health(),
+        request.app.state.llm.check_health(),
+    )
 
+    service_status = (
+        ServiceHealthStatus.ok
+        if database_available and llm_available
+        else ServiceHealthStatus.unhealthy
+    )
+    database_status = (
+        DependencyHealthStatus.ok
+        if database_available
+        else DependencyHealthStatus.unavailable
+    )
+    llm_status = (
+        DependencyHealthStatus.ok
+        if llm_available
+        else DependencyHealthStatus.unavailable
+    )
+
+    response = HealthResponse(
+        status=service_status,
+        database=database_status,
+        llm=llm_status,
+    )
     if service_status != ServiceHealthStatus.ok:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content=HealthResponse(
-                status=service_status,
-                database=database_status,
-            ).model_dump(mode="json"),
+            content=response.model_dump(mode="json"),
         )
 
-    return HealthResponse(
-        status=service_status,
-        database=database_status,
-    )
+    return response

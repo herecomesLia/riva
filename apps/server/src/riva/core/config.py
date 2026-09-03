@@ -28,7 +28,7 @@ class LLMSettings(BaseModel):
     timeout_seconds: float = Field(default=60, gt=0)
     max_retries: int = Field(default=2, ge=0)
     health_timeout_seconds: float = Field(default=5, gt=0)
-    health_cache_seconds: float = Field(default=30, ge=0)
+    health_ttl_seconds: float = Field(default=30, ge=0)
 
     @field_validator("base_url", mode="before")
     @classmethod
@@ -130,7 +130,7 @@ class Settings(BaseSettings):
         os.environ["RIVA_LLM_HEALTH_TIMEOUT_SECONDS"] = str(
             self.llm.health_timeout_seconds
         )
-        os.environ["RIVA_LLM_HEALTH_CACHE_SECONDS"] = str(self.llm.health_cache_seconds)
+        os.environ["RIVA_LLM_HEALTH_TTL_SECONDS"] = str(self.llm.health_ttl_seconds)
         os.environ["RIVA_CORS_ALLOWED_ORIGINS"] = ",".join(self.cors_allowed_origins)
         os.environ["RIVA_CORS_ALLOW_CREDENTIALS"] = str(
             self.cors_allow_credentials
