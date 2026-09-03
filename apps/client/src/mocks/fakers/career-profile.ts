@@ -1,10 +1,8 @@
-import { ApiError } from "@/api/error"
 import type {
   CareerProfileResponse,
   CreateCareerProfileRequest,
   EducationEntryRequest,
   EducationEntryResponse,
-  ErrorCode,
   ProjectEntryRequest,
   ProjectEntryResponse,
   UpdateCareerProfileRequest,
@@ -15,14 +13,11 @@ import {
   careerProfileFixture,
   resumeImportedCareerProfileFixture,
 } from "@/mocks/fixtures/career-profile"
+import { createMockApiError } from "@/mocks/utils"
 import type { ResumeImportInput } from "@/models/resume"
 
 const createdAt = "2025-01-15T08:00:00Z"
 const updatedAt = "2025-02-01T08:00:00Z"
-
-function careerProfileError(code: ErrorCode, message: string): ApiError {
-  return new ApiError({ error: { code, message, issues: [] } })
-}
 
 type CareerProfileSections = Pick<
   CareerProfileResponse,
@@ -74,7 +69,7 @@ function validateSkills(profile: CareerProfileResponse) {
   )
 
   if (hasMismatch) {
-    throw careerProfileError(
+    throw createMockApiError(
       "domain.validation_failed",
       "Work experience skills must exist in the career profile skills list.",
     )
@@ -87,7 +82,7 @@ export function createCareerProfileFaker(initialProfile: CareerProfileResponse |
   return {
     async get(): Promise<CareerProfileResponse> {
       if (!profile) {
-        throw careerProfileError("resource.not_found", "Career profile was not found.")
+        throw createMockApiError("resource.not_found", "Career profile was not found.")
       }
 
       return structuredClone(profile)
@@ -95,7 +90,7 @@ export function createCareerProfileFaker(initialProfile: CareerProfileResponse |
 
     async create(input: CreateCareerProfileRequest): Promise<CareerProfileResponse> {
       if (profile) {
-        throw careerProfileError("resource.conflict", "Career profile already exists.")
+        throw createMockApiError("resource.conflict", "Career profile already exists.")
       }
 
       const nextProfile: CareerProfileResponse = {
@@ -111,7 +106,7 @@ export function createCareerProfileFaker(initialProfile: CareerProfileResponse |
 
     async update(input: UpdateCareerProfileRequest): Promise<CareerProfileResponse> {
       if (!profile) {
-        throw careerProfileError("resource.not_found", "Career profile was not found.")
+        throw createMockApiError("resource.not_found", "Career profile was not found.")
       }
 
       const nextProfile: CareerProfileResponse = {
