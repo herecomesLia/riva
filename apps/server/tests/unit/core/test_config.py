@@ -3,7 +3,7 @@ import os
 import pytest
 from pydantic import ValidationError
 
-from riva.core.config import SameSitePolicy, Settings
+from riva.core.config import LLMSettings, SameSitePolicy, Settings
 
 DATABASE_URL = "postgresql+asyncpg://test:test@invalid/test"
 SESSION_DIGEST_KEY = "valid-session-digest-key"
@@ -13,6 +13,8 @@ SESSION_DIGEST_KEY = "valid-session-digest-key"
 def clear_riva_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     for field_name in Settings.model_fields:
         monkeypatch.delenv(f"RIVA_{field_name.upper()}", raising=False)
+    for field_name in LLMSettings.model_fields:
+        monkeypatch.delenv(f"RIVA_LLM_{field_name.upper()}", raising=False)
 
 
 def _settings(**overrides: object) -> Settings:
@@ -83,6 +85,51 @@ def test_settings_rejects_blank_session_digest_key(session_digest_key: str) -> N
 
 def test_settings_accepts_non_blank_session_digest_key() -> None:
     assert _settings(session_digest_key="valid-key").session_digest_key == "valid-key"
+
+
+def test_settings_treats_empty_llm_base_url_as_not_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RIVA_LLM_BASE_URL", "")
+    monkeypatch.setenv("RIVA_LLM_MODEL", "")
+    monkeypatch.setenv("RIVA_LLM_API_KEY", "")
+
+    settings = _settings()
+
+    assert settings.llm.configured is False
+
+
+@pytest.mark.parametrize(
+    "llm",
+    [
+        {"base_url": "https://llm.test/v1"},
+        {"base_url": "https://llm.test/v1", "model": "   "},
+        {"base_url": "https://llm.test/v1", "api_key": None},
+        {"base_url": "https://llm.test/v1", "api_key": "   "},
+    ],
+)
+def test_settings_requires_model_and_api_key_when_llm_is_configured(
+    llm: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError):
+        _settings(llm=llm)
+
+
+def test_settings_loads_llm_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RIVA_LLM_BASE_URL", "https://llm.test/v1")
+    monkeypatch.setenv("RIVA_LLM_MODEL", "test-model")
+    monkeypatch.setenv("RIVA_LLM_API_KEY", "test-key")
+    monkeypatch.setenv("RIVA_LLM_HEALTH_TTL_SECONDS", "12")
+
+    settings = _settings()
+
+    assert str(settings.llm.base_url) == "https://llm.test/v1"
+    assert settings.llm.model == "test-model"
+    assert settings.llm.api_key is not None
+    assert settings.llm.api_key.get_secret_value() == "test-key"
+    assert settings.llm.health_ttl_seconds == 12
 
 
 @pytest.mark.parametrize(
@@ -193,6 +240,15 @@ def test_write_environ_writes_all_settings(
         session_cookie_path="/api",
         session_idle_timeout_seconds=60,
         session_refresh_interval_seconds=0,
+        llm={
+            "model": "test-model",
+            "api_key": "test-key",
+            "base_url": "https://llm.test/v1",
+            "timeout_seconds": 12,
+            "max_retries": 3,
+            "health_timeout_seconds": 7,
+            "health_ttl_seconds": 18,
+        },
     )
     expected = {
         "RIVA_HOST": "0.0.0.0",
@@ -200,6 +256,13 @@ def test_write_environ_writes_all_settings(
         "RIVA_LOG_LEVEL": "debug",
         "RIVA_LOG_FORMAT": "json",
         "RIVA_DATABASE_URL": "postgresql+asyncpg://riva:riva@db/riva",
+        "RIVA_LLM_MODEL": "test-model",
+        "RIVA_LLM_API_KEY": "test-key",
+        "RIVA_LLM_BASE_URL": "https://llm.test/v1",
+        "RIVA_LLM_TIMEOUT_SECONDS": "12.0",
+        "RIVA_LLM_MAX_RETRIES": "3",
+        "RIVA_LLM_HEALTH_TIMEOUT_SECONDS": "7.0",
+        "RIVA_LLM_HEALTH_TTL_SECONDS": "18.0",
         "RIVA_CORS_ALLOWED_ORIGINS": "https://a.test,https://b.test",
         "RIVA_CORS_ALLOW_CREDENTIALS": "false",
         "RIVA_SESSION_DIGEST_KEY": "digest-key",
