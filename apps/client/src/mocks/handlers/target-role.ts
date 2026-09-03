@@ -1,0 +1,52 @@
+import {
+  getArchiveTargetRoleMockHandler,
+  getCreateTargetRoleMockHandler,
+  getDeleteTargetRoleMockHandler,
+  getListTargetRolesMockHandler,
+  getRestoreTargetRoleMockHandler,
+  getSetActiveTargetRoleMockHandler,
+  getUpdateTargetRoleJdMockHandler,
+  getUpdateTargetRoleMockHandler,
+} from "@/api/generated/endpoints/target-roles/target-roles.msw"
+import type {
+  CreateTargetRoleRequest,
+  SetActiveTargetRoleRequest,
+  UpdateJobDescriptionRequest,
+  UpdateTargetRoleRequest,
+} from "@/api/generated/models"
+import { targetRoleFaker as rawTargetRoleFaker } from "@/mocks/fakers/target-role"
+import { asMswFaker } from "@/mocks/handlers/adapter"
+
+const targetRoleFaker = asMswFaker(rawTargetRoleFaker, {
+  "resource.not_found": 404,
+  "resource.conflict": 409,
+})
+
+export const targetRoleHandlers = [
+  getListTargetRolesMockHandler(() => targetRoleFaker.list()),
+  getCreateTargetRoleMockHandler(async ({ request }) => {
+    const input = (await request.json()) as CreateTargetRoleRequest
+    return targetRoleFaker.create(input)
+  }),
+  getUpdateTargetRoleMockHandler(async ({ params, request }) => {
+    const input = (await request.json()) as UpdateTargetRoleRequest
+    return targetRoleFaker.update(params.targetRoleId as string, input)
+  }),
+  getDeleteTargetRoleMockHandler(({ params }) =>
+    targetRoleFaker.delete(params.targetRoleId as string),
+  ),
+  getSetActiveTargetRoleMockHandler(async ({ request }) => {
+    const input = (await request.json()) as SetActiveTargetRoleRequest
+    return targetRoleFaker.setActive(input)
+  }),
+  getArchiveTargetRoleMockHandler(({ params }) =>
+    targetRoleFaker.archive(params.targetRoleId as string),
+  ),
+  getRestoreTargetRoleMockHandler(({ params }) =>
+    targetRoleFaker.restore(params.targetRoleId as string),
+  ),
+  getUpdateTargetRoleJdMockHandler(async ({ params, request }) => {
+    const input = (await request.json()) as UpdateJobDescriptionRequest
+    return targetRoleFaker.updateJd(params.targetRoleId as string, input)
+  }),
+]
