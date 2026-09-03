@@ -21,6 +21,7 @@ export default defineConfig({
       client: "axios-functions",
       target: fileURLToPath(new URL("./src/api/generated/endpoints", import.meta.url)),
       schemas: fileURLToPath(new URL("./src/api/generated/models", import.meta.url)),
+      tsconfig: { compilerOptions: { target: "es2023" } },
       clean: true,
       indexFiles: true,
       tagsSplitDeduplication: true,
