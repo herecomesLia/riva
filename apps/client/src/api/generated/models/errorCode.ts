@@ -9,6 +9,7 @@ export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode]
 
 export const ErrorCode = {
   dependencydatabase_unavailable: "dependency.database_unavailable",
+  dependencyllm_unavailable: "dependency.llm_unavailable",
   requestcsrf_failed: "request.csrf_failed",
   requesthttp_error: "request.http_error",
   requestmethod_not_allowed: "request.method_not_allowed",

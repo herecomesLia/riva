@@ -14,6 +14,7 @@ from riva.api.routes import router
 from riva.core.config import Settings
 from riva.core.logging import RequestLoggingMiddleware
 from riva.db import Database
+from riva.llm import LLMClient
 from riva.utils import seconds_to_ms
 
 
@@ -29,7 +30,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         database = Database(settings.database_url)
         app.state.database = database
 
+    llm: LLMClient | None = app.state.llm
+    if llm is None:
+        llm = LLMClient(settings.llm)
+        app.state.llm = llm
+
     logger = structlog.get_logger("riva.app")
+    if not settings.llm.configured:
+        logger.warning("llm.not_configured")
+
     lifecycle_fields = {
         "log_level": settings.log_level.value,
     }
@@ -59,6 +68,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
                     status="in_progress",
                     **lifecycle_fields,
                 )
+                await llm.close()
     except Exception:
         if startup_succeeded:
             if shutdown_started_at is not None:
@@ -120,6 +130,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Riva API", lifespan=lifespan)
     app.state.settings = settings
     app.state.database = database
+    app.state.llm = None
     register_exception_handlers(app)
     register_middlewares(app)
     app.include_router(router, prefix="/api")

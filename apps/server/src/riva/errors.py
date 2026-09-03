@@ -4,6 +4,7 @@ from typing import ClassVar
 
 class ErrorCode(StrEnum):
     DEPENDENCY_DATABASE_UNAVAILABLE = "dependency.database_unavailable"
+    DEPENDENCY_LLM_UNAVAILABLE = "dependency.llm_unavailable"
     REQUEST_CSRF_FAILED = "request.csrf_failed"
     REQUEST_HTTP_ERROR = "request.http_error"
     REQUEST_METHOD_NOT_ALLOWED = "request.method_not_allowed"

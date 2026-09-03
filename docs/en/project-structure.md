@@ -81,9 +81,8 @@ apps/server/
 │       ├── models/
 │       ├── schemas/
 │       ├── services/
-│       ├── agents/
-│       ├── prompts/
-│       └── integrations/
+│       ├── ai/
+│       └── llm/
 ├── tests/
 └── migrations/
 ```
@@ -99,6 +98,5 @@ Layer responsibilities:
 - `schemas/`: Pydantic request and response schemas.
 - `services/`: business services for resumes, jobs, matching analysis, questions,
   interviews, and review scoring.
-- `agents/`: agents and workflows.
-- `prompts/`: prompt templates, scoring rubrics, and output formats.
-- `integrations/`: adapters for LLM providers, object storage, email, and third-party APIs.
+- `ai/`: AI business workflows and agents.
+- `llm/`: OpenAI-compatible LLM runtime and client integration.
