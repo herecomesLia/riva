@@ -308,7 +308,6 @@ describe("training completion to history mock integration", () => {
         company: "Edited Company",
         recruitmentType: role.recruitmentType,
         location: role.location,
-        experienceRange: role.experienceRange,
       }),
     )
 

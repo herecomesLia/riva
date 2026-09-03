@@ -25,7 +25,6 @@ const newRole = {
   company: "Shopify",
   recruitmentType: "experienced" as const,
   location: "Remote",
-  experienceRange: { minYears: 4, maxYears: null },
 }
 
 beforeEach(() => {
@@ -119,7 +118,6 @@ describe("roles stateful mock service", () => {
         title: "前端平台工程师",
         company: "Riva",
         location: "上海",
-        experienceRange: { minYears: 3, maxYears: 5 },
       },
     })
   })
@@ -490,7 +488,6 @@ describe("roles stateful mock service", () => {
       company: before.company,
       recruitmentType: before.recruitmentType,
       location: before.location,
-      experienceRange: before.experienceRange,
     })
     const assertion = expect(promise).rejects.toThrow("version is out of date")
     await vi.runAllTimersAsync()

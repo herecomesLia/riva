@@ -161,17 +161,6 @@ function CurrentRoleDataContent({
   currentRole: NonNullable<DashboardResponse["currentRole"]>
 }) {
   const { t } = useTranslation()
-  const experienceYears = currentRole.experienceYears
-  const experienceYearsLabel = !experienceYears
-    ? null
-    : experienceYears.min !== null && experienceYears.max !== null
-      ? t("dashboard.currentRole.experienceYears.range", experienceYears)
-      : experienceYears.min !== null
-        ? t("dashboard.currentRole.experienceYears.minimum", { min: experienceYears.min })
-        : experienceYears.max !== null
-          ? t("dashboard.currentRole.experienceYears.maximum", { max: experienceYears.max })
-          : null
-  const metadata = [currentRole.location, experienceYearsLabel].filter(Boolean)
 
   return (
     <>
@@ -183,10 +172,10 @@ function CurrentRoleDataContent({
           <p className="truncate font-heading text-2xl font-medium tracking-tight">
             {currentRole.title}
           </p>
-          {metadata.length > 0 && (
+          {currentRole.location && (
             <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
               <MapPinIcon className="size-3.5 shrink-0" />
-              {metadata.join(" · ")}
+              {currentRole.location}
             </p>
           )}
         </div>

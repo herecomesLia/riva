@@ -2,11 +2,6 @@ export type TargetRoleRecruitmentType = "campus" | "experienced"
 
 export type TargetRoleStatus = "active" | "archived"
 
-export type TargetRoleExperienceRange = {
-  minYears: number | null
-  maxYears: number | null
-}
-
 export type JobDescriptionParsingStatus = "missing" | "parsing" | "ready" | "failed"
 
 export type MissingJobDescription = {
@@ -146,7 +141,6 @@ type TargetRoleBase = {
   company: string | null
   recruitmentType: TargetRoleRecruitmentType | null
   location: string | null
-  experienceRange: TargetRoleExperienceRange | null
   /** Whether the saved role is available for active use or retained as an archive. */
   status: TargetRoleStatus
   createdAt: string
@@ -216,7 +210,6 @@ export type CreateTargetRoleInput = {
   company: string | null
   recruitmentType: TargetRoleRecruitmentType | null
   location: string | null
-  experienceRange: TargetRoleExperienceRange | null
 }
 
 export type TargetRoleImportSourceType = "text" | "image" | "url"
@@ -255,7 +248,6 @@ export type UpdateTargetRoleInput = {
   company: string | null
   recruitmentType: TargetRoleRecruitmentType | null
   location: string | null
-  experienceRange: TargetRoleExperienceRange | null
 }
 
 export type SetCurrentTargetRoleInput = {

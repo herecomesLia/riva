@@ -488,8 +488,6 @@ function RecognitionReview({
       company: recognition.suggestedRole.company ?? "",
       recruitmentType: recognition.suggestedRole.recruitmentType ?? "unspecified",
       location: recognition.suggestedRole.location ?? "",
-      minYears: recognition.suggestedRole.experienceRange?.minYears?.toString() ?? "",
-      maxYears: recognition.suggestedRole.experienceRange?.maxYears?.toString() ?? "",
     }),
     [recognition],
   )

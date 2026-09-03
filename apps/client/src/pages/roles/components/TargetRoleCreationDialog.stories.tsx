@@ -32,7 +32,6 @@ function recognize(input: RecognizeTargetRoleInput) {
       company: "Riva",
       recruitmentType: "experienced" as const,
       location: "Shanghai",
-      experienceRange: { minYears: 3, maxYears: 5 },
     },
   })
 }

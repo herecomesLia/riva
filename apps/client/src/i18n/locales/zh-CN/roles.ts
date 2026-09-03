@@ -21,7 +21,7 @@ export const roles = {
       url: "岗位链接",
     },
     methodDescriptions: {
-      manual: "填写岗位名称、公司、地点和经验要求，JD 可在创建后补充。",
+      manual: "填写岗位名称、公司和地点，JD 可在创建后补充。",
       text: "粘贴完整招聘信息，由 Riva 识别岗位基础信息和 JD。",
       image: "上传一张或多张岗位截图，由视觉 Agent 直接理解原图。",
       url: "提供公开岗位网页，由 Riva 获取并识别页面信息。",
@@ -85,14 +85,10 @@ export const roles = {
       company: "公司名称",
       recruitmentType: "招聘类型",
       location: "地点",
-      minYears: "最低经验年限",
-      maxYears: "最高经验年限",
     },
     options: { unspecified: "未填写" },
     validation: {
       required: "请填写岗位名称。",
-      nonNegative: "经验年限必须是非负整数。",
-      experienceRange: "最低经验年限不能大于最高经验年限。",
     },
     cancel: "取消",
     save: "保存",
@@ -297,7 +293,6 @@ export const roles = {
       company: "公司",
       recruitmentType: "招聘类型",
       location: "工作地点",
-      experience: "经验要求",
     },
     sections: {
       basics: "岗位信息",
@@ -356,12 +351,6 @@ export const roles = {
       label: "生成失败",
       description: "分析未生成，岗位和 JD 数据未受影响。",
     },
-  },
-  experience: {
-    range: "{{min}}–{{max}} 年",
-    minimum: "{{min}} 年以上",
-    maximum: "不超过 {{max}} 年",
-    unspecified: "未填写",
   },
   empty: {
     title: "还没有目标岗位",

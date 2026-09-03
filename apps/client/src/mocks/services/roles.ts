@@ -234,7 +234,6 @@ function createRole(
     company: input.company,
     recruitmentType: input.recruitmentType,
     location: input.location,
-    experienceRange: input.experienceRange,
     status: "active" as const,
     createdAt,
     updatedAt: createdAt,
@@ -348,8 +347,6 @@ function inferRoleBasics(rawText: string): TargetRoleRecognitionResult["suggeste
     const pattern = new RegExp(`^(?:${labels.join("|")})\\s*[:：]\\s*(.+)$`, "i")
     return lines.map((line) => line.match(pattern)?.[1]?.trim()).find(Boolean) ?? null
   }
-  const range = rawText.match(/(\d+)\s*[-–—至]\s*(\d+)\s*(?:years?|年)/i)
-  const minimum = rawText.match(/(\d+)\s*(?:\+|年以上|years?\s+or\s+more)/i)
   return {
     title: field(["岗位名称", "职位", "job title", "role"]) ?? lines[0] ?? "",
     company: field(["公司名称", "公司", "company"]),
@@ -359,11 +356,6 @@ function inferRoleBasics(rawText: string): TargetRoleRecognitionResult["suggeste
         ? "experienced"
         : null,
     location: field(["工作地点", "地点", "location"]),
-    experienceRange: range
-      ? { minYears: Number(range[1]), maxYears: Number(range[2]) }
-      : minimum
-        ? { minYears: Number(minimum[1]), maxYears: null }
-        : null,
   }
 }
 
@@ -378,7 +370,6 @@ export async function updateTargetRole(input: UpdateTargetRoleInput): Promise<Ro
     company: input.company,
     recruitmentType: input.recruitmentType,
     location: input.location,
-    experienceRange: input.experienceRange,
   }
   return setMockResponse(replaceRole(updatedRole))
 }

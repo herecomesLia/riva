@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
+import { act, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -48,7 +48,6 @@ function createActions(
           company: "Riva",
           recruitmentType: "experienced",
           location: "Shanghai",
-          experienceRange: { minYears: 3, maxYears: 5 },
         },
       }),
     ),
@@ -510,7 +509,7 @@ describe("RolesView", () => {
     )
   })
 
-  it("validates required title, non-negative experience, and experience order", async () => {
+  it("validates required role title", async () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("noRoles")
     const actions = createActions(data)
@@ -528,25 +527,10 @@ describe("RolesView", () => {
     const dialog = await screen.findByRole("dialog", {
       name: i18n.t("roles.creation.methodTitles.manual"),
     })
-    const minimumExperience = within(dialog).getByLabelText(i18n.t("roles.editor.fields.minYears"))
-    fireEvent.change(minimumExperience, { target: { value: "-1" } })
     await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.editor.save") }))
     expect(
       await within(dialog).findByText(i18n.t("roles.editor.validation.required")),
     ).toBeInTheDocument()
-    expect(
-      await within(dialog).findByText(i18n.t("roles.editor.validation.nonNegative")),
-    ).toBeInTheDocument()
-
-    await user.type(within(dialog).getByLabelText(i18n.t("roles.editor.fields.title")), "SRE")
-    await user.clear(minimumExperience)
-    await user.type(minimumExperience, "5")
-    await user.type(within(dialog).getByLabelText(i18n.t("roles.editor.fields.maxYears")), "2")
-    await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.editor.save") }))
-    expect(
-      await within(dialog).findByText(i18n.t("roles.editor.validation.experienceRange")),
-    ).toBeInTheDocument()
-
     expect(actions.createTargetRole).not.toHaveBeenCalled()
   })
 

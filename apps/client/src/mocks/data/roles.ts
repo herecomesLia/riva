@@ -30,7 +30,6 @@ function createRoleBase(
     company: "ByteDance",
     recruitmentType: "experienced",
     location: "Shanghai",
-    experienceRange: { minYears: 5, maxYears: null },
     status: "active",
     createdAt: "2026-07-01T09:00:00.000Z",
     updatedAt: "2026-07-14T09:00:00.000Z",

@@ -4,8 +4,7 @@ import { dashboardResponseMock } from "@/mocks/data/dashboard"
 import { resetRolesMockState } from "@/mocks/services/roles"
 import { resetTrainingRecordsMockState } from "@/mocks/services/training-records"
 import { getDashboardData } from "@/services/dashboard"
-import type { TargetRoleExperienceRange } from "@/models/roles"
-import { getRolesPage, setCurrentTargetRole, updateTargetRole } from "@/services/roles"
+import { getRolesPage, setCurrentTargetRole } from "@/services/roles"
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -21,23 +20,6 @@ afterEach(() => {
 async function settle<T>(promise: Promise<T>) {
   await vi.runAllTimersAsync()
   return promise
-}
-
-async function updateCurrentExperienceRange(experienceRange: TargetRoleExperienceRange | null) {
-  const roles = await settle(getRolesPage())
-  const role = roles.roles.find((candidate) => candidate.id === roles.currentRoleId)!
-  await settle(
-    updateTargetRole({
-      roleId: role.id,
-      version: role.version,
-      title: role.title,
-      company: role.company,
-      recruitmentType: role.recruitmentType,
-      location: role.location,
-      experienceRange,
-    }),
-  )
-  return settle(getDashboardData())
 }
 
 describe("getDashboardData mock service", () => {
@@ -171,30 +153,4 @@ describe("getDashboardData mock service", () => {
 
     expect(dashboard.metrics.roleFit).toEqual({ currentValue: null, previousValue: null })
   })
-
-  it.each([
-    [
-      { minYears: 3, maxYears: 5 },
-      { min: 3, max: 5 },
-    ],
-    [
-      { minYears: 5, maxYears: null },
-      { min: 5, max: null },
-    ],
-    [
-      { minYears: null, maxYears: 3 },
-      { min: null, max: 3 },
-    ],
-    [{ minYears: null, maxYears: null }, null],
-    [null, null],
-  ] satisfies Array<
-    [TargetRoleExperienceRange | null, { min: number | null; max: number | null } | null]
-  >)(
-    "projects the %o experience range without losing one-sided bounds",
-    async (range, expected) => {
-      const dashboard = await updateCurrentExperienceRange(range)
-
-      expect(dashboard.currentRole?.experienceYears).toEqual(expected)
-    },
-  )
 })

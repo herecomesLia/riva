@@ -2,19 +2,7 @@ import { deriveDashboardTrainingData } from "@/mocks/derivations/dashboard-train
 import { listTrainingRecordSnapshots } from "@/mocks/repositories/training-records"
 import { getRolesPage } from "@/mocks/services/roles"
 import type { DashboardResponse } from "@/models/dashboard"
-import type { TargetRole, TargetRoleExperienceRange } from "@/models/roles"
-
-function toDashboardExperienceYears(
-  experienceRange: TargetRoleExperienceRange | null,
-): NonNullable<DashboardResponse["currentRole"]>["experienceYears"] {
-  if (
-    !experienceRange ||
-    (experienceRange.minYears === null && experienceRange.maxYears === null)
-  ) {
-    return null
-  }
-  return { min: experienceRange.minYears, max: experienceRange.maxYears }
-}
+import type { TargetRole } from "@/models/roles"
 
 function toRoleFit(role: TargetRole | null): DashboardResponse["metrics"]["roleFit"] {
   if (role?.matchingAnalysis?.status !== "current") {
@@ -37,7 +25,6 @@ function toCurrentRoleSummary(
     company: role.company,
     recruitmentType: role.recruitmentType,
     location: role.location,
-    experienceYears: toDashboardExperienceYears(role.experienceRange),
     profileCompleted,
     jobDescriptionAdded: role.jobDescription.status !== "missing",
   }

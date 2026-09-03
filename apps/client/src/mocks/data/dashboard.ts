@@ -11,10 +11,6 @@ export const dashboardResponseMock: DashboardResponse = {
     company: "ByteDance",
     recruitmentType: "experienced",
     location: "Shanghai",
-    experienceYears: {
-      min: 3,
-      max: 5,
-    },
     profileCompleted: true,
     jobDescriptionAdded: false,
   },

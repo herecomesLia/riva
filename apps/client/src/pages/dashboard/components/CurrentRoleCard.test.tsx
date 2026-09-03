@@ -65,26 +65,6 @@ describe("CurrentRoleCard", () => {
     expect(screen.queryByRole("button", { name: "添加岗位 JD" })).not.toBeInTheDocument()
   })
 
-  it.each([
-    [{ min: 3, max: 5 }, "3–5 年"],
-    [{ min: 5, max: null }, "5 年以上"],
-    [{ min: null, max: 3 }, "3 年以内"],
-  ] as const)("formats the %o experience range", async (experienceYears, expected) => {
-    renderRole(createRole({ experienceYears, location: null }))
-
-    expect(await screen.findByText(expected)).toBeInTheDocument()
-  })
-
-  it.each([null, { min: null, max: null }] as const)(
-    "omits empty experience metadata for %o",
-    async (experienceYears) => {
-      renderRole(createRole({ experienceYears, location: null }))
-
-      expect(await screen.findByText(dashboardResponseMock.currentRole!.title)).toBeInTheDocument()
-      expect(screen.queryByText(/(?:–\d+ 年|年以上|年以内)/)).not.toBeInTheDocument()
-    },
-  )
-
   it("renders the loading state", async () => {
     const { container } = renderWithProviders(<CurrentRoleCard state={{ status: "loading" }} />)
 

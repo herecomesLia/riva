@@ -6,7 +6,6 @@ import {
   MapPinIcon,
   PencilIcon,
   StarIcon,
-  TimerIcon,
   Trash2Icon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -14,7 +13,7 @@ import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import type { TargetRole, TargetRoleExperienceRange } from "@/models/roles"
+import type { TargetRole } from "@/models/roles"
 
 import type { RoleDetailsActions } from "./RoleDetails"
 
@@ -102,11 +101,6 @@ export function TargetRoleOverview({
             label={t("roles.details.fields.location")}
             value={role.location ?? t("roles.fallbackValue")}
           />
-          <RoleField
-            icon={TimerIcon}
-            label={t("roles.details.fields.experience")}
-            value={formatExperience(role.experienceRange, t)}
-          />
         </dl>
       </CardContent>
     </Card>
@@ -129,18 +123,4 @@ function RoleField({
       <dd className="min-w-0 text-sm font-medium">{value}</dd>
     </div>
   )
-}
-
-function formatExperience(
-  range: TargetRoleExperienceRange | null,
-  t: ReturnType<typeof useTranslation>["t"],
-) {
-  if (!range || (range.minYears === null && range.maxYears === null)) {
-    return t("roles.experience.unspecified")
-  }
-  if (range.minYears !== null && range.maxYears !== null) {
-    return t("roles.experience.range", { min: range.minYears, max: range.maxYears })
-  }
-  if (range.minYears !== null) return t("roles.experience.minimum", { min: range.minYears })
-  return t("roles.experience.maximum", { max: range.maxYears })
 }

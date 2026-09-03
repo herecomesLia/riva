@@ -22,7 +22,7 @@ export const roles = {
       url: "Job link",
     },
     methodDescriptions: {
-      manual: "Enter the role, company, location, and experience. You can add the JD later.",
+      manual: "Enter the role, company, and location. You can add the JD later.",
       text: "Paste the full posting so Riva can recognize the role basics and JD.",
       image: "Upload one or more screenshots for the vision agent to understand directly.",
       url: "Provide a public job page for Riva to retrieve and recognize.",
@@ -90,14 +90,10 @@ export const roles = {
       company: "Company name",
       recruitmentType: "Recruitment type",
       location: "Location",
-      minYears: "Minimum years of experience",
-      maxYears: "Maximum years of experience",
     },
     options: { unspecified: "Not specified" },
     validation: {
       required: "Enter a role title.",
-      nonNegative: "Experience must be a non-negative integer.",
-      experienceRange: "Minimum experience cannot exceed maximum experience.",
     },
     cancel: "Cancel",
     save: "Save",
@@ -312,7 +308,6 @@ export const roles = {
       company: "Company",
       recruitmentType: "Recruitment type",
       location: "Location",
-      experience: "Experience",
     },
     sections: {
       basics: "Role information",
@@ -371,12 +366,6 @@ export const roles = {
       label: "Generation failed",
       description: "No analysis was generated; your role and JD data are unchanged.",
     },
-  },
-  experience: {
-    range: "{{min}}–{{max}} years",
-    minimum: "{{min}}+ years",
-    maximum: "Up to {{max}} years",
-    unspecified: "Not specified",
   },
   empty: {
     title: "No target roles yet",

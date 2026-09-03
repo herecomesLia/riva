@@ -71,31 +71,6 @@ export const ValidationError = meta.story({
   },
 })
 
-export const ExperienceRangeError = meta.story({
-  args: {
-    mode: "create",
-    onCreate: fn(async () => undefined),
-    onDirtyChange: fn(),
-    onOpenChange: fn(),
-    onSaved: fn(),
-    onUpdate: fn(async () => undefined),
-    open: true,
-    role: null,
-  },
-  play: async ({ userEvent }) => {
-    const dialog = await screen.findByRole("dialog")
-    await userEvent.type(within(dialog).getByLabelText(/岗位名称|role title/i), "Platform Engineer")
-    await userEvent.type(within(dialog).getByLabelText(/最低经验|minimum/i), "5")
-    await userEvent.type(within(dialog).getByLabelText(/最高经验|maximum/i), "3")
-    await userEvent.click(within(dialog).getByRole("button", { name: /^保存$|^save$/i }))
-    await expect(
-      within(dialog).findByText(
-        /最低经验年限不能大于最高经验年限|minimum experience cannot exceed/i,
-      ),
-    ).resolves.toBeInTheDocument()
-  },
-})
-
 const failedUpdate = fn(async () => {
   throw new Error("transport detail")
 })

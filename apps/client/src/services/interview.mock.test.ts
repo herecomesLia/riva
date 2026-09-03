@@ -1029,7 +1029,6 @@ describe("interview mock reset boundaries", () => {
         company: "Riva",
         recruitmentType: role.recruitmentType,
         location: role.location,
-        experienceRange: role.experienceRange,
       })
       await vi.runAllTimersAsync()
       const updated = await updatePromise
@@ -1063,7 +1062,6 @@ describe("interview mock reset boundaries", () => {
         company: "Riva",
         recruitmentType: "experienced",
         location: "Shanghai",
-        experienceRange: { minYears: 3, maxYears: null },
       })
       await vi.runAllTimersAsync()
       const created = await createPromise

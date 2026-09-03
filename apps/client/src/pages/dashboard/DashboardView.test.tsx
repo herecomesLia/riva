@@ -36,7 +36,6 @@ const partialDashboardResponse = {
     company: null,
     recruitmentType: "experienced",
     location: null,
-    experienceYears: null,
     profileCompleted: false,
     jobDescriptionAdded: true,
   },

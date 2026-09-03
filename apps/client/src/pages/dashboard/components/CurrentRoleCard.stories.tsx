@@ -35,18 +35,6 @@ const bothIncompleteRole = createRole({
   profileCompleted: false,
 })
 
-const minimumExperienceRole = createRole({
-  experienceYears: { min: 5, max: null },
-})
-
-const maximumExperienceRole = createRole({
-  experienceYears: { min: null, max: 3 },
-})
-
-const noExperienceRangeRole = createRole({
-  experienceYears: null,
-})
-
 const meta = preview.meta({
   component: CurrentRoleCard,
   decorators: [withRouter],
@@ -91,23 +79,5 @@ export const JobDescriptionMissing = meta.story({
 export const BothIncomplete = meta.story({
   args: {
     state: { data: bothIncompleteRole, status: "ready" },
-  },
-})
-
-export const MinimumExperience = meta.story({
-  args: {
-    state: { data: minimumExperienceRole, status: "ready" },
-  },
-})
-
-export const MaximumExperience = meta.story({
-  args: {
-    state: { data: maximumExperienceRole, status: "ready" },
-  },
-})
-
-export const NoExperienceRange = meta.story({
-  args: {
-    state: { data: noExperienceRangeRole, status: "ready" },
   },
 })

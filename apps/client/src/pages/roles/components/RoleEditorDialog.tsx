@@ -40,8 +40,6 @@ export type RoleDraft = {
   company: string
   recruitmentType: TargetRoleRecruitmentType | "unspecified"
   location: string
-  minYears: string
-  maxYears: string
 }
 
 type RoleEditorDialogProps = {
@@ -55,28 +53,12 @@ type RoleEditorDialogProps = {
   role: TargetRole | null
 }
 
-const optionalNonNegativeInteger = z
-  .string()
-  .refine((value) => value === "" || (/^\d+$/.test(value) && Number(value) >= 0), "nonNegative")
-
-const roleDraftSchema = z
-  .object({
-    title: z.string().trim().min(1, "required"),
-    company: z.string(),
-    recruitmentType: z.enum(["campus", "experienced", "unspecified"]),
-    location: z.string(),
-    minYears: optionalNonNegativeInteger,
-    maxYears: optionalNonNegativeInteger,
-  })
-  .superRefine((value, context) => {
-    if (
-      value.minYears !== "" &&
-      value.maxYears !== "" &&
-      Number(value.minYears) > Number(value.maxYears)
-    ) {
-      context.addIssue({ code: "custom", message: "experienceRange", path: ["maxYears"] })
-    }
-  })
+const roleDraftSchema = z.object({
+  title: z.string().trim().min(1, "required"),
+  company: z.string(),
+  recruitmentType: z.enum(["campus", "experienced", "unspecified"]),
+  location: z.string(),
+})
 
 export function RoleEditorDialog({
   mode,
@@ -171,10 +153,6 @@ export function RoleEditorForm({
           />
           <TextField form={form} label={t("roles.editor.fields.location")} name="location" />
         </div>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <TextField form={form} label={t("roles.editor.fields.minYears")} name="minYears" number />
-          <TextField form={form} label={t("roles.editor.fields.maxYears")} name="maxYears" number />
-        </div>
       </FieldGroup>
       {saveError && (
         <Alert variant="destructive">
@@ -201,7 +179,7 @@ export function RoleEditorForm({
   )
 }
 
-function TextField({ form, label, name, number = false, required = false }: any) {
+function TextField({ form, label, name, required = false }: any) {
   const { t } = useTranslation()
   return (
     <form.Field name={name}>
@@ -215,17 +193,15 @@ function TextField({ form, label, name, number = false, required = false }: any)
                 aria-invalid={invalid || undefined}
                 aria-required={required || undefined}
                 id={field.name}
-                min={number ? 0 : undefined}
                 onBlur={field.handleBlur}
                 onChange={(event) => field.handleChange(event.target.value)}
-                step={number ? 1 : undefined}
-                type={number ? "number" : "text"}
+                type="text"
                 value={field.state.value}
               />
             </FieldControl>
             <FieldError
-              errors={field.state.meta.errors.map((error: unknown) => ({
-                message: translateValidationError(t, error),
+              errors={field.state.meta.errors.map(() => ({
+                message: t("roles.editor.validation.required"),
               }))}
             />
           </Field>
@@ -274,36 +250,21 @@ function DraftStateSync({
   return null
 }
 
-function translateValidationError(t: ReturnType<typeof useTranslation>["t"], error: unknown) {
-  const message =
-    typeof error === "object" && error !== null && "message" in error
-      ? String(error.message)
-      : String(error)
-  return t(
-    `roles.editor.validation.${message === "required" || message === "experienceRange" ? message : "nonNegative"}`,
-  )
-}
-
 function createRoleDraft(role: TargetRole | null): RoleDraft {
   return {
     title: role?.title ?? "",
     company: role?.company ?? "",
     recruitmentType: role?.recruitmentType ?? "unspecified",
     location: role?.location ?? "",
-    minYears: role?.experienceRange?.minYears?.toString() ?? "",
-    maxYears: role?.experienceRange?.maxYears?.toString() ?? "",
   }
 }
 
 function toBasicInput(value: RoleDraft) {
-  const minYears = value.minYears === "" ? null : Number(value.minYears)
-  const maxYears = value.maxYears === "" ? null : Number(value.maxYears)
   return {
     title: value.title.trim(),
     company: value.company.trim() || null,
     recruitmentType: value.recruitmentType === "unspecified" ? null : value.recruitmentType,
     location: value.location.trim() || null,
-    experienceRange: minYears === null && maxYears === null ? null : { minYears, maxYears },
   }
 }
 

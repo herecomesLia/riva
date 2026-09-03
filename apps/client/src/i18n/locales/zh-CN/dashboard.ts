@@ -14,11 +14,6 @@ export const dashboard = {
   },
   currentRole: {
     eyebrow: "当前目标",
-    experienceYears: {
-      range: "{{min}}–{{max}} 年",
-      minimum: "{{min}} 年以上",
-      maximum: "{{max}} 年以内",
-    },
     recruitmentTypes: {
       campus: "校招",
       experienced: "社招",

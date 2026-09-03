@@ -251,7 +251,6 @@ describe("practice stateful mock service: answering", () => {
         company: "Riva",
         recruitmentType: "experienced",
         location: null,
-        experienceRange: null,
       }),
     )
     const createdRole = roles.roles.find((role) => role.title === "Backend Engineer")
@@ -271,7 +270,6 @@ describe("practice stateful mock service: answering", () => {
         company: createdRole.company,
         recruitmentType: createdRole.recruitmentType,
         location: createdRole.location,
-        experienceRange: createdRole.experienceRange,
       }),
     )
     const afterEdit = await context.settle(context.getPracticePage())
@@ -295,7 +293,6 @@ describe("practice stateful mock service: answering", () => {
         company: "Riva",
         recruitmentType: null,
         location: null,
-        experienceRange: null,
       }),
     )
     const createdRole = roles.roles.find((role) => role.title === "HR Business Partner")
