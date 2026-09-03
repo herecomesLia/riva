@@ -360,7 +360,6 @@ describe("roles stateful mock service", () => {
       parsedAt: previousAnalysis.parsedAt,
       analysisVersion: previousAnalysis.analysisVersion + 1,
     })
-    expect(updated.jobDescriptionAnalysis.rivaSummary).not.toBe(previousAnalysis.rivaSummary)
     expect(updated.version).toBe(before.version + 1)
     expect(updated.matchingAnalysis).toEqual({ ...previousMatchingAnalysis, status: "stale" })
   })

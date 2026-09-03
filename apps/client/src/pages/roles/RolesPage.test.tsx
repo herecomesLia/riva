@@ -343,7 +343,7 @@ describe("RolesPage", () => {
     const user = userEvent.setup()
     const { initial, parsing: parsingA, ready: readyA } = createJobDescriptionFlowResponses()
     const parsingB = createReplacementParsingResponse(parsingA)
-    const readyB = createReadyResponseFromParsing(parsingB, "Replacement platform JD summary.")
+    const readyB = createReadyResponseFromParsing(parsingB)
     const statusA = createDeferred<(typeof readyA.roles)[number]>()
     const statusB = createDeferred<(typeof readyB.roles)[number]>()
     vi.mocked(getRolesPage).mockResolvedValue(initial)
@@ -373,7 +373,9 @@ describe("RolesPage", () => {
 
     await act(async () => statusB.resolve(readyB.roles[0]!))
     expect(queryClient.getQueryData(["roles"])).toEqual(readyB)
-    expect(await screen.findByText("Replacement platform JD summary.")).toBeInTheDocument()
+    expect(
+      await screen.findByText(readyB.roles[0]!.jobDescriptionAnalysis!.responsibilities[0]!),
+    ).toBeInTheDocument()
   })
 
   it("does not let an old failed request mark a replacement JD as unsynchronized", async () => {
@@ -1200,10 +1202,7 @@ function pollingInput(response: ReturnType<typeof createRolesMockResponse>) {
   }
 }
 
-function createReadyResponseFromParsing(
-  parsing: ReturnType<typeof createRolesMockResponse>,
-  summary: string,
-) {
+function createReadyResponseFromParsing(parsing: ReturnType<typeof createRolesMockResponse>) {
   const response = structuredClone(parsing)
   const role = response.roles[0]!
   if (role.jobDescription.status !== "parsing") {
@@ -1222,7 +1221,6 @@ function createReadyResponseFromParsing(
     },
     jobDescriptionAnalysis: {
       ...parsedFixture.jobDescriptionAnalysis,
-      rivaSummary: summary,
       jobDescriptionVersion: role.jobDescription.version,
     },
   }

@@ -969,7 +969,6 @@ describe("RolesView", () => {
 
     const result = await screen.findByTestId("job-description-analysis")
     for (const key of [
-      "rivaSummary",
       "responsibilities",
       "requiredSkills",
       "qualificationRequirements",
@@ -982,20 +981,11 @@ describe("RolesView", () => {
       ).toBeInTheDocument()
     }
     expect(within(result).getAllByRole("button", { name: /^编辑 |^edit /i })).toHaveLength(6)
-    expect(
-      within(result).queryByRole("button", {
-        name: i18n.t("roles.jd.actions.editModuleLabel", {
-          module: i18n.t("roles.jd.analysis.rivaSummary"),
-        }),
-      }),
-    ).not.toBeInTheDocument()
     expect(result).not.toHaveTextContent("解析结果可按模块校正，修改后匹配分析需要重新生成。")
     expect(result).not.toHaveTextContent("高频关键词")
-    expect(result).toHaveTextContent(analysis.rivaSummary)
     expect(result).toHaveTextContent(analysis.responsibilities[0]!)
     expect(result).toHaveTextContent(analysis.requiredSkills.programmingLanguages[0]!)
     for (const key of [
-      "rivaSummary",
       "responsibilities",
       "qualificationRequirements",
       "requiredSkills",

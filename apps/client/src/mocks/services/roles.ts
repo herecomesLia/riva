@@ -79,33 +79,6 @@ function nextRoleVersion(role: TargetRole) {
   return { updatedAt: nextTimestamp(), version: role.version + 1 }
 }
 
-function createRivaSummary(analysis: JobDescriptionAnalysis) {
-  const skills = [
-    ...analysis.requiredSkills.programmingLanguages,
-    ...analysis.requiredSkills.frameworksAndLibraries,
-    ...analysis.requiredSkills.conceptsAndMethods,
-  ].slice(0, 3)
-  const responsibility = analysis.responsibilities[0]?.replace(/[。.]$/, "")
-  const qualification = [
-    ...analysis.qualificationRequirements.education,
-    ...analysis.qualificationRequirements.majors,
-    ...analysis.qualificationRequirements.experience,
-  ][0]
-  const preferred = analysis.preferredQualifications[0]
-  const softSkill = analysis.softSkills[0]
-  const domain = analysis.businessDomains[0]
-  return [
-    responsibility,
-    skills.length ? `重点要求 ${skills.join("、")}` : null,
-    qualification ? `任职资格包括 ${qualification}` : null,
-    preferred ? `加分项为 ${preferred}` : null,
-    softSkill ? `强调 ${softSkill}` : null,
-    domain ? `业务领域为 ${domain}` : null,
-  ]
-    .filter(Boolean)
-    .join("；")
-}
-
 function markMatchingAnalysisStale(matchingAnalysis: MatchingAnalysis | null) {
   if (matchingAnalysis?.status === "current")
     return { ...matchingAnalysis, status: "stale" as const }
@@ -576,7 +549,6 @@ export async function updateJobDescriptionAnalysisModule(
     jobDescriptionAnalysis: {
       ...nextAnalysis,
       analysisVersion: role.jobDescriptionAnalysis.analysisVersion + 1,
-      rivaSummary: createRivaSummary(nextAnalysis),
     },
     matchingAnalysis: invalidateMatchingAnalysisAfterAnalysisCorrection(role.matchingAnalysis),
   }

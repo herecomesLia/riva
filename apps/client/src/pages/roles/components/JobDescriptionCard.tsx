@@ -8,7 +8,6 @@ import {
   ListChecksIcon,
   PencilIcon,
   RefreshCwIcon,
-  SparklesIcon,
   type LucideIcon,
 } from "lucide-react"
 import type { ReactNode } from "react"
@@ -225,9 +224,6 @@ function ReadyState({
   const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-5" data-testid="job-description-analysis">
-      <AnalysisSection icon={SparklesIcon} title={t("roles.jd.analysis.rivaSummary")}>
-        <p className="text-sm leading-6">{analysis.rivaSummary}</p>
-      </AnalysisSection>
       <AnalysisList
         field="responsibilities"
         items={analysis.responsibilities}

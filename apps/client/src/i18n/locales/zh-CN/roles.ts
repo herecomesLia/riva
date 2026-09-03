@@ -143,7 +143,6 @@ export const roles = {
       description: "JD 已保存并仍处于解析中。可以重新同步，不会重复创建解析任务。",
     },
     analysis: {
-      rivaSummary: "RIVA 岗位总结",
       responsibilities: "岗位职责",
       requiredSkills: "必备技能",
       qualificationRequirements: "任职资格",

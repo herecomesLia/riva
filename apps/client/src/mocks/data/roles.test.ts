@@ -62,7 +62,6 @@ function expectConsistentJobDescription(role: TargetRole) {
       expect(jobDescriptionAnalysis?.responsibilities).not.toHaveLength(0)
       expect(jobDescriptionAnalysis?.requiredSkills.programmingLanguages).not.toHaveLength(0)
       expect(jobDescriptionAnalysis?.qualificationRequirements.experience).not.toHaveLength(0)
-      expect(jobDescriptionAnalysis?.rivaSummary.trim()).not.toBe("")
       expect("frequentKeywords" in (jobDescriptionAnalysis ?? {})).toBe(false)
   }
 }
@@ -226,9 +225,8 @@ describe("roles mock scenarios", () => {
     ).not.toContain("technicalFoundation")
   })
 
-  it("keeps generated summaries and removed keywords outside the module update contract", () => {
+  it("keeps removed keywords outside the module update contract", () => {
     const analysis = createRolesMockResponse().roles[0]!.jobDescriptionAnalysis!
-    expect(analysis.rivaSummary).toBeTruthy()
     expect("frequentKeywords" in analysis).toBe(false)
   })
   it.each(scenarios)("keeps the %s response internally consistent", (scenario) => {

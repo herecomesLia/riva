@@ -65,8 +65,6 @@ export type JobDescriptionAnalysis = {
   analysisVersion: number
   /** When structured JD parsing completed. */
   parsedAt: string
-  /** System-derived summary of the current structured modules. */
-  rivaSummary: string
   responsibilities: string[]
   qualificationRequirements: QualificationRequirements
   requiredSkills: RequiredSkillGroups

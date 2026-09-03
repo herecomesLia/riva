@@ -95,7 +95,6 @@ export function createJobDescriptionAnalysisFixture({
     jobDescriptionVersion,
     analysisVersion,
     parsedAt,
-    rivaSummary: "负责可扩展前端架构与复杂业务交付，重点要求 React、TypeScript 和跨团队协作能力。",
     responsibilities: [
       "负责商家运营产品的前端架构与交付。",
       "与产品、设计和后端团队协作，推进复杂业务流程。",

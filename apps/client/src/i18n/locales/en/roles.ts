@@ -152,7 +152,6 @@ export const roles = {
         "The JD is saved and remains in parsing. Synchronizing again will not create another parsing job.",
     },
     analysis: {
-      rivaSummary: "RIVA Role Summary",
       responsibilities: "Responsibilities",
       requiredSkills: "Required Skills",
       qualificationRequirements: "Qualifications",
