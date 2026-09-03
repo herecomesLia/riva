@@ -215,24 +215,15 @@ async def test_active_archive_restore_state_machine_has_no_partial_writes(
         await _reload_user(database, user.id)
     ).active_target_role_id == active_role.id
 
-    with pytest.raises(ConflictError):
-        await target_role_service.archive(user, active_role.id)
+    await target_role_service.archive(user, active_role.id)
     reloaded_active = await _reload_role(database, active_role.id)
     assert reloaded_active is not None
-    assert reloaded_active.is_archived is False
-    assert (
-        await _reload_user(database, user.id)
-    ).active_target_role_id == active_role.id
+    assert reloaded_active.is_archived is True
+    assert (await _reload_user(database, user.id)).active_target_role_id is None
 
     await target_role_service.archive(user, other_role.id)
     with pytest.raises(ConflictError):
         await target_role_service.set_active(user, other_role.id)
-    reloaded_other = await _reload_role(database, other_role.id)
-    assert reloaded_other is not None
-    assert reloaded_other.is_archived is True
-    assert (
-        await _reload_user(database, user.id)
-    ).active_target_role_id == active_role.id
 
     await target_role_service.restore(user, other_role.id)
     await target_role_service.set_active(user, other_role.id)

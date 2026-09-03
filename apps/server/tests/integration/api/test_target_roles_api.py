@@ -104,7 +104,7 @@ async def test_target_role_http_lifecycle_covers_all_endpoints(
     assert delete_response.status_code == 204
 
 
-async def test_active_and_archive_conflicts_use_public_errors(
+async def test_archiving_active_role_clears_active_role_and_archived_role_cannot_activate(
     client: AsyncClient,
 ) -> None:
     await register_user(client)
@@ -121,12 +121,11 @@ async def test_active_and_archive_conflicts_use_public_errors(
         f"/api/target-roles/{active['id']}/archive",
         headers=ORIGIN_HEADERS,
     )
-    assert_error_response(
-        response,
-        status_code=409,
-        code="resource.conflict",
-        message="The active target role cannot be archived.",
-    )
+    assert response.status_code == 200
+
+    response = await client.get("/api/target-roles")
+    assert response.status_code == 200
+    assert response.json()["activeTargetRoleId"] is None
 
     response = await client.post(
         f"/api/target-roles/{archived['id']}/archive",

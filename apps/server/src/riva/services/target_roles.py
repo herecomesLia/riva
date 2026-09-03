@@ -97,7 +97,7 @@ class TargetRoleService:
     async def archive(self, user: User, target_role_id: UUID) -> TargetRole:
         role = await self.get(user, target_role_id)
         if user.active_target_role_id == role.id:
-            raise ConflictError("The active target role cannot be archived.")
+            user.active_target_role_id = None
         role.is_archived = True
         await self.session.commit()
         return role
