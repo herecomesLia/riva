@@ -9,5 +9,6 @@ export type ServiceHealthStatus = (typeof ServiceHealthStatus)[keyof typeof Serv
 
 export const ServiceHealthStatus = {
   ok: "ok",
-  unhealthy: "unhealthy",
+  degraded: "degraded",
+  unavailable: "unavailable",
 } as const

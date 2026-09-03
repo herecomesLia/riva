@@ -26,11 +26,12 @@ async def health(request: Request) -> HealthResponse | JSONResponse:
         request.app.state.llm.check_health(),
     )
 
-    service_status = (
-        ServiceHealthStatus.ok
-        if database_available and llm_available
-        else ServiceHealthStatus.unhealthy
-    )
+    if not database_available:
+        service_status = ServiceHealthStatus.unavailable
+    elif not llm_available:
+        service_status = ServiceHealthStatus.degraded
+    else:
+        service_status = ServiceHealthStatus.ok
     database_status = (
         DependencyHealthStatus.ok
         if database_available
@@ -47,7 +48,7 @@ async def health(request: Request) -> HealthResponse | JSONResponse:
         database=database_status,
         llm=llm_status,
     )
-    if service_status != ServiceHealthStatus.ok:
+    if service_status == ServiceHealthStatus.unavailable:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content=response.model_dump(mode="json"),

@@ -5,7 +5,8 @@ from riva.schemas.base import ResponseModel
 
 class ServiceHealthStatus(StrEnum):
     ok = "ok"
-    unhealthy = "unhealthy"
+    degraded = "degraded"
+    unavailable = "unavailable"
 
 
 class DependencyHealthStatus(StrEnum):

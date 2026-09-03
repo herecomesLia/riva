@@ -24,7 +24,7 @@ from httpx import AsyncClient
             True,
             503,
             {
-                "status": "unhealthy",
+                "status": "unavailable",
                 "database": "unavailable",
                 "llm": "ok",
             },
@@ -32,15 +32,15 @@ from httpx import AsyncClient
         (
             True,
             False,
-            503,
-            {"status": "unhealthy", "database": "ok", "llm": "unavailable"},
+            200,
+            {"status": "degraded", "database": "ok", "llm": "unavailable"},
         ),
         (
             False,
             False,
             503,
             {
-                "status": "unhealthy",
+                "status": "unavailable",
                 "database": "unavailable",
                 "llm": "unavailable",
             },
