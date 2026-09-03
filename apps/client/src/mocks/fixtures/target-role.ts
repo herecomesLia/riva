@@ -1,4 +1,29 @@
-import type { TargetRoleListResponse, TargetRoleResponse } from "@/api/generated/models"
+import type {
+  CreateTargetRoleRequest,
+  TargetRoleListResponse,
+  TargetRoleResponse,
+} from "@/api/generated/models"
+
+export const textRecognitionFixture = {
+  title: "Senior Frontend Engineer",
+  company: "ByteDance",
+  recruitmentTrack: "experienced",
+  location: "Shanghai",
+} satisfies CreateTargetRoleRequest
+
+export const imageRecognitionFixture = {
+  title: "Frontend Engineer",
+  company: "Riva Technology",
+  recruitmentTrack: "experienced",
+  location: "Shanghai",
+} satisfies CreateTargetRoleRequest
+
+export const urlRecognitionFixture = {
+  title: "Product Manager",
+  company: "Meituan",
+  recruitmentTrack: "experienced",
+  location: "Beijing",
+} satisfies CreateTargetRoleRequest
 
 export const targetRoleFixture = {
   id: "11111111-1111-4111-8111-111111111111",
