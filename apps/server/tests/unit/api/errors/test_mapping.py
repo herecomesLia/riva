@@ -2,9 +2,8 @@ import pytest
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from riva.api.errors.exceptions import AuthRequiredError, CsrfFailedError
 from riva.api.errors.mapping import (
-    AuthRequiredError,
-    CsrfFailedError,
     ErrorDetails,
     HttpErrorPolicy,
     resolve_error_details,
@@ -84,3 +83,14 @@ def test_resolve_framework_error_details(
     expected: ErrorDetails,
 ) -> None:
     assert resolve_error_details(exception) == expected
+
+
+def test_resolve_error_details_does_not_use_error_attributes() -> None:
+    class ErrorWithPublicAttributes(RuntimeError):
+        code = ErrorCode.DEPENDENCY_DATABASE_UNAVAILABLE
+        message = "internal-secret"
+
+    assert resolve_error_details(ErrorWithPublicAttributes()) == ErrorDetails(
+        ErrorCode.SERVER_INTERNAL_ERROR,
+        "An internal server error occurred.",
+    )

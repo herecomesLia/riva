@@ -7,13 +7,8 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from riva.api.cookies import delete_session_cookie
-from riva.api.errors.mapping import (
-    APIRequestError,
-    resolve_error_details,
-    resolve_http_policy,
-)
-from riva.db.errors import DatabaseUnavailableError
-from riva.errors import AppError
+from riva.api.errors.mapping import resolve_error_details, resolve_http_policy
+from riva.errors import AppError, DependencyUnavailableError
 from riva.schemas.errors import ErrorBody, ErrorIssue, ErrorResponse
 
 REQUEST_ID_HEADER = "X-Request-ID"
@@ -53,20 +48,20 @@ def _build_error_response(
     return response
 
 
-async def mapped_error_handler(
+async def app_error_handler(
     request: Request,
-    exc: AppError | APIRequestError,
+    exc: AppError,
 ) -> JSONResponse:
     return _build_error_response(request, exc)
 
 
-async def database_unavailable_error_handler(
+async def dependency_unavailable_error_handler(
     request: Request,
-    exc: DatabaseUnavailableError,
+    exc: DependencyUnavailableError,
 ) -> JSONResponse:
     structlog.get_logger("riva.api").error(
         "api.dependency_unavailable",
-        dependency="database",
+        dependency=exc.dependency,
         request_id=_get_request_id(request),
         method=request.method,
         path=request.url.path,
@@ -147,16 +142,15 @@ def _validation_issues(exc: RequestValidationError) -> list[ErrorIssue]:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    app.add_exception_handler(AppError, mapped_error_handler)
-    app.add_exception_handler(APIRequestError, mapped_error_handler)
+    app.add_exception_handler(
+        DependencyUnavailableError,
+        dependency_unavailable_error_handler,
+    )
+    app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     app.add_exception_handler(
         ResponseValidationError,
         response_validation_error_handler,
-    )
-    app.add_exception_handler(
-        DatabaseUnavailableError,
-        database_unavailable_error_handler,
     )
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(Exception, unexpected_error_handler)

@@ -1,12 +1,15 @@
 from dataclasses import dataclass
-from typing import ClassVar
 
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from starlette import status
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from riva.db.errors import DatabaseUnavailableError
-from riva.errors import ErrorCode
+from riva.api.errors.exceptions import (
+    APINotImplementedError,
+    AuthRequiredError,
+    CsrfFailedError,
+)
+from riva.errors import AppError, DependencyUnavailableError, ErrorCode
 from riva.services.errors import (
     AuthenticationError,
     ConflictError,
@@ -15,29 +18,6 @@ from riva.services.errors import (
     NotFoundError,
     SessionExpiredError,
 )
-
-
-class APIRequestError(Exception):
-    code: ClassVar[ErrorCode]
-    message: ClassVar[str]
-
-    def __init__(self) -> None:
-        super().__init__(self.message)
-
-
-class AuthRequiredError(APIRequestError):
-    code = ErrorCode.AUTH_NOT_AUTHENTICATED
-    message = "Authentication is required."
-
-
-class CsrfFailedError(APIRequestError):
-    code = ErrorCode.REQUEST_CSRF_FAILED
-    message = "CSRF validation failed."
-
-
-class APINotImplementedError(APIRequestError):
-    code = ErrorCode.REQUEST_NOT_IMPLEMENTED
-    message = "This operation is not implemented."
 
 
 @dataclass(frozen=True)
@@ -65,10 +45,10 @@ HTTP_ERROR_POLICIES: dict[type[Exception], HttpErrorPolicy] = {
     NotFoundError: HttpErrorPolicy(status.HTTP_404_NOT_FOUND),
     ConflictError: HttpErrorPolicy(status.HTTP_409_CONFLICT),
     DomainValidationError: HttpErrorPolicy(status.HTTP_422_UNPROCESSABLE_CONTENT),
+    DependencyUnavailableError: HttpErrorPolicy(status.HTTP_503_SERVICE_UNAVAILABLE),
     AuthRequiredError: HttpErrorPolicy(status.HTTP_401_UNAUTHORIZED),
     CsrfFailedError: HttpErrorPolicy(status.HTTP_403_FORBIDDEN),
     APINotImplementedError: HttpErrorPolicy(status.HTTP_501_NOT_IMPLEMENTED),
-    DatabaseUnavailableError: HttpErrorPolicy(status.HTTP_503_SERVICE_UNAVAILABLE),
     RequestValidationError: HttpErrorPolicy(status.HTTP_422_UNPROCESSABLE_CONTENT),
     ResponseValidationError: HttpErrorPolicy(status.HTTP_500_INTERNAL_SERVER_ERROR),
     Exception: HttpErrorPolicy(status.HTTP_500_INTERNAL_SERVER_ERROR),
@@ -106,10 +86,11 @@ def resolve_http_policy(error: Exception | type[Exception]) -> HttpErrorPolicy:
 
 
 def resolve_error_details(error: Exception | type[Exception]) -> ErrorDetails:
-    code = getattr(error, "code", None)
-    message = getattr(error, "message", None)
-    if isinstance(code, ErrorCode) and isinstance(message, str):
-        return ErrorDetails(code, message)
+    if isinstance(error, AppError):
+        return ErrorDetails(error.code, error.message)
+
+    if isinstance(error, type) and issubclass(error, AppError):
+        return ErrorDetails(error.code, error._default_message)
 
     if isinstance(error, StarletteHTTPException):
         if error.status_code == status.HTTP_404_NOT_FOUND:

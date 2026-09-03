@@ -1,6 +1,7 @@
-from riva.errors import ErrorCode
+from riva.errors import DependencyUnavailableError, ErrorCode
 
 
-class DatabaseUnavailableError(RuntimeError):
+class DatabaseUnavailableError(DependencyUnavailableError):
+    dependency = "database"
     code = ErrorCode.DEPENDENCY_DATABASE_UNAVAILABLE
-    message = "Database is temporarily unavailable."
+    _default_message = "Database is temporarily unavailable."

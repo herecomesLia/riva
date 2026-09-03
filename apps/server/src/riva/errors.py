@@ -28,3 +28,7 @@ class AppError(Exception):
     def __init__(self, message: str | None = None) -> None:
         self.message = self._default_message if message is None else message
         super().__init__(self.message)
+
+
+class DependencyUnavailableError(AppError):
+    dependency: ClassVar[str]

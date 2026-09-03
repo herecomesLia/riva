@@ -1,4 +1,4 @@
-from riva.api.errors.mapping import (
+from riva.api.errors.exceptions import (
     APINotImplementedError,
     APIRequestError,
     AuthRequiredError,
