@@ -31,28 +31,25 @@ const scenarios: RolesMockScenario[] = [
 
 function expectConsistentJobDescription(role: TargetRole) {
   const { jobDescription, jobDescriptionAnalysis } = role
+  expect("rawText" in jobDescription).toBe(false)
 
   switch (jobDescription.status) {
     case "missing":
-      expect(jobDescription.rawText).toBeNull()
       expect(jobDescription.version).toBeNull()
       expect(jobDescription.parsingFailureReason).toBeNull()
       expect(jobDescriptionAnalysis).toBeNull()
       return
     case "parsing":
-      expect(jobDescription.rawText.trim()).not.toBe("")
       expect(jobDescription.version).toBeTypeOf("number")
       expect(jobDescription.parsingFailureReason).toBeNull()
       expect(jobDescriptionAnalysis).toBeNull()
       return
     case "failed":
-      expect(jobDescription.rawText.trim()).not.toBe("")
       expect(jobDescription.version).toBeTypeOf("number")
       expect(jobDescription.parsingFailureReason.trim()).not.toBe("")
       expect(jobDescriptionAnalysis).toBeNull()
       return
     case "ready":
-      expect(jobDescription.rawText.trim()).not.toBe("")
       expect(jobDescription.version).toBeTypeOf("number")
       expect(jobDescription.parsingFailureReason).toBeNull()
       expect(jobDescriptionAnalysis).not.toBeNull()

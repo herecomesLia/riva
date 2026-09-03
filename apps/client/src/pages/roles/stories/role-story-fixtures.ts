@@ -44,13 +44,6 @@ export function createLongJobDescriptionResponse() {
   if (role.jobDescription.status !== "ready" || !role.jobDescriptionAnalysis) {
     throw new Error("Expected a ready JD fixture.")
   }
-  role.jobDescription.rawText = [
-    "Own the architecture and delivery of a multi-region merchant operations platform used by thousands of internal users.",
-    "Partner with product, design, data, and infrastructure teams to turn complex workflows into reliable, accessible interfaces.",
-    "Establish frontend quality standards covering performance budgets, observability, automated testing, and incident response.",
-    "Mentor engineers, lead technical planning, and communicate trade-offs to both engineering and business stakeholders.",
-    "Candidates should have deep TypeScript and React experience, strong systems thinking, and a record of shipping large SaaS products.",
-  ].join("\n\n")
   role.jobDescriptionAnalysis.responsibilities.push(
     "Define measurable frontend reliability and performance standards across product teams.",
     "Lead cross-functional technical planning for multi-quarter platform initiatives.",

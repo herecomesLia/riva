@@ -36,7 +36,7 @@ export const Add = meta.story({
   play: async ({ userEvent }) => {
     const dialog = await screen.findByRole("dialog")
     await userEvent.type(
-      within(dialog).getByLabelText(/JD 原文|JD text/i),
+      within(dialog).getByLabelText(/岗位 JD 文本|job description text/i),
       "Lead reliable product delivery.",
     )
     await userEvent.click(

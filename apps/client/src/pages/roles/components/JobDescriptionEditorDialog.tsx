@@ -20,7 +20,7 @@ import type { SaveTargetRoleJobDescriptionInput, TargetRole } from "@/models/rol
 
 import { getRolesActionErrorCode } from "../roles-errors"
 
-const jobDescriptionSchema = z.object({ rawText: z.string().trim().min(1, "required") })
+const jobDescriptionSchema = z.object({ text: z.string().trim().min(1, "required") })
 
 export function JobDescriptionEditorDialog({
   onDirtyChange,
@@ -83,12 +83,12 @@ function JobDescriptionEditorForm({
   const { t } = useTranslation()
   const [saveError, setSaveError] = useState<"requestFailed" | "versionConflict" | null>(null)
   const form = useForm({
-    defaultValues: { rawText: role.jobDescription.rawText ?? "" },
+    defaultValues: { text: "" },
     validators: { onSubmit: jobDescriptionSchema },
     onSubmit: async ({ value }) => {
       setSaveError(null)
       try {
-        await onSave({ roleId: role.id, version: role.version, rawText: value.rawText.trim() })
+        await onSave({ roleId: role.id, version: role.version, text: value.text.trim() })
         onSaved()
       } catch (error) {
         setSaveError(getRolesActionErrorCode(error))
@@ -113,7 +113,7 @@ function JobDescriptionEditorForm({
           {(isDirty) => <DraftStateSync isDirty={isDirty} onDirtyChange={onDirtyChange} />}
         </form.Subscribe>
         <FieldGroup>
-          <form.Field name="rawText">
+          <form.Field name="text">
             {(field) => {
               const invalid = field.state.meta.isTouched && !field.state.meta.isValid
               return (

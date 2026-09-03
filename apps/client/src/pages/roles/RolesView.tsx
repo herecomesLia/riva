@@ -17,7 +17,6 @@ import {
 import type {
   ArchiveTargetRoleInput,
   CreateTargetRoleInput,
-  CreateTargetRoleFromRecognitionInput,
   DeleteTargetRoleInput,
   GenerateOrRegenerateMatchingAnalysisInput,
   GetJobDescriptionParsingStatusInput,
@@ -28,8 +27,6 @@ import type {
   RestoreTargetRoleInput,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
-  StartOrRetryJobDescriptionParsingInput,
-  TargetRoleRecognitionResult,
   UpdateTargetRoleInput,
   UpdateJobDescriptionAnalysisModuleInput,
 } from "@/models/roles"
@@ -56,15 +53,9 @@ import { getRolesActionErrorCode, type RolesActionErrorCode } from "./roles-erro
 export type RolesViewActions = {
   archiveTargetRole: (input: ArchiveTargetRoleInput) => Promise<RolesPageResponse>
   createTargetRole: (input: CreateTargetRoleInput) => Promise<RolesPageResponse>
-  createTargetRoleFromRecognition: (
-    input: CreateTargetRoleFromRecognitionInput,
-  ) => Promise<RolesPageResponse>
   deleteTargetRole: (input: DeleteTargetRoleInput) => Promise<RolesPageResponse>
   generateMatchingAnalysis: (
     input: GenerateOrRegenerateMatchingAnalysisInput,
-  ) => Promise<RolesPageResponse>
-  retryJobDescriptionParsing: (
-    input: StartOrRetryJobDescriptionParsingInput,
   ) => Promise<RolesPageResponse>
   retryJobDescriptionSynchronization: (
     input: GetJobDescriptionParsingStatusInput,
@@ -72,7 +63,7 @@ export type RolesViewActions = {
   retryMatchingAnalysisSynchronization: (
     input: GetMatchingAnalysisStatusInput,
   ) => Promise<RolesPageResponse>
-  recognizeTargetRole: (input: RecognizeTargetRoleInput) => Promise<TargetRoleRecognitionResult>
+  recognizeTargetRole: (input: RecognizeTargetRoleInput) => Promise<RolesPageResponse>
   restoreTargetRole: (input: RestoreTargetRoleInput) => Promise<RolesPageResponse>
   saveJobDescription: (input: SaveTargetRoleJobDescriptionInput) => Promise<RolesPageResponse>
   setCurrentTargetRole: (input: SetCurrentTargetRoleInput) => Promise<RolesPageResponse>
@@ -302,17 +293,6 @@ function RolesReadyView({
                               }),
                             )
                           },
-                          retryJobDescriptionParsing: () => {
-                            if (selectedRole.jobDescription.status !== "failed") return
-                            const jobDescriptionVersion = selectedRole.jobDescription.version
-                            void runAction(() =>
-                              actions.retryJobDescriptionParsing({
-                                roleId: selectedRole.id,
-                                version: selectedRole.version,
-                                jobDescriptionVersion,
-                              }),
-                            )
-                          },
                           retryJobDescriptionSynchronization: () => {
                             if (selectedRole.jobDescription.status !== "parsing") return
                             const jobDescriptionVersion = selectedRole.jobDescription.version
@@ -379,15 +359,22 @@ function RolesReadyView({
       {actions && (
         <>
           <TargetRoleCreationDialog
-            onCreateFromRecognition={async (input) => {
-              await actions.createTargetRoleFromRecognition(input)
-            }}
             onDirtyChange={handleDirtyChange}
             onManualCreate={async (input) => {
               await actions.createTargetRole(input)
             }}
             onOpenChange={(open) => !open && requestCloseEditor()}
-            onRecognize={actions.recognizeTargetRole}
+            onRecognize={async (input) => {
+              const response = await actions.recognizeTargetRole(input)
+              const createdRole = response.roles.find(
+                (role) => !data.roles.some((existing) => existing.id === role.id),
+              )
+              if (createdRole) {
+                setRoleCategory("active")
+                setSelectedRoleId(createdRole.id)
+                setActiveTab("job-description")
+              }
+            }}
             onSaved={closeEditor}
             open={isCreationDialogOpen}
           />

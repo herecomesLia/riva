@@ -12,7 +12,7 @@ export const roles = {
   },
   creation: {
     title: "添加目标岗位",
-    description: "选择一种录入方式。通过文字、图片或链接录入时，Riva 会先识别岗位信息供你确认。",
+    description: "选择一种录入方式。通过文字、图片或链接录入时，Riva 会识别并创建目标岗位。",
     methodsLabel: "目标岗位录入方式",
     methods: {
       manual: "手动填写",
@@ -32,7 +32,7 @@ export const roles = {
       image: "上传岗位图片",
       url: "添加岗位链接",
     },
-    methodDialogDescription: "完成录入后保存目标岗位；通过 Riva 识别的信息会先供你检查和修改。",
+    methodDialogDescription: "Riva 识别后会直接创建目标岗位；你可以在岗位页面继续修改识别结果。",
     backToMethods: "返回选择方式",
     changeMethod: {
       title: "更换录入方式？",
@@ -63,12 +63,6 @@ export const roles = {
       description: "粘贴可公开访问的岗位页面，Riva 将从页面获取并识别岗位信息。",
       placeholder: "https://example.com/jobs/role",
       invalid: "请输入有效的 HTTP 或 HTTPS 岗位链接。",
-    },
-    review: {
-      source: "Riva 已完成识别，来源：{{source}}。请检查并修正后再保存。",
-      rawText: "识别出的 JD 原文",
-      description: "这份原文将在创建岗位后进入现有的 JD 结构化解析流程。",
-      back: "返回重新录入",
     },
   },
   editor: {
@@ -117,19 +111,18 @@ export const roles = {
     cardDescription: "粘贴岗位 JD，并查看结构化解析结果。",
     actions: {
       add: "粘贴岗位 JD",
-      replace: "编辑或替换 JD",
+      replace: "更新JD",
       editModule: "编辑",
       editModuleLabel: "编辑 {{module}}",
       saveCorrection: "保存修改",
       savingCorrection: "正在保存",
-      retry: "重试解析",
       resynchronize: "重新同步状态",
     },
     editor: {
       addTitle: "粘贴岗位 JD",
-      replaceTitle: "编辑或替换岗位 JD",
-      description: "第一版仅支持粘贴文本。保存后将开始结构化解析。",
-      fieldLabel: "岗位 JD 原文",
+      replaceTitle: "更新JD",
+      description: "提交后将重新解析并替换当前结构化结果。",
+      fieldLabel: "岗位 JD 文本",
       placeholder: "在这里粘贴完整的岗位职责、任职要求和加分项……",
       required: "请粘贴岗位 JD 文本。",
       save: "保存并解析",
@@ -221,8 +214,8 @@ export const roles = {
           description: "JD 解析完成后即可生成匹配分析。",
         },
         failed: {
-          title: "请先重试 JD 解析",
-          description: "当前 JD 尚未得到结构化结果，匹配分析暂不可用。",
+          title: "请重新提交岗位 JD",
+          description: "当前 JD 尚未得到结构化结果，请提交一份新的完整 JD。",
         },
       },
     },
@@ -326,7 +319,7 @@ export const roles = {
     },
     failed: {
       label: "解析失败",
-      description: "JD 原文已保留，可稍后重试解析。",
+      description: "请重新提交一份完整 JD。",
     },
   },
   matchingAnalysisStatus: {

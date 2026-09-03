@@ -19,7 +19,6 @@ export type RoleDetailsActions = {
   setCurrent: () => void
   editJobDescription: () => void
   editJobDescriptionAnalysisModule: (field: JobDescriptionAnalysisModuleField) => void
-  retryJobDescriptionParsing: () => void
   retryJobDescriptionSynchronization: () => void
   generateMatchingAnalysis: () => void
   retryMatchingAnalysisSynchronization: () => void
@@ -110,7 +109,6 @@ export function RoleDetails({
               <JobDescriptionCard
                 onEdit={actions?.editJobDescription}
                 onEditAnalysisModule={actions?.editJobDescriptionAnalysisModule}
-                onRetry={actions?.retryJobDescriptionParsing}
                 onRetrySynchronization={actions?.retryJobDescriptionSynchronization}
                 pending={pending}
                 role={role}

@@ -4,7 +4,6 @@ import type { RolesPageResponse } from "@/models/roles"
 import {
   archiveTargetRole,
   createTargetRole,
-  createTargetRoleFromRecognition,
   deleteTargetRole,
   generateMatchingAnalysis,
   getRolesPage,
@@ -12,7 +11,6 @@ import {
   recognizeTargetRole,
   restoreTargetRole,
   setCurrentTargetRole,
-  startJobDescriptionParsing,
   updateJobDescriptionAnalysisModule,
   updateTargetRole,
 } from "@/services/roles"
@@ -46,11 +44,6 @@ export function RolesPage() {
   }
 
   const createMutation = useMutation({ mutationFn: createTargetRole, onSuccess: setRolesResponse })
-  const recognitionMutation = useMutation({ mutationFn: recognizeTargetRole })
-  const createFromRecognitionMutation = useMutation({
-    mutationFn: createTargetRoleFromRecognition,
-    onSuccess: setRolesResponse,
-  })
   const updateMutation = useMutation({ mutationFn: updateTargetRole, onSuccess: setRolesResponse })
   const setCurrentMutation = useMutation({
     mutationFn: setCurrentTargetRole,
@@ -66,10 +59,6 @@ export function RolesPage() {
   })
   const deleteMutation = useMutation({ mutationFn: deleteTargetRole, onSuccess: setRolesResponse })
   const generateMatchingAnalysisMutation = useMutation({ mutationFn: generateMatchingAnalysis })
-  const saveJobDescriptionMutation = useMutation({ mutationFn: saveJobDescription })
-  const retryJobDescriptionParsingMutation = useMutation({
-    mutationFn: startJobDescriptionParsing,
-  })
   const updateJobDescriptionAnalysisModuleMutation = useMutation({
     mutationFn: updateJobDescriptionAnalysisModule,
   })
@@ -91,19 +80,11 @@ export function RolesPage() {
   const actions: RolesViewActions = {
     archiveTargetRole: (input) => runMutation(archiveMutation.mutateAsync, input),
     createTargetRole: (input) => runMutation(createMutation.mutateAsync, input),
-    createTargetRoleFromRecognition: (input) =>
-      runMutation(createFromRecognitionMutation.mutateAsync, input),
     deleteTargetRole: (input) => runMutation(deleteMutation.mutateAsync, input),
     generateMatchingAnalysis: async (input) => {
       const response = await runMutation(generateMatchingAnalysisMutation.mutateAsync, input)
       setRolesResponse(response)
       clearMatchingAnalysisSynchronizationError(input.roleId)
-      return response
-    },
-    retryJobDescriptionParsing: async (input) => {
-      const response = await runMutation(retryJobDescriptionParsingMutation.mutateAsync, input)
-      setRolesResponse(response)
-      clearSynchronizationError(input.roleId)
       return response
     },
     retryJobDescriptionSynchronization: async (input) => {
@@ -116,10 +97,14 @@ export function RolesPage() {
       if (!response) throw new RolesActionError("requestFailed")
       return response
     },
-    recognizeTargetRole: (input) => recognitionMutation.mutateAsync(input),
+    recognizeTargetRole: async (input) => {
+      const response = await runMutation(recognizeTargetRole, input)
+      setRolesResponse(response)
+      return response
+    },
     restoreTargetRole: (input) => runMutation(restoreMutation.mutateAsync, input),
     saveJobDescription: async (input) => {
-      const response = await runMutation(saveJobDescriptionMutation.mutateAsync, input)
+      const response = await runMutation(saveJobDescription, input)
       setRolesResponse(response)
       clearSynchronizationError(input.roleId)
       return response

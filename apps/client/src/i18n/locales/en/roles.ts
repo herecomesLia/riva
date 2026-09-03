@@ -13,7 +13,7 @@ export const roles = {
   creation: {
     title: "Add target role",
     description:
-      "Choose an entry method. For text, images, or a link, Riva recognizes the role details for your review first.",
+      "Choose an entry method. For text, images, or a link, Riva recognizes and creates the target role.",
     methodsLabel: "Target role entry method",
     methods: {
       manual: "Enter manually",
@@ -34,7 +34,7 @@ export const roles = {
       url: "Add a job posting link",
     },
     methodDialogDescription:
-      "Save the target role when ready. Information recognized by Riva is available for review and correction first.",
+      "Riva creates the target role after recognition. You can correct the result from the role page.",
     backToMethods: "Back to entry methods",
     changeMethod: {
       title: "Change entry method?",
@@ -68,12 +68,6 @@ export const roles = {
         "Paste a publicly accessible job page and Riva will retrieve and recognize its role details.",
       placeholder: "https://example.com/jobs/role",
       invalid: "Enter a valid HTTP or HTTPS job posting URL.",
-    },
-    review: {
-      source: "Riva finished recognizing {{source}}. Review and correct the result before saving.",
-      rawText: "Recognized JD text",
-      description: "After creation, this text enters the existing structured JD parsing flow.",
-      back: "Back to entry",
     },
   },
   editor: {
@@ -125,18 +119,17 @@ export const roles = {
     cardDescription: "Paste the role JD and review its structured analysis.",
     actions: {
       add: "Paste job description",
-      replace: "Edit or replace JD",
+      replace: "Update JD",
       editModule: "Edit",
       editModuleLabel: "Edit {{module}}",
       saveCorrection: "Save changes",
       savingCorrection: "Saving",
-      retry: "Retry parsing",
       resynchronize: "Synchronize status",
     },
     editor: {
       addTitle: "Paste job description",
-      replaceTitle: "Edit or replace job description",
-      description: "The first version supports pasted text only. Saving starts structured parsing.",
+      replaceTitle: "Update JD",
+      description: "Submitting reparses it and replaces the current structured result.",
       fieldLabel: "Job description text",
       placeholder: "Paste the full responsibilities, requirements, and preferred qualifications…",
       required: "Paste the job description text.",
@@ -234,8 +227,8 @@ export const roles = {
           description: "Match analysis will be available after JD parsing completes.",
         },
         failed: {
-          title: "Retry JD parsing first",
-          description: "A structured JD result is required before match analysis can start.",
+          title: "Submit the job description again",
+          description: "Submit a complete new JD before starting match analysis.",
         },
       },
     },
@@ -341,7 +334,7 @@ export const roles = {
     },
     failed: {
       label: "Parsing failed",
-      description: "The original JD is preserved and parsing can be retried later.",
+      description: "Submit a complete new JD.",
     },
   },
   matchingAnalysisStatus: {

@@ -9,7 +9,7 @@ import {
   SparklesIcon,
   XIcon,
 } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -54,14 +54,12 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import type {
-  CreateTargetRoleFromRecognitionInput,
   CreateTargetRoleInput,
   RecognizeTargetRoleInput,
   TargetRoleImportSourceType,
-  TargetRoleRecognitionResult,
 } from "@/models/roles"
 
-import { RoleEditorForm, type RoleDraft } from "./RoleEditorDialog"
+import { RoleEditorForm } from "./RoleEditorDialog"
 
 type CreationMethod = "manual" | TargetRoleImportSourceType
 type RecognitionInputError = "imageRequired" | "textRequired" | "urlInvalid" | null
@@ -74,7 +72,6 @@ const creationMethods = [
 ] satisfies { value: CreationMethod; icon: typeof PencilLineIcon }[]
 
 export function TargetRoleCreationDialog({
-  onCreateFromRecognition,
   onDirtyChange,
   onManualCreate,
   onOpenChange,
@@ -82,11 +79,10 @@ export function TargetRoleCreationDialog({
   onSaved,
   open,
 }: {
-  onCreateFromRecognition: (input: CreateTargetRoleFromRecognitionInput) => Promise<void>
   onDirtyChange: (isDirty: boolean) => void
   onManualCreate: (input: CreateTargetRoleInput) => Promise<void>
   onOpenChange: (open: boolean) => void
-  onRecognize: (input: RecognizeTargetRoleInput) => Promise<TargetRoleRecognitionResult>
+  onRecognize: (input: RecognizeTargetRoleInput) => Promise<void>
   onSaved: () => void
   open: boolean
 }) {
@@ -96,14 +92,12 @@ export function TargetRoleCreationDialog({
   const [text, setText] = useState("")
   const [images, setImages] = useState<File[]>([])
   const [url, setUrl] = useState("")
-  const [recognition, setRecognition] = useState<TargetRoleRecognitionResult | null>(null)
   const [recognitionError, setRecognitionError] = useState(false)
   const [inputError, setInputError] = useState<RecognitionInputError>(null)
   const [isRecognizing, setIsRecognizing] = useState(false)
   const [confirmMethodChangeOpen, setConfirmMethodChangeOpen] = useState(false)
 
-  const sourceDirty =
-    text.trim().length > 0 || images.length > 0 || url.trim().length > 0 || recognition !== null
+  const sourceDirty = text.trim().length > 0 || images.length > 0 || url.trim().length > 0
 
   useEffect(
     () => onDirtyChange(manualDirty || sourceDirty),
@@ -117,7 +111,6 @@ export function TargetRoleCreationDialog({
     setText("")
     setImages([])
     setUrl("")
-    setRecognition(null)
     setRecognitionError(false)
     setInputError(null)
     setIsRecognizing(false)
@@ -138,7 +131,6 @@ export function TargetRoleCreationDialog({
     setText("")
     setImages([])
     setUrl("")
-    setRecognition(null)
     setRecognitionError(false)
     setInputError(null)
     setConfirmMethodChangeOpen(false)
@@ -157,7 +149,8 @@ export function TargetRoleCreationDialog({
     setRecognitionError(false)
     setIsRecognizing(true)
     try {
-      setRecognition(await onRecognize(input))
+      await onRecognize(input)
+      onSaved()
     } catch {
       setRecognitionError(true)
     } finally {
@@ -216,17 +209,7 @@ export function TargetRoleCreationDialog({
             <DialogDescription>{t("roles.creation.methodDialogDescription")}</DialogDescription>
           </DialogHeader>
 
-          {recognition ? (
-            <RecognitionReview
-              onBack={() => setRecognition(null)}
-              onCreate={onCreateFromRecognition}
-              onDirtyChange={setManualDirty}
-              onOpenChange={onOpenChange}
-              onReturnToMethods={returnToMethods}
-              onSaved={onSaved}
-              recognition={recognition}
-            />
-          ) : method ? (
+          {method ? (
             <div className="flex min-w-0 flex-col gap-6">
               {method === "manual" && (
                 <RoleEditorForm
@@ -459,87 +442,6 @@ function UrlImportPanel({
         {error && <FieldError>{t("roles.creation.url.invalid")}</FieldError>}
       </Field>
     </FieldGroup>
-  )
-}
-
-function RecognitionReview({
-  onBack,
-  onCreate,
-  onDirtyChange,
-  onOpenChange,
-  onReturnToMethods,
-  onSaved,
-  recognition,
-}: {
-  onBack: () => void
-  onCreate: (input: CreateTargetRoleFromRecognitionInput) => Promise<void>
-  onDirtyChange: (isDirty: boolean) => void
-  onOpenChange: (open: boolean) => void
-  onReturnToMethods: () => void
-  onSaved: () => void
-  recognition: TargetRoleRecognitionResult
-}) {
-  const { t } = useTranslation()
-  const [rawText, setRawText] = useState(recognition.rawText)
-  const [roleDirty, setRoleDirty] = useState(false)
-  const initialDraft = useMemo<RoleDraft>(
-    () => ({
-      title: recognition.suggestedRole.title,
-      company: recognition.suggestedRole.company ?? "",
-      recruitmentType: recognition.suggestedRole.recruitmentType ?? "unspecified",
-      location: recognition.suggestedRole.location ?? "",
-    }),
-    [recognition],
-  )
-
-  useEffect(
-    () => onDirtyChange(roleDirty || rawText !== recognition.rawText),
-    [onDirtyChange, rawText, recognition.rawText, roleDirty],
-  )
-
-  return (
-    <div className="flex flex-col gap-6" data-testid="target-role-recognition-review">
-      <Alert>
-        <SparklesIcon />
-        <AlertDescription>
-          {t("roles.creation.review.source", { source: recognition.sourceLabel })}
-        </AlertDescription>
-      </Alert>
-      <div>
-        <Button onClick={onBack} type="button" variant="ghost">
-          {t("roles.creation.review.back")}
-        </Button>
-      </div>
-      <FieldGroup>
-        <Field>
-          <FieldLabel htmlFor="target-role-recognized-text">
-            {t("roles.creation.review.rawText")}
-          </FieldLabel>
-          <FieldDescription>{t("roles.creation.review.description")}</FieldDescription>
-          <FieldControl>
-            <Textarea
-              className="min-h-48 resize-y"
-              id="target-role-recognized-text"
-              onChange={(event) => setRawText(event.target.value)}
-              value={rawText}
-            />
-          </FieldControl>
-        </Field>
-      </FieldGroup>
-      <RoleEditorForm
-        initialDraft={initialDraft}
-        mode="create"
-        onCreate={(input) =>
-          onCreate({ ...input, rawText: rawText.trim(), recognitionId: recognition.recognitionId })
-        }
-        onDirtyChange={setRoleDirty}
-        onOpenChange={onOpenChange}
-        onSaved={onSaved}
-        onUpdate={() => Promise.resolve()}
-        role={null}
-        footerStart={<ReturnToMethodsButton onClick={onReturnToMethods} />}
-      />
-    </div>
   )
 }
 

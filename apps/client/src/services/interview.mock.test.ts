@@ -1203,7 +1203,7 @@ describe("interview mock reset boundaries", () => {
       const savePromise = saveJobDescription({
         roleId: product.id,
         version: product.version,
-        rawText: "Updated product manager job description",
+        text: "Updated product manager job description",
       })
       await vi.runAllTimersAsync()
       await savePromise
@@ -1233,7 +1233,7 @@ describe("interview mock reset boundaries", () => {
       const savePromise = saveJobDescription({
         roleId: product.id,
         version: product.version,
-        rawText: "Own merchant product strategy, roadmap, collaboration, and measurable outcomes.",
+        text: "Own merchant product strategy, roadmap, collaboration, and measurable outcomes.",
       })
       await vi.runAllTimersAsync()
       const parsing = await savePromise

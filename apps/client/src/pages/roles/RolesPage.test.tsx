@@ -11,7 +11,6 @@ import { MATCHING_ANALYSIS_POLL_INTERVAL_MS } from "@/pages/roles/hooks/useMatch
 import {
   archiveTargetRole,
   createTargetRole,
-  createTargetRoleFromRecognition,
   deleteTargetRole,
   generateMatchingAnalysis,
   getJobDescriptionParsingStatus,
@@ -21,7 +20,6 @@ import {
   recognizeTargetRole,
   restoreTargetRole,
   setCurrentTargetRole,
-  startJobDescriptionParsing,
   updateJobDescriptionAnalysisModule,
   updateTargetRole,
 } from "@/services/roles"
@@ -32,7 +30,6 @@ vi.mock("@/services/roles", async (importOriginal) => ({
   getRolesPage: vi.fn(),
   archiveTargetRole: vi.fn(),
   createTargetRole: vi.fn(),
-  createTargetRoleFromRecognition: vi.fn(),
   deleteTargetRole: vi.fn(),
   generateMatchingAnalysis: vi.fn(),
   getJobDescriptionParsingStatus: vi.fn(),
@@ -41,7 +38,6 @@ vi.mock("@/services/roles", async (importOriginal) => ({
   recognizeTargetRole: vi.fn(),
   restoreTargetRole: vi.fn(),
   setCurrentTargetRole: vi.fn(),
-  startJobDescriptionParsing: vi.fn(),
   updateJobDescriptionAnalysisModule: vi.fn(),
   updateTargetRole: vi.fn(),
 }))
@@ -63,13 +59,11 @@ function renderRolesPage() {
 const mutationMocks = [
   archiveTargetRole,
   createTargetRole,
-  createTargetRoleFromRecognition,
   deleteTargetRole,
   generateMatchingAnalysis,
   restoreTargetRole,
   saveJobDescription,
   setCurrentTargetRole,
-  startJobDescriptionParsing,
   updateJobDescriptionAnalysisModule,
   updateTargetRole,
 ] as const
@@ -366,7 +360,6 @@ describe("RolesPage", () => {
     ).toMatchObject({
       version: parsingB.roles[0]!.version,
       jobDescription: {
-        rawText: parsingB.roles[0]!.jobDescription.rawText,
         version: parsingB.roles[0]!.jobDescription.version,
       },
     })
@@ -498,22 +491,6 @@ describe("RolesPage", () => {
     expect(
       await screen.findByText(failed.roles[0]!.jobDescription.parsingFailureReason!),
     ).toBeInTheDocument()
-  })
-
-  it("retries a failed JD parse and stores the ready result", async () => {
-    const user = userEvent.setup()
-    const { failed, parsing, ready } = createJobDescriptionRetryResponses()
-    vi.mocked(getRolesPage).mockResolvedValue(failed)
-    vi.mocked(startJobDescriptionParsing).mockResolvedValue(parsing)
-    vi.mocked(getJobDescriptionParsingStatus).mockResolvedValue(ready.roles[0]!)
-    const { queryClient } = renderRolesPage()
-
-    await openJobDescriptionTab()
-    await screen.findByTestId("job-description-card")
-    await user.click(screen.getByRole("button", { name: i18n.t("roles.jd.actions.retry") }))
-
-    await waitFor(() => expect(queryClient.getQueryData(["roles"])).toEqual(ready))
-    expect(await screen.findByTestId("job-description-analysis")).toBeInTheDocument()
   })
 
   it("keeps the parsing snapshot and offers synchronization retry after polling fails", async () => {
@@ -1007,12 +984,12 @@ describe("RolesPage", () => {
   })
 })
 
-async function submitJobDescription(user: ReturnType<typeof userEvent.setup>, rawText: string) {
+async function submitJobDescription(user: ReturnType<typeof userEvent.setup>, text: string) {
   await openJobDescriptionTab()
   await screen.findByTestId("job-description-card")
   await user.click(screen.getByRole("button", { name: i18n.t("roles.jd.actions.add") }))
   const dialog = await screen.findByRole("dialog")
-  await user.type(within(dialog).getByLabelText(i18n.t("roles.jd.editor.fieldLabel")), rawText)
+  await user.type(within(dialog).getByLabelText(i18n.t("roles.jd.editor.fieldLabel")), text)
   await user.click(within(dialog).getByRole("button", { name: i18n.t("roles.jd.editor.save") }))
 }
 
@@ -1032,7 +1009,6 @@ function createJobDescriptionFlowResponses() {
     throw new Error("Expected the parsing JD fixture.")
   }
   parsingRole.version = initial.roles[0]!.version + 1
-  parsingRole.jobDescription.rawText = "Lead React architecture and TypeScript delivery."
 
   const ready = createRolesMockResponse("roleWithParsedJobDescription")
   const readyRole = ready.roles[0]!
@@ -1040,7 +1016,6 @@ function createJobDescriptionFlowResponses() {
     throw new Error("Expected the ready JD fixture to include analysis.")
   }
   readyRole.version = parsingRole.version + 1
-  readyRole.jobDescription.rawText = parsingRole.jobDescription.rawText
   readyRole.jobDescription.version = parsingRole.jobDescription.version
   readyRole.jobDescriptionAnalysis.jobDescriptionVersion = parsingRole.jobDescription.version
 
@@ -1073,7 +1048,6 @@ function createReplacementParsingResponse(initial: ReturnType<typeof createRoles
     version: role.version + 1,
     jobDescription: {
       status: "parsing",
-      rawText: "A replacement JD for a platform engineering position.",
       version: nextJobDescriptionVersion,
       parsingFailureReason: null,
     },
@@ -1084,50 +1058,6 @@ function createReplacementParsingResponse(initial: ReturnType<typeof createRoles
         : role.matchingAnalysis,
   }
   return response
-}
-
-function createJobDescriptionRetryResponses() {
-  const failed = createRolesMockResponse("roleWithJobDescriptionFailed")
-  const failedRole = failed.roles[0]!
-  if (failedRole.jobDescription.status !== "failed") {
-    throw new Error("Expected the failed JD fixture.")
-  }
-
-  const parsing = structuredClone(failed)
-  parsing.roles[0] = {
-    ...failedRole,
-    version: failedRole.version + 1,
-    jobDescription: {
-      ...failedRole.jobDescription,
-      status: "parsing",
-      parsingFailureReason: null,
-    },
-    jobDescriptionAnalysis: null,
-  }
-
-  const parsedFixture = createRolesMockResponse("roleWithParsedJobDescription").roles[0]!
-  if (parsedFixture.jobDescription.status !== "ready" || !parsedFixture.jobDescriptionAnalysis) {
-    throw new Error("Expected the ready JD fixture.")
-  }
-  const parsingRole = parsing.roles[0]!
-  if (parsingRole.jobDescription.status !== "parsing") {
-    throw new Error("Expected the retry response to be parsing.")
-  }
-  const ready = structuredClone(parsing)
-  ready.roles[0] = {
-    ...parsingRole,
-    version: parsingRole.version + 1,
-    jobDescription: {
-      ...parsingRole.jobDescription,
-      status: "ready",
-    },
-    jobDescriptionAnalysis: {
-      ...parsedFixture.jobDescriptionAnalysis,
-      jobDescriptionVersion: parsingRole.jobDescription.version,
-    },
-  }
-
-  return { failed, parsing, ready }
 }
 
 function createJobDescriptionPollingResponses() {

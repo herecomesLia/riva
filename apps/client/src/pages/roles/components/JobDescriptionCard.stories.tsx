@@ -64,7 +64,6 @@ export const SynchronizationRetry = meta.story({
 export const Failed = meta.story({
   args: {
     onEdit: fn(),
-    onRetry: fn(),
     role: roleFor("roleWithJobDescriptionFailed"),
     synchronizationError: false,
   },

@@ -5,11 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
 import { createRolesMockResponse } from "@/mocks/data/roles"
-import type {
-  RecognizeTargetRoleInput,
-  RolesPageResponse,
-  TargetRoleRecognitionResult,
-} from "@/models/roles"
+import type { RecognizeTargetRoleInput, RolesPageResponse } from "@/models/roles"
 import { renderWithProviders } from "@/test/render"
 
 import { RolesView, type RolesViewActions } from "./RolesView"
@@ -23,34 +19,11 @@ function createActions(
   return {
     archiveTargetRole: vi.fn(async () => data),
     createTargetRole: vi.fn(async () => data),
-    createTargetRoleFromRecognition: vi.fn(async () => data),
     deleteTargetRole: vi.fn(async () => data),
     generateMatchingAnalysis: vi.fn(async () => data),
-    retryJobDescriptionParsing: vi.fn(async () => data),
     retryJobDescriptionSynchronization: vi.fn(async () => data),
     retryMatchingAnalysisSynchronization: vi.fn(async () => data),
-    recognizeTargetRole: vi.fn(
-      async (input: RecognizeTargetRoleInput): Promise<TargetRoleRecognitionResult> => ({
-        recognitionId: `recognition_${input.sourceType}`,
-        sourceType: input.sourceType,
-        sourceLabel:
-          input.sourceType === "text"
-            ? "pasted job posting"
-            : input.sourceType === "image"
-              ? input.images.map((image) => image.name).join(", ")
-              : input.url,
-        rawText:
-          input.sourceType === "text"
-            ? input.text
-            : "Frontend Engineer\nCompany: Riva\nLocation: Shanghai\n3-5 years of experience",
-        suggestedRole: {
-          title: "Frontend Engineer",
-          company: "Riva",
-          recruitmentType: "experienced",
-          location: "Shanghai",
-        },
-      }),
-    ),
+    recognizeTargetRole: vi.fn(async (_input: RecognizeTargetRoleInput) => data),
     restoreTargetRole: vi.fn(async () => data),
     saveJobDescription: vi.fn(async () => data),
     setCurrentTargetRole: vi.fn(async () => data),
@@ -622,12 +595,12 @@ describe("RolesView", () => {
     ).toBeInTheDocument()
   })
 
-  it("recognizes pasted text and creates the reviewed role with its JD", async () => {
+  it("recognizes pasted text and closes without retaining a review draft", async () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("noRoles")
     const actions = createActions(data)
     renderReadyView(data, { actions })
-    const rawText = [
+    const text = [
       "岗位名称：前端工程师",
       "公司：Riva",
       "工作地点：上海",
@@ -644,25 +617,13 @@ describe("RolesView", () => {
     const dialog = await screen.findByRole("dialog", {
       name: i18n.t("roles.creation.methodTitles.text"),
     })
-    await user.type(within(dialog).getByLabelText(i18n.t("roles.creation.text.label")), rawText)
+    await user.type(within(dialog).getByLabelText(i18n.t("roles.creation.text.label")), text)
     await user.click(
       within(dialog).getByRole("button", { name: i18n.t("roles.creation.recognize") }),
     )
 
-    const review = await within(dialog).findByTestId("target-role-recognition-review")
-    expect(actions.recognizeTargetRole).toHaveBeenCalledWith({ sourceType: "text", text: rawText })
-    expect(within(review).getByLabelText(i18n.t("roles.editor.fields.title"))).toHaveValue(
-      "Frontend Engineer",
-    )
-
-    await user.click(within(review).getByRole("button", { name: i18n.t("roles.editor.save") }))
-    expect(actions.createTargetRoleFromRecognition).toHaveBeenCalledWith(
-      expect.objectContaining({
-        rawText,
-        recognitionId: "recognition_text",
-        title: "Frontend Engineer",
-      }),
-    )
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
+    expect(actions.recognizeTargetRole).toHaveBeenCalledWith({ sourceType: "text", text })
   })
 
   it("sends uploaded screenshots directly through the image Agent entry path", async () => {
@@ -689,7 +650,7 @@ describe("RolesView", () => {
       within(dialog).getByRole("button", { name: i18n.t("roles.creation.recognize") }),
     )
 
-    await within(dialog).findByTestId("target-role-recognition-review")
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
     expect(actions.recognizeTargetRole).toHaveBeenCalledWith({
       sourceType: "image",
       images: [image],
@@ -718,7 +679,7 @@ describe("RolesView", () => {
       within(dialog).getByRole("button", { name: i18n.t("roles.creation.recognize") }),
     )
 
-    await within(dialog).findByTestId("target-role-recognition-review")
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument())
     expect(actions.recognizeTargetRole).toHaveBeenCalledWith({ sourceType: "url", url })
   })
 
@@ -927,39 +888,35 @@ describe("RolesView", () => {
     ).toBeEnabled()
   })
 
-  it("shows the safe business failure and retry action", async () => {
+  it("shows the safe business failure and offers a new JD submission", async () => {
     const data = createRolesMockResponse("roleWithJobDescriptionFailed")
     const role = data.roles[0]!
-    renderReadyView(data, { initialActiveTab: "job-description" })
+    renderReadyView(data, { actions: createActions(data), initialActiveTab: "job-description" })
 
     const card = await screen.findByTestId("job-description-card")
     expect(card).toHaveTextContent(role.jobDescription.parsingFailureReason!)
     expect(
-      within(card).getByRole("button", { name: i18n.t("roles.jd.actions.retry") }),
+      within(card).getByRole("button", { name: i18n.t("roles.jd.actions.replace") }),
     ).toBeEnabled()
   })
 
-  it("disables retry while a failed parse retry is pending", async () => {
+  it("opens an empty JD editor after a parsing failure", async () => {
     const user = userEvent.setup()
     const data = createRolesMockResponse("roleWithJobDescriptionFailed")
-    let resolveRetry!: (response: RolesPageResponse) => void
-    const retryJobDescriptionParsing = vi.fn(
-      () =>
-        new Promise<RolesPageResponse>((resolve) => {
-          resolveRetry = resolve
-        }),
-    )
     renderReadyView(data, {
-      actions: createActions(data, { retryJobDescriptionParsing }),
+      actions: createActions(data),
       initialActiveTab: "job-description",
     })
 
-    const retry = await screen.findByRole("button", { name: i18n.t("roles.jd.actions.retry") })
-    await user.click(retry)
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("roles.jd.actions.replace") }),
+    )
 
-    await waitFor(() => expect(retryJobDescriptionParsing).toHaveBeenCalledTimes(1))
-    expect(retry).toBeDisabled()
-    resolveRetry(data)
+    expect(
+      within(await screen.findByRole("dialog")).getByLabelText(
+        i18n.t("roles.jd.editor.fieldLabel"),
+      ),
+    ).toHaveValue("")
   })
 
   it("renders every structured section for a ready job description", async () => {

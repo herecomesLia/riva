@@ -12,7 +12,6 @@ function createActions(overrides: Partial<RoleDetailsActions> = {}): RoleDetails
     edit: fn(),
     editJobDescription: fn(),
     generateMatchingAnalysis: fn(),
-    retryJobDescriptionParsing: fn(),
     retryJobDescriptionSynchronization: fn(),
     retryMatchingAnalysisSynchronization: fn(),
     restore: fn(),

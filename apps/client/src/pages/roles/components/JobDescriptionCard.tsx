@@ -28,7 +28,6 @@ import type {
 export function JobDescriptionCard({
   onEdit,
   onEditAnalysisModule,
-  onRetry,
   onRetrySynchronization,
   pending,
   role,
@@ -36,7 +35,6 @@ export function JobDescriptionCard({
 }: {
   onEdit?: () => void
   onEditAnalysisModule?: (field: JobDescriptionAnalysisModuleField) => void
-  onRetry?: () => void
   onRetrySynchronization?: () => void
   pending?: boolean
   role: TargetRole
@@ -90,7 +88,6 @@ export function JobDescriptionCard({
           <FailedState
             failureReason={jobDescription.parsingFailureReason}
             onEdit={onEdit}
-            onRetry={onRetry}
             pending={pending}
           />
         )}
@@ -169,12 +166,10 @@ function ParsingState({
 function FailedState({
   failureReason,
   onEdit,
-  onRetry,
   pending,
 }: {
   failureReason: string
   onEdit?: () => void
-  onRetry?: () => void
   pending?: boolean
 }) {
   const { t } = useTranslation()
@@ -185,16 +180,6 @@ function FailedState({
         <AlertDescription>{failureReason}</AlertDescription>
       </Alert>
       <div className="flex flex-wrap gap-2">
-        {onRetry && (
-          <Button disabled={pending} onClick={onRetry} size="sm">
-            {pending ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <RefreshCwIcon data-icon="inline-start" />
-            )}
-            {t("roles.jd.actions.retry")}
-          </Button>
-        )}
         {onEdit && (
           <Button
             className="border-primary text-primary hover:bg-primary/10 hover:text-primary"

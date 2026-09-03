@@ -7,7 +7,6 @@ import { waitForMockDelay } from "@/mocks/utils"
 import type {
   ArchiveTargetRoleInput,
   CreateTargetRoleInput,
-  CreateTargetRoleFromRecognitionInput,
   DeleteTargetRoleInput,
   GenerateOrRegenerateMatchingAnalysisInput,
   GetJobDescriptionParsingStatusInput,
@@ -20,9 +19,7 @@ import type {
   RolesPageResponse,
   SaveTargetRoleJobDescriptionInput,
   SetCurrentTargetRoleInput,
-  StartOrRetryJobDescriptionParsingInput,
   TargetRole,
-  TargetRoleRecognitionResult,
   UpdateJobDescriptionAnalysisModuleInput,
   UpdateTargetRoleInput,
 } from "@/models/roles"
@@ -34,13 +31,15 @@ function copy<T>(value: T): T {
 let mockResponse = createRolesMockResponse()
 let createdRoleCount = 0
 let timestampSequence = 0
-const parsingAttempts = new Map<string, number>()
+const parsingFailureKeys = new Set<string>()
+const matchingFailureRoleIds = new Set<string>()
 
 export function resetRolesMockState(scenario: RolesMockScenario = "matchingAnalysisCurrent") {
   mockResponse = createRolesMockResponse(scenario)
   createdRoleCount = 0
   timestampSequence = 0
-  parsingAttempts.clear()
+  parsingFailureKeys.clear()
+  matchingFailureRoleIds.clear()
 }
 
 export function getRolesMockSnapshot(): RolesPageResponse {
@@ -102,15 +101,11 @@ function parsingKey(role: TargetRole) {
 
 function parsingShouldFail(role: TargetRole) {
   if (role.jobDescription.status !== "parsing") return false
-  const text = role.jobDescription.rawText.toLowerCase()
-  const key = parsingKey(role)
-  const attempts = (parsingAttempts.get(key) ?? 0) + 1
-  parsingAttempts.set(key, attempts)
-  return text.includes("unparseable") || (text.includes("retryable") && attempts === 1)
+  return parsingFailureKeys.has(parsingKey(role))
 }
 
 function matchingShouldFail(role: ReadyTargetRole) {
-  return role.jobDescription.rawText.toLowerCase().includes("analysis-failure")
+  return matchingFailureRoleIds.has(role.id)
 }
 
 function isReadyTargetRole(role: TargetRole): role is ReadyTargetRole {
@@ -194,10 +189,7 @@ export async function createTargetRole(input: CreateTargetRoleInput): Promise<Ro
   return createRole(input)
 }
 
-function createRole(
-  input: CreateTargetRoleInput,
-  recognizedJobDescription?: string,
-): RolesPageResponse {
+function createRole(input: CreateTargetRoleInput, jobDescriptionText?: string): RolesPageResponse {
   const createdAt = nextTimestamp()
   createdRoleCount += 1
   const becomesCurrent = mockResponse.roles.length === 0
@@ -213,12 +205,11 @@ function createRole(
     version: 1,
     matchingAnalysis: null,
   }
-  const role: TargetRole = recognizedJobDescription
+  const role: TargetRole = jobDescriptionText
     ? {
         ...roleBase,
         jobDescription: {
           status: "parsing",
-          rawText: recognizedJobDescription,
           version: 1,
           parsingFailureReason: null,
         },
@@ -228,12 +219,17 @@ function createRole(
         ...roleBase,
         jobDescription: {
           status: "missing",
-          rawText: null,
           version: null,
           parsingFailureReason: null,
         },
         jobDescriptionAnalysis: null,
       }
+  if (jobDescriptionText?.toLowerCase().includes("unparseable")) {
+    parsingFailureKeys.add(`${role.id}:1`)
+  }
+  if (jobDescriptionText?.toLowerCase().includes("analysis-failure")) {
+    matchingFailureRoleIds.add(role.id)
+  }
   return setMockResponse({
     ...mockResponse,
     roles: [...mockResponse.roles, role],
@@ -243,39 +239,26 @@ function createRole(
 
 export async function recognizeTargetRole(
   input: RecognizeTargetRoleInput,
-): Promise<TargetRoleRecognitionResult> {
-  await waitForMockDelay()
-  return createRecognitionResult(input)
-}
-
-export async function createTargetRoleFromRecognition(
-  input: CreateTargetRoleFromRecognitionInput,
 ): Promise<RolesPageResponse> {
   await waitForMockDelay()
-  if (!input.recognitionId.trim()) throw new Error("Target role recognition is required.")
-  const rawText = input.rawText.trim()
-  if (!rawText) throw new Error("Recognized job description text is required.")
-  return createRole(input, rawText)
+  const { role, text } = recognizeRole(input)
+  return createRole(role, text)
 }
 
-function createRecognitionResult(input: RecognizeTargetRoleInput): TargetRoleRecognitionResult {
+function recognizeRole(input: RecognizeTargetRoleInput): {
+  role: CreateTargetRoleInput
+  text: string
+} {
   if (input.sourceType === "text") {
-    const rawText = input.text.trim()
-    if (!rawText) throw new Error("Job posting text is required.")
-    return {
-      recognitionId: "recognition_text_1",
-      sourceType: "text",
-      sourceLabel: rawText.split(/\r?\n/, 1)[0] ?? "pasted-job-posting",
-      rawText,
-      suggestedRole: inferRoleBasics(rawText),
-    }
+    const text = input.text.trim()
+    if (!text) throw new Error("Job posting text is required.")
+    return { role: inferRoleBasics(text), text }
   }
 
   if (input.sourceType === "image") {
     if (input.images.length === 0) throw new Error("At least one job posting image is required.")
     // UI-only fixture: the production adapter sends the original File[] to the vision Agent.
-    const sourceLabel = input.images.map((image) => image.name).join(", ")
-    const rawText = [
+    const text = [
       "Frontend Engineer",
       "Company: Riva Technology",
       "Location: Shanghai",
@@ -283,36 +266,24 @@ function createRecognitionResult(input: RecognizeTargetRoleInput): TargetRoleRec
       "Build accessible React interfaces and collaborate with product and design teams.",
       "Strong TypeScript, React, and frontend architecture skills are required.",
     ].join("\n")
-    return {
-      recognitionId: "recognition_image_1",
-      sourceType: "image",
-      sourceLabel,
-      rawText,
-      suggestedRole: inferRoleBasics(rawText),
-    }
+    return { role: inferRoleBasics(text), text }
   }
 
   const url = input.url.trim()
   if (!url) throw new Error("A job posting URL is required.")
   const parsedUrl = new URL(url)
-  const rawText = [
+  const text = [
     "Product Manager",
     `Company: ${parsedUrl.hostname.replace(/^www\./, "")}`,
     "Location: Beijing",
     "Own product discovery, roadmap planning, delivery, and outcome measurement.",
     "Work closely with engineering, design, operations, and commercial teams.",
   ].join("\n")
-  return {
-    recognitionId: "recognition_url_1",
-    sourceType: "url",
-    sourceLabel: url,
-    rawText,
-    suggestedRole: inferRoleBasics(rawText),
-  }
+  return { role: inferRoleBasics(text), text }
 }
 
-function inferRoleBasics(rawText: string): TargetRoleRecognitionResult["suggestedRole"] {
-  const lines = rawText
+function inferRoleBasics(text: string): CreateTargetRoleInput {
+  const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
@@ -323,9 +294,9 @@ function inferRoleBasics(rawText: string): TargetRoleRecognitionResult["suggeste
   return {
     title: field(["岗位名称", "职位", "job title", "role"]) ?? lines[0] ?? "",
     company: field(["公司名称", "公司", "company"]),
-    recruitmentType: /校招|campus|graduate/i.test(rawText)
+    recruitmentType: /校招|campus|graduate/i.test(text)
       ? "campus"
-      : /社招|experienced|years? of experience/i.test(rawText)
+      : /社招|experienced|years? of experience/i.test(text)
         ? "experienced"
         : null,
     location: field(["工作地点", "地点", "location"]),
@@ -406,6 +377,10 @@ export async function deleteTargetRole(input: DeleteTargetRoleInput): Promise<Ro
   requireCurrentVersion(role, input.version)
 
   const remainingRoles = mockResponse.roles.filter((candidate) => candidate.id !== role.id)
+  matchingFailureRoleIds.delete(role.id)
+  for (const key of parsingFailureKeys) {
+    if (key.startsWith(`${role.id}:`)) parsingFailureKeys.delete(key)
+  }
   const wasCurrent = mockResponse.currentRoleId === role.id
   const currentRoleId = wasCurrent
     ? resolveFallbackCurrentRoleId(remainingRoles, role.id)
@@ -420,8 +395,8 @@ export async function saveJobDescription(
   await waitForMockDelay()
   const role = requireRole(input.roleId)
   requireCurrentVersion(role, input.version)
-  const rawText = input.rawText.trim()
-  if (!rawText) throw new Error("Job description text is required.")
+  const text = input.text.trim()
+  if (!text) throw new Error("Job description text is required.")
 
   const jobDescriptionVersion = (role.jobDescription.version ?? 0) + 1
   const updatedRole: TargetRole = {
@@ -429,42 +404,17 @@ export async function saveJobDescription(
     ...nextRoleVersion(role),
     jobDescription: {
       status: "parsing",
-      rawText,
       version: jobDescriptionVersion,
       parsingFailureReason: null,
     },
     jobDescriptionAnalysis: null,
     matchingAnalysis: markMatchingAnalysisStale(role.matchingAnalysis),
   }
-  return setMockResponse(replaceRole(updatedRole))
-}
-
-export async function startJobDescriptionParsing(
-  input: StartOrRetryJobDescriptionParsingInput,
-): Promise<RolesPageResponse> {
-  await waitForMockDelay()
-  const role = requireRole(input.roleId)
-  requireCurrentVersion(role, input.version)
-  if (role.jobDescription.status === "missing") {
-    throw new Error("Save a job description before starting parsing.")
-  }
-  if (role.jobDescription.version !== input.jobDescriptionVersion) {
-    throw new Error("Job description version is out of date.")
-  }
-  if (role.jobDescription.status === "parsing" || role.jobDescription.status === "ready") {
-    return copy(mockResponse)
-  }
-
-  const updatedRole: TargetRole = {
-    ...role,
-    ...nextRoleVersion(role),
-    jobDescription: {
-      ...role.jobDescription,
-      status: "parsing",
-      parsingFailureReason: null,
-    },
-    jobDescriptionAnalysis: null,
-  }
+  const key = `${role.id}:${jobDescriptionVersion}`
+  if (text.toLowerCase().includes("unparseable")) parsingFailureKeys.add(key)
+  else parsingFailureKeys.delete(key)
+  if (text.toLowerCase().includes("analysis-failure")) matchingFailureRoleIds.add(role.id)
+  else matchingFailureRoleIds.delete(role.id)
   return setMockResponse(replaceRole(updatedRole))
 }
 

@@ -4,7 +4,6 @@ import { resetRolesMockState } from "@/mocks/services/roles"
 import {
   archiveTargetRole,
   createTargetRole,
-  createTargetRoleFromRecognition,
   deleteTargetRole,
   generateMatchingAnalysis,
   getJobDescriptionParsingStatus,
@@ -14,7 +13,6 @@ import {
   recognizeTargetRole,
   restoreTargetRole,
   setCurrentTargetRole,
-  startJobDescriptionParsing,
   updateJobDescriptionAnalysisModule,
   updateTargetRole,
 } from "@/services/roles"
@@ -66,10 +64,10 @@ async function getCurrentRole() {
   return role
 }
 
-async function saveAndParseCurrentRole(rawText: string) {
+async function saveAndParseCurrentRole(text: string) {
   const currentRole = await getCurrentRole()
   const parsing = await settle(
-    saveJobDescription({ roleId: currentRole.id, version: currentRole.version, rawText }),
+    saveJobDescription({ roleId: currentRole.id, version: currentRole.version, text }),
   )
   const parsingRole = parsing.roles.find((role) => role.id === currentRole.id)!
   return pollJobDescription(parsingRole)
@@ -103,49 +101,25 @@ describe("roles stateful mock service", () => {
     expect(response.roles[0]).not.toHaveProperty("isCurrent")
   })
 
-  it("recognizes pasted job text into a reviewable role draft", async () => {
-    const rawText = ["岗位名称：前端平台工程师", "公司：Riva", "工作地点：上海", "3-5 年经验"].join(
+  it("recognizes pasted job text and creates a parsing role without retaining the text", async () => {
+    resetRolesMockState("noRoles")
+    const text = ["岗位名称：前端平台工程师", "公司：Riva", "工作地点：上海", "3-5 年经验"].join(
       "\n",
     )
 
-    const result = await settle(recognizeTargetRole({ sourceType: "text", text: rawText }))
-
-    expect(result).toMatchObject({
-      recognitionId: "recognition_text_1",
-      sourceType: "text",
-      rawText,
-      suggestedRole: {
-        title: "前端平台工程师",
-        company: "Riva",
-        location: "上海",
-      },
-    })
-  })
-
-  it("creates a recognized role and its parsing JD in one response", async () => {
-    resetRolesMockState("noRoles")
-    const rawText = "Frontend Engineer\nBuild accessible React interfaces."
-
-    const response = await settle(
-      createTargetRoleFromRecognition({
-        ...newRole,
-        recognitionId: "recognition_text_1",
-        rawText,
-      }),
-    )
+    const response = await settle(recognizeTargetRole({ sourceType: "text", text }))
 
     expect(response.currentRoleId).toBe("role_created_1")
-    expect(response.roles).toHaveLength(1)
     expect(response.roles[0]).toMatchObject({
-      title: newRole.title,
-      version: 1,
+      title: "前端平台工程师",
+      company: "Riva",
+      location: "上海",
       jobDescription: {
         status: "parsing",
-        rawText,
         version: 1,
       },
-      jobDescriptionAnalysis: null,
     })
+    expect(response.roles[0]!.jobDescription).not.toHaveProperty("rawText")
   })
 
   it("keeps the existing current role when creating additional roles", async () => {
@@ -349,7 +323,6 @@ describe("roles stateful mock service", () => {
       throw new Error("Expected the structured JD analysis to remain ready.")
     }
 
-    expect(updated.jobDescription.rawText).toBe(before.jobDescription.rawText)
     expect(updated.jobDescription.version).toBe(before.jobDescription.version)
     expect(updated.jobDescriptionAnalysis).toMatchObject({
       qualificationRequirements: {
@@ -503,7 +476,7 @@ describe("roles stateful mock service", () => {
       saveJobDescription({
         roleId: role.id,
         version: role.version,
-        rawText: "Lead React and TypeScript delivery for merchant operations products.",
+        text: "Lead React and TypeScript delivery for merchant operations products.",
       }),
     )
     const parsingRole = parsing.roles[0]!
@@ -517,71 +490,6 @@ describe("roles stateful mock service", () => {
     expect(ready.jobDescriptionAnalysis?.analysisVersion).toBe(1)
   })
 
-  it("keeps failed JD text and supports a successful retry", async () => {
-    resetRolesMockState("singleRoleWithoutJobDescription")
-    const failed = await saveAndParseCurrentRole(
-      "Retryable JD parsing issue for a React and TypeScript role.",
-    )
-
-    expect(failed.jobDescription).toMatchObject({ status: "failed" })
-    expect(failed.jobDescriptionAnalysis).toBeNull()
-    if (failed.jobDescription.status !== "failed") throw new Error("Expected a failed JD parse.")
-
-    const retrying = await settle(
-      startJobDescriptionParsing({
-        roleId: failed.id,
-        version: failed.version,
-        jobDescriptionVersion: failed.jobDescription.version,
-      }),
-    )
-    const retryingRole = retrying.roles[0]!
-    const ready = await pollJobDescription(retryingRole)
-
-    expect(retryingRole.jobDescription.status).toBe("parsing")
-    expect(ready.jobDescription.status).toBe("ready")
-  })
-
-  it("allows a failed JD retry to fail again when the source remains unparseable", async () => {
-    resetRolesMockState("singleRoleWithoutJobDescription")
-    const failed = await saveAndParseCurrentRole("Unparseable copied PDF content.")
-    if (failed.jobDescription.status !== "failed") throw new Error("Expected a failed JD parse.")
-
-    const retrying = await settle(
-      startJobDescriptionParsing({
-        roleId: failed.id,
-        version: failed.version,
-        jobDescriptionVersion: failed.jobDescription.version,
-      }),
-    )
-    const failedAgain = await pollJobDescription(retrying.roles[0]!)
-
-    expect(failedAgain.jobDescription).toMatchObject({ status: "failed" })
-    expect(failedAgain.jobDescriptionAnalysis).toBeNull()
-  })
-
-  it("does not create a second JD parsing task while one is running", async () => {
-    resetRolesMockState("singleRoleWithoutJobDescription")
-    const role = await getCurrentRole()
-    const parsing = await settle(
-      saveJobDescription({
-        roleId: role.id,
-        version: role.version,
-        rawText: "Lead React and TypeScript delivery for merchant operations products.",
-      }),
-    )
-    const parsingRole = parsing.roles[0]!
-
-    const repeatedStart = await settle(
-      startJobDescriptionParsing({
-        roleId: parsingRole.id,
-        version: parsingRole.version,
-        jobDescriptionVersion: parsingRole.jobDescription.version!,
-      }),
-    )
-
-    expect(repeatedStart).toEqual(parsing)
-  })
-
   it("does not let an old JD poll advance a newer parsing job", async () => {
     resetRolesMockState("singleRoleWithoutJobDescription")
     const initial = await getCurrentRole()
@@ -589,7 +497,7 @@ describe("roles stateful mock service", () => {
       saveJobDescription({
         roleId: initial.id,
         version: initial.version,
-        rawText: "JD A requires React delivery experience.",
+        text: "JD A requires React delivery experience.",
       }),
     )
     const parsingA = responseA.roles[0]!
@@ -597,7 +505,7 @@ describe("roles stateful mock service", () => {
       saveJobDescription({
         roleId: parsingA.id,
         version: parsingA.version,
-        rawText: "JD B requires TypeScript architecture experience.",
+        text: "JD B requires TypeScript architecture experience.",
       }),
     )
     const parsingB = responseB.roles[0]!
@@ -609,7 +517,6 @@ describe("roles stateful mock service", () => {
     expect(stalePollResult.version).toBe(parsingB.version)
     expect(stalePollResult.jobDescription).toMatchObject({
       status: "parsing",
-      rawText: "JD B requires TypeScript architecture experience.",
       version: 2,
     })
 
@@ -617,7 +524,6 @@ describe("roles stateful mock service", () => {
     expect(readyB.version).toBe(parsingB.version + 1)
     expect(readyB.jobDescription).toMatchObject({
       status: "ready",
-      rawText: "JD B requires TypeScript architecture experience.",
       version: 2,
     })
   })
@@ -630,7 +536,7 @@ describe("roles stateful mock service", () => {
       saveJobDescription({
         roleId: role.id,
         version: role.version,
-        rawText: "Updated JD requiring React, TypeScript, accessibility, and technical leadership.",
+        text: "Updated JD requiring React, TypeScript, accessibility, and technical leadership.",
       }),
     )
 
@@ -649,7 +555,7 @@ describe("roles stateful mock service", () => {
       saveJobDescription({
         roleId: role.id,
         version: role.version,
-        rawText: "Updated JD requiring React and TypeScript delivery.",
+        text: "Updated JD requiring React and TypeScript delivery.",
       }),
     )
 

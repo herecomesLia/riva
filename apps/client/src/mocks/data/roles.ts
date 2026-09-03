@@ -48,7 +48,6 @@ function createMissingJobDescriptionRole(
     ...createRoleBase(id, title, overrides),
     jobDescription: {
       status: "missing",
-      rawText: null,
       version: null,
       parsingFailureReason: null,
     },
@@ -65,8 +64,6 @@ function createParsingJobDescriptionRole(
     ...createRoleBase(id, title, overrides),
     jobDescription: {
       status: "parsing",
-      rawText:
-        "Own the frontend architecture for merchant operations workflows and collaborate across product teams.",
       version: 2,
       parsingFailureReason: null,
     },
@@ -83,11 +80,9 @@ function createFailedJobDescriptionRole(
     ...createRoleBase(id, title, overrides),
     jobDescription: {
       status: "failed",
-      rawText:
-        "Build reliable web applications for international creators and improve user-facing performance.",
       version: 3,
       parsingFailureReason:
-        "We could not extract structured requirements from this JD. Please review the text and try again.",
+        "We could not extract structured requirements from this JD. Please submit it again.",
     },
     jobDescriptionAnalysis: null,
   }
@@ -104,8 +99,6 @@ function createReadyJobDescriptionRole(
     ...createRoleBase(id, title, { matchingAnalysis, ...overrides }),
     jobDescription: {
       status: "ready",
-      rawText:
-        "Lead frontend architecture for merchant operations products. Build React and TypeScript experiences, improve performance, and mentor engineers through complex delivery decisions.",
       version: jobDescriptionVersion,
       parsingFailureReason: null,
     },

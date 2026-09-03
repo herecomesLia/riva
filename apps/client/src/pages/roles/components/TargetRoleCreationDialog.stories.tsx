@@ -1,7 +1,7 @@
 import { useState } from "react"
 
 import preview from "#storybook/preview"
-import { expect, fn, screen, within } from "storybook/test"
+import { expect, fn, screen, waitFor, within } from "storybook/test"
 
 import type { RecognizeTargetRoleInput } from "@/models/roles"
 
@@ -13,34 +13,14 @@ const meta = preview.meta({
 })
 
 function recognize(input: RecognizeTargetRoleInput) {
-  const rawText =
-    input.sourceType === "text"
-      ? input.text
-      : "Frontend Engineer\nCompany: Riva\nLocation: Shanghai\n3-5 years of experience"
-  return Promise.resolve({
-    recognitionId: `recognition_${input.sourceType}`,
-    sourceType: input.sourceType,
-    sourceLabel:
-      input.sourceType === "text"
-        ? "Pasted job posting"
-        : input.sourceType === "image"
-          ? input.images.map((image) => image.name).join(", ")
-          : input.url,
-    rawText,
-    suggestedRole: {
-      title: "Frontend Engineer",
-      company: "Riva",
-      recruitmentType: "experienced" as const,
-      location: "Shanghai",
-    },
-  })
+  void input
+  return Promise.resolve()
 }
 
 function DialogHarness() {
   const [open, setOpen] = useState(true)
   return (
     <TargetRoleCreationDialog
-      onCreateFromRecognition={async () => setOpen(false)}
       onDirtyChange={() => undefined}
       onManualCreate={async () => setOpen(false)}
       onOpenChange={setOpen}
@@ -64,7 +44,7 @@ export const Manual = meta.story({
   },
 })
 
-export const PasteAndReview = meta.story({
+export const PasteAndRecognize = meta.story({
   render: () => <DialogHarness />,
   play: async ({ userEvent }) => {
     const dialog = await screen.findByRole("dialog")
@@ -79,15 +59,12 @@ export const PasteAndReview = meta.story({
     await userEvent.click(
       within(entryDialog).getByRole("button", { name: /让 Riva 识别|recognize with riva/i }),
     )
-    await expect(
-      within(entryDialog).findByTestId("target-role-recognition-review"),
-    ).resolves.toBeVisible()
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveAttribute("data-closed"))
   },
 })
 
 export const ImageAgent = meta.story({
   args: {
-    onCreateFromRecognition: fn(async () => undefined),
     onDirtyChange: fn(),
     onManualCreate: fn(async () => undefined),
     onOpenChange: fn(),
@@ -101,7 +78,9 @@ export const ImageAgent = meta.story({
     const entryDialog = await screen.findByRole("dialog", {
       name: /上传岗位图片|upload job posting images/i,
     })
-    await expect(within(entryDialog).findByText(/视觉 Agent|vision agent/i)).resolves.toBeVisible()
+    await waitFor(() =>
+      expect(within(entryDialog).getByText(/视觉 Agent|vision agent/i)).toBeVisible(),
+    )
   },
 })
 
@@ -120,8 +99,6 @@ export const JobLink = meta.story({
     await userEvent.click(
       within(entryDialog).getByRole("button", { name: /让 Riva 识别|recognize with riva/i }),
     )
-    await expect(
-      within(entryDialog).findByTestId("target-role-recognition-review"),
-    ).resolves.toBeVisible()
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveAttribute("data-closed"))
   },
 })

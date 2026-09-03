@@ -6,14 +6,12 @@ export type JobDescriptionParsingStatus = "missing" | "parsing" | "ready" | "fai
 
 export type MissingJobDescription = {
   status: "missing"
-  rawText: null
   version: null
   parsingFailureReason: null
 }
 
 export type ParsingJobDescription = {
   status: "parsing"
-  rawText: string
   /** Increments only when the saved JD text changes. */
   version: number
   parsingFailureReason: null
@@ -21,7 +19,6 @@ export type ParsingJobDescription = {
 
 export type ReadyJobDescription = {
   status: "ready"
-  rawText: string
   /** Increments only when the saved JD text changes. */
   version: number
   parsingFailureReason: null
@@ -29,7 +26,6 @@ export type ReadyJobDescription = {
 
 export type FailedJobDescription = {
   status: "failed"
-  rawText: string
   /** Increments only when the saved JD text changes. */
   version: number
   parsingFailureReason: string
@@ -226,19 +222,6 @@ export type RecognizeTargetRoleInput =
       url: string
     }
 
-export type TargetRoleRecognitionResult = {
-  recognitionId: string
-  sourceType: TargetRoleImportSourceType
-  sourceLabel: string
-  rawText: string
-  suggestedRole: CreateTargetRoleInput
-}
-
-export type CreateTargetRoleFromRecognitionInput = CreateTargetRoleInput & {
-  recognitionId: string
-  rawText: string
-}
-
 export type UpdateTargetRoleInput = {
   roleId: string
   version: number
@@ -271,13 +254,7 @@ export type DeleteTargetRoleInput = {
 export type SaveTargetRoleJobDescriptionInput = {
   roleId: string
   version: number
-  rawText: string
-}
-
-export type StartOrRetryJobDescriptionParsingInput = {
-  roleId: string
-  version: number
-  jobDescriptionVersion: number
+  text: string
 }
 
 export type GetJobDescriptionParsingStatusInput = {
