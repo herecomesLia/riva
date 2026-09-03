@@ -7,17 +7,17 @@
 
 export interface JobRequirementsResponse {
   /** @items.minLength 1 */
-  education?: string[]
+  education: string[]
   /** @items.minLength 1 */
-  graduationCohorts?: string[]
+  graduationCohorts: string[]
   /** @items.minLength 1 */
-  majors?: string[]
+  majors: string[]
   /** @items.minLength 1 */
-  experience?: string[]
+  experience: string[]
   /** @items.minLength 1 */
-  languages?: string[]
+  languages: string[]
   /** @items.minLength 1 */
-  certifications?: string[]
+  certifications: string[]
   /** @items.minLength 1 */
-  other?: string[]
+  other: string[]
 }

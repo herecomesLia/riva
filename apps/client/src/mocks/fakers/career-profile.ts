@@ -2,8 +2,14 @@ import { ApiError } from "@/api/error"
 import type {
   CareerProfileResponse,
   CreateCareerProfileRequest,
+  EducationEntryRequest,
+  EducationEntryResponse,
   ErrorCode,
+  ProjectEntryRequest,
+  ProjectEntryResponse,
   UpdateCareerProfileRequest,
+  WorkExperienceEntryRequest,
+  WorkExperienceEntryResponse,
 } from "@/api/generated/models"
 import {
   careerProfileFixture,
@@ -15,13 +21,56 @@ const createdAt = "2025-01-15T08:00:00Z"
 const updatedAt = "2025-02-01T08:00:00Z"
 
 function careerProfileError(code: ErrorCode, message: string): ApiError {
-  return new ApiError({ error: { code, message } })
+  return new ApiError({ error: { code, message, issues: [] } })
+}
+
+type CareerProfileSections = Pick<
+  CareerProfileResponse,
+  "education" | "workExperiences" | "projects" | "skills"
+>
+
+function normalizeSections(input: {
+  education?: EducationEntryRequest[]
+  workExperiences?: WorkExperienceEntryRequest[]
+  projects?: ProjectEntryRequest[]
+  skills?: string[]
+}): CareerProfileSections {
+  return {
+    education: (input.education ?? []).map((entry) =>
+      structuredClone({
+        degree: null,
+        major: null,
+        ...entry,
+      } as EducationEntryResponse),
+    ),
+    workExperiences: (input.workExperiences ?? []).map((entry) =>
+      structuredClone({
+        employmentType: null,
+        location: null,
+        responsibilities: [],
+        achievements: [],
+        skills: [],
+        ...entry,
+      } as WorkExperienceEntryResponse),
+    ),
+    projects: (input.projects ?? []).map((entry) =>
+      structuredClone({
+        role: null,
+        description: [],
+        achievements: [],
+        techStack: [],
+        url: null,
+        ...entry,
+      } as ProjectEntryResponse),
+    ),
+    skills: structuredClone(input.skills ?? []),
+  }
 }
 
 function validateSkills(profile: CareerProfileResponse) {
   const skills = new Set(profile.skills)
   const hasMismatch = profile.workExperiences.some((experience) =>
-    experience.skills?.some((skill) => !skills.has(skill)),
+    experience.skills.some((skill) => !skills.has(skill)),
   )
 
   if (hasMismatch) {
@@ -50,10 +99,7 @@ export function createCareerProfileFaker(initialProfile: CareerProfileResponse |
       }
 
       const nextProfile: CareerProfileResponse = {
-        education: structuredClone(input.education ?? []),
-        workExperiences: structuredClone(input.workExperiences ?? []),
-        projects: structuredClone(input.projects ?? []),
-        skills: structuredClone(input.skills ?? []),
+        ...normalizeSections(input),
         createdAt,
         updatedAt: createdAt,
       }
@@ -69,14 +115,12 @@ export function createCareerProfileFaker(initialProfile: CareerProfileResponse |
       }
 
       const nextProfile: CareerProfileResponse = {
-        education:
-          input.education === undefined ? profile.education : structuredClone(input.education),
-        workExperiences:
-          input.workExperiences === undefined
-            ? profile.workExperiences
-            : structuredClone(input.workExperiences),
-        projects: input.projects === undefined ? profile.projects : structuredClone(input.projects),
-        skills: input.skills === undefined ? profile.skills : structuredClone(input.skills),
+        ...normalizeSections({
+          education: input.education ?? profile.education,
+          workExperiences: input.workExperiences ?? profile.workExperiences,
+          projects: input.projects ?? profile.projects,
+          skills: input.skills ?? profile.skills,
+        }),
         createdAt: profile.createdAt,
         updatedAt,
       }

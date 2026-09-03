@@ -29,7 +29,7 @@ export function asMswFaker<T extends Record<string, AsyncMethod>>(
             error: {
               code: error.code,
               message: error.message,
-              ...(error.issues ? { issues: error.issues } : {}),
+              issues: error.issues,
             },
           }
           throw HttpResponse.json(response, { status })

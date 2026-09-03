@@ -11,6 +11,6 @@ export interface EducationEntryResponse {
   endDate: string | null
   /** @minLength 1 */
   school: string
-  degree?: string | null
-  major?: string | null
+  degree: string | null
+  major: string | null
 }

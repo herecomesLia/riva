@@ -31,7 +31,7 @@ describe("profile service", () => {
   it("maps only resource.not_found to null", async () => {
     vi.mocked(getCareerProfile).mockRejectedValueOnce(
       new ApiError({
-        error: { code: "resource.not_found", message: "Career profile was not found." },
+        error: { code: "resource.not_found", message: "Career profile was not found.", issues: [] },
       }),
     )
     await expect(getProfile()).resolves.toBeNull()

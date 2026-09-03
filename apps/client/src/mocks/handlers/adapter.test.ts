@@ -9,7 +9,7 @@ describe("asMswFaker", () => {
       {
         async fail() {
           throw new ApiError({
-            error: { code: "auth.username_taken", message: "Already exists" },
+            error: { code: "auth.username_taken", message: "Already exists", issues: [] },
           })
         },
       },
@@ -24,7 +24,7 @@ describe("asMswFaker", () => {
       const response = error as Response
       expect(response.status).toBe(409)
       await expect(response.json()).resolves.toEqual({
-        error: { code: "auth.username_taken", message: "Already exists" },
+        error: { code: "auth.username_taken", message: "Already exists", issues: [] },
       })
     }
   })

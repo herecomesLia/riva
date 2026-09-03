@@ -32,30 +32,30 @@ export function WorkExperienceCard({ experiences, onEdit }: WorkExperienceCardPr
         <ol className="relative flex flex-col gap-6">
           {experiences.map((experience, index) => {
             const details = [
-              (experience.responsibilities?.length ?? 0) > 0 && (
+              experience.responsibilities.length > 0 && (
                 <DetailList
                   icon={NotebookPenIcon}
-                  items={experience.responsibilities ?? []}
+                  items={experience.responsibilities}
                   key="responsibilities"
                   title={t("profile.field.responsibilities")}
                 />
               ),
-              (experience.achievements?.length ?? 0) > 0 && (
+              experience.achievements.length > 0 && (
                 <DetailList
                   icon={ChartColumnIncreasingIcon}
-                  items={experience.achievements ?? []}
+                  items={experience.achievements}
                   key="achievements"
                   title={t("profile.field.achievements")}
                 />
               ),
-              (experience.skills?.length ?? 0) > 0 && (
+              experience.skills.length > 0 && (
                 <div className="flex flex-col gap-2" key="skills">
                   <h4 className="flex items-center gap-2 text-sm font-medium">
                     <TagsIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />
                     {t("profile.field.skills")}
                   </h4>
                   <div className="flex flex-wrap gap-2" data-testid="work-experience-skills">
-                    {experience.skills?.map((skill) => (
+                    {experience.skills.map((skill) => (
                       <ProfileSkillBadge key={skill} name={skill} showIcon={false} />
                     ))}
                   </div>

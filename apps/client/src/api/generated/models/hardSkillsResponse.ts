@@ -7,17 +7,17 @@
 
 export interface HardSkillsResponse {
   /** @items.minLength 1 */
-  programmingLanguages?: string[]
+  programmingLanguages: string[]
   /** @items.minLength 1 */
-  frameworksAndLibraries?: string[]
+  frameworksAndLibraries: string[]
   /** @items.minLength 1 */
-  platforms?: string[]
+  platforms: string[]
   /** @items.minLength 1 */
-  tools?: string[]
+  tools: string[]
   /** @items.minLength 1 */
-  conceptsAndMethods?: string[]
+  conceptsAndMethods: string[]
   /** @items.minLength 1 */
-  databasesAndMiddleware?: string[]
+  databasesAndMiddleware: string[]
   /** @items.minLength 1 */
-  other?: string[]
+  other: string[]
 }

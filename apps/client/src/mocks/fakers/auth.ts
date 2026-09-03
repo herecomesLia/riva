@@ -8,7 +8,7 @@ import type {
 import { authUserFixture } from "@/mocks/fixtures/auth"
 
 function authError(code: ErrorCode, message: string): ApiError {
-  return new ApiError({ error: { code, message } })
+  return new ApiError({ error: { code, message, issues: [] } })
 }
 
 export const authFaker = {

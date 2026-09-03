@@ -10,5 +10,5 @@ import type { ErrorIssue } from "./errorIssue"
 export interface ErrorBody {
   code: ErrorCode
   message: string
-  issues?: ErrorIssue[] | null
+  issues: ErrorIssue[]
 }

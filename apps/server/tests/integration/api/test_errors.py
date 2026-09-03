@@ -56,12 +56,13 @@ async def test_not_found_returns_standard_error_response(
 ) -> None:
     response = await client.get("/api/not-exist")
 
-    assert_error_response(
+    body = assert_error_response(
         response,
         status_code=404,
         code="request.not_found",
         message="The requested endpoint was not found.",
     )
+    assert body["error"]["issues"] == []
 
 
 async def test_method_not_allowed_returns_standard_error_response(

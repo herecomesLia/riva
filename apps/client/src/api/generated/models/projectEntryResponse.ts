@@ -11,12 +11,12 @@ export interface ProjectEntryResponse {
   endDate: string | null
   /** @minLength 1 */
   name: string
-  role?: string | null
+  role: string | null
   /** @items.minLength 1 */
-  description?: string[]
+  description: string[]
   /** @items.minLength 1 */
-  achievements?: string[]
+  achievements: string[]
   /** @items.minLength 1 */
-  techStack?: string[]
-  url?: string | null
+  techStack: string[]
+  url: string | null
 }

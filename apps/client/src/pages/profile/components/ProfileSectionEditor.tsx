@@ -568,27 +568,27 @@ function createDraft(profile: CareerProfileResponse, section: EditableExperience
       return {
         items: structuredClone(profile.workExperiences).map((item) => ({
           ...item,
-          achievements: structuredClone(item.achievements ?? []),
+          achievements: structuredClone(item.achievements),
           clientId: createTemporaryId(),
           endDate: item.endDate ?? "",
           employmentType: item.employmentType ?? "",
           isCurrent: item.endDate === null,
           location: item.location ?? "",
-          responsibilities: structuredClone(item.responsibilities ?? []),
-          skills: structuredClone(item.skills ?? []),
+          responsibilities: structuredClone(item.responsibilities),
+          skills: structuredClone(item.skills),
         })),
       }
     case "projectExperience":
       return {
         items: structuredClone(profile.projects).map((item) => ({
           ...item,
-          achievements: structuredClone(item.achievements ?? []),
+          achievements: structuredClone(item.achievements),
           clientId: createTemporaryId(),
-          description: structuredClone(item.description ?? []),
+          description: structuredClone(item.description),
           endDate: item.endDate ?? "",
           isCurrent: item.endDate === null,
           role: item.role ?? "",
-          techStack: structuredClone(item.techStack ?? []),
+          techStack: structuredClone(item.techStack),
           url: item.url ?? "",
         })),
       }

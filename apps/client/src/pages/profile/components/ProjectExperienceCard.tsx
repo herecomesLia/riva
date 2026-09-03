@@ -38,13 +38,13 @@ export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCar
         <ol className="relative flex flex-col gap-6">
           {projects.map((project, index) => {
             const details: ProjectDetail[] = [
-              ...((project.description?.length ?? 0) > 0
+              ...(project.description.length > 0
                 ? [
                     {
                       content: (
                         <DetailList
                           icon={NotebookPenIcon}
-                          items={project.description ?? []}
+                          items={project.description}
                           title={t("profile.field.projectDescription")}
                         />
                       ),
@@ -52,13 +52,13 @@ export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCar
                     },
                   ]
                 : []),
-              ...((project.achievements?.length ?? 0) > 0
+              ...(project.achievements.length > 0
                 ? [
                     {
                       content: (
                         <DetailList
                           icon={ChartColumnIncreasingIcon}
-                          items={project.achievements ?? []}
+                          items={project.achievements}
                           title={t("profile.field.projectAchievements")}
                         />
                       ),
@@ -66,7 +66,7 @@ export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCar
                     },
                   ]
                 : []),
-              ...((project.techStack?.length ?? 0) > 0
+              ...(project.techStack.length > 0
                 ? [
                     {
                       content: (
@@ -82,7 +82,7 @@ export function ProjectExperienceCard({ onEdit, projects }: ProjectExperienceCar
                             className="flex flex-wrap gap-2"
                             data-testid="project-experience-technologies"
                           >
-                            {project.techStack?.map((technology) => (
+                            {project.techStack.map((technology) => (
                               <ProfileSkillBadge
                                 key={technology}
                                 name={technology}

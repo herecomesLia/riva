@@ -35,92 +35,61 @@ export const getListTargetRolesResponseMock = (
           (_, i) => i + 1,
         ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
         requirements: {
-          education: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
-          graduationCohorts: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
-          majors: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
-          experience: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
-          languages: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
-          certifications: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
-          other: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
+          education: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+          graduationCohorts: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+          majors: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+          experience: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+          languages: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+          certifications: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+          other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+            () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+          ),
         },
         hardSkills: {
-          programmingLanguages: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
-          frameworksAndLibraries: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
-          platforms: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
-          tools: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
-          conceptsAndMethods: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
-          databasesAndMiddleware: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
-          other: faker.helpers.arrayElement([
-            Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-              faker.string.alpha({ length: { min: 1, max: 20 } }),
-            ),
-            undefined,
-          ]),
+          programmingLanguages: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+          frameworksAndLibraries: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+          platforms: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+          tools: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+            () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+          ),
+          conceptsAndMethods: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+          databasesAndMiddleware: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+          other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+            () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+          ),
         },
         softSkills: Array.from(
           { length: faker.number.int({ min: 1, max: 10 }) },
@@ -164,92 +133,57 @@ export const getCreateTargetRoleResponseMock = (
       (_, i) => i + 1,
     ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
     requirements: {
-      education: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      graduationCohorts: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      majors: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      experience: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      languages: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      certifications: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      other: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
+      education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      graduationCohorts: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      majors: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      experience: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      languages: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      certifications: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
     },
     hardSkills: {
-      programmingLanguages: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      frameworksAndLibraries: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      platforms: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      tools: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      conceptsAndMethods: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      databasesAndMiddleware: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      other: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
+      programmingLanguages: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      frameworksAndLibraries: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      platforms: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      tools: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      conceptsAndMethods: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      databasesAndMiddleware: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
     },
     softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
       () => faker.string.alpha({ length: { min: 10, max: 20 } }),
@@ -289,92 +223,57 @@ export const getUpdateTargetRoleResponseMock = (
       (_, i) => i + 1,
     ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
     requirements: {
-      education: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      graduationCohorts: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      majors: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      experience: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      languages: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      certifications: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      other: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
+      education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      graduationCohorts: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      majors: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      experience: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      languages: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      certifications: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
     },
     hardSkills: {
-      programmingLanguages: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      frameworksAndLibraries: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      platforms: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      tools: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      conceptsAndMethods: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      databasesAndMiddleware: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      other: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
+      programmingLanguages: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      frameworksAndLibraries: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      platforms: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      tools: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      conceptsAndMethods: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      databasesAndMiddleware: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
     },
     softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
       () => faker.string.alpha({ length: { min: 10, max: 20 } }),
@@ -414,92 +313,57 @@ export const getArchiveTargetRoleResponseMock = (
       (_, i) => i + 1,
     ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
     requirements: {
-      education: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      graduationCohorts: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      majors: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      experience: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      languages: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      certifications: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      other: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
+      education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      graduationCohorts: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      majors: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      experience: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      languages: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      certifications: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
     },
     hardSkills: {
-      programmingLanguages: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      frameworksAndLibraries: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      platforms: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      tools: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      conceptsAndMethods: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      databasesAndMiddleware: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      other: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
+      programmingLanguages: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      frameworksAndLibraries: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      platforms: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      tools: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      conceptsAndMethods: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      databasesAndMiddleware: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
     },
     softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
       () => faker.string.alpha({ length: { min: 10, max: 20 } }),
@@ -539,92 +403,57 @@ export const getRestoreTargetRoleResponseMock = (
       (_, i) => i + 1,
     ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
     requirements: {
-      education: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      graduationCohorts: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      majors: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      experience: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      languages: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      certifications: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      other: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
+      education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      graduationCohorts: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      majors: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      experience: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      languages: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      certifications: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
     },
     hardSkills: {
-      programmingLanguages: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      frameworksAndLibraries: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      platforms: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      tools: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      conceptsAndMethods: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      databasesAndMiddleware: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      other: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
+      programmingLanguages: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      frameworksAndLibraries: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      platforms: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      tools: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      conceptsAndMethods: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      databasesAndMiddleware: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
     },
     softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
       () => faker.string.alpha({ length: { min: 10, max: 20 } }),
@@ -664,92 +493,57 @@ export const getUpdateTargetRoleJdResponseMock = (
       (_, i) => i + 1,
     ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
     requirements: {
-      education: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      graduationCohorts: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      majors: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      experience: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      languages: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      certifications: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      other: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
+      education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      graduationCohorts: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      majors: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      experience: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      languages: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      certifications: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
     },
     hardSkills: {
-      programmingLanguages: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      frameworksAndLibraries: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      platforms: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      tools: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      conceptsAndMethods: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      databasesAndMiddleware: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
-      other: faker.helpers.arrayElement([
-        Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-          faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        undefined,
-      ]),
+      programmingLanguages: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      frameworksAndLibraries: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      platforms: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      tools: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
+      conceptsAndMethods: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      databasesAndMiddleware: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+      ),
     },
     softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
       () => faker.string.alpha({ length: { min: 10, max: 20 } }),

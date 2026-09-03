@@ -40,12 +40,11 @@ def _build_error_response(
             error=ErrorBody(
                 code=details.code,
                 message=details.message,
-                issues=issues,
+                issues=issues or [],
             ),
         ).model_dump(
             mode="json",
             by_alias=True,
-            exclude_none=True,
         ),
         headers=dict(headers) if headers is not None else None,
     )

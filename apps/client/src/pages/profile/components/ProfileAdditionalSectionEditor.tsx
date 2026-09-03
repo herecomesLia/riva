@@ -130,7 +130,7 @@ export function ProfileAdditionalSectionEditor({
           skills,
           workExperiences: profile.workExperiences.map((experience) => ({
             ...experience,
-            skills: experience.skills?.filter((skill) => allowedSkills.has(skill)),
+            skills: experience.skills.filter((skill) => allowedSkills.has(skill)),
           })),
         })
       } catch {

@@ -5,13 +5,13 @@ import type { ErrorIssue, ErrorResponse } from "@/api/generated/models"
 
 export class ApiError extends Error {
   readonly code: ErrorCode
-  readonly issues: ErrorIssue[] | null
+  readonly issues: ErrorIssue[]
 
   constructor(response: ErrorResponse) {
     super(response.error.message)
     this.name = "ApiError"
     this.code = response.error.code
-    this.issues = response.error.issues ?? null
+    this.issues = response.error.issues
   }
 }
 

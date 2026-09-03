@@ -27,7 +27,7 @@ describe("auth service", () => {
     async (code) => {
       vi.mocked(getCurrentUser).mockRejectedValue(
         new ApiError({
-          error: { code, message: "Authentication is required." },
+          error: { code, message: "Authentication is required.", issues: [] },
         }),
       )
 

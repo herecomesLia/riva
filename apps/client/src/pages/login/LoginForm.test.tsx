@@ -17,7 +17,7 @@ vi.mock("@/hooks/use-auth", () => ({
 const loginMock = vi.fn()
 
 function apiError(code: ErrorCode, message: string) {
-  return new ApiError({ error: { code, message } })
+  return new ApiError({ error: { code, message, issues: [] } })
 }
 
 function invalidCredentialsError() {

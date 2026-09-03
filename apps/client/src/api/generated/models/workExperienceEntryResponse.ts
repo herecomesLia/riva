@@ -14,12 +14,12 @@ export interface WorkExperienceEntryResponse {
   company: string
   /** @minLength 1 */
   title: string
-  employmentType?: EmploymentType | null
-  location?: string | null
+  employmentType: EmploymentType | null
+  location: string | null
   /** @items.minLength 1 */
-  responsibilities?: string[]
+  responsibilities: string[]
   /** @items.minLength 1 */
-  achievements?: string[]
+  achievements: string[]
   /** @items.minLength 1 */
-  skills?: string[]
+  skills: string[]
 }
