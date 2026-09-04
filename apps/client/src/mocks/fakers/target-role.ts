@@ -11,11 +11,12 @@ import type {
   UpdateJobDescriptionRequest,
   UpdateTargetRoleRequest,
 } from "@/api/generated/models"
-import type { RecognizeTargetRoleInput } from "@/models/roles"
+import type { MatchingAnalysisResult, RecognizeTargetRoleInput } from "@/models/roles"
 import {
   imageRecognitionFixture,
   jobDescriptionParsingFailureInput,
   jobDescriptionParsingFailureReason,
+  matchResultFixture,
   parsedJobDescriptionFixture,
   targetRoleListFixture,
   textRecognitionFixture,
@@ -53,6 +54,9 @@ type TaskRecord<T> =
   | { status: "success"; result: T }
   | { status: "failed"; result: string }
 
+type MatchRecord =
+  TaskRecord<MatchingAnalysisResult> | { status: "stale"; result: MatchingAnalysisResult }
+
 function normalizeRequirements(input: JobRequirementsRequest): JobRequirementsResponse {
   return {
     education: input.education ?? [],
@@ -80,6 +84,7 @@ function normalizeHardSkills(input: HardSkillsRequest): HardSkillsResponse {
 export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
   let state = structuredClone(initialState)
   const jobDescriptionParsingTasks = new Map<string, TaskRecord<JobDescriptionResponse>>()
+  const matches = new Map<string, MatchRecord>()
   let createdRoleSequence = 0
   let timestampSequence = 0
 
@@ -119,6 +124,12 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
     const task = { status: "running", result } satisfies TaskRecord<JobDescriptionResponse>
     jobDescriptionParsingTasks.set(roleId, task)
     return structuredClone(task)
+  }
+
+  function staleMatch(roleId: string) {
+    const match = matches.get(roleId)
+    if (match?.status !== "success") return
+    matches.set(roleId, { status: "stale", result: structuredClone(match.result) })
   }
 
   async function create(input: CreateTargetRoleRequest): Promise<TargetRoleResponse> {
@@ -177,6 +188,7 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
       text: string,
     ): Promise<TaskRecord<JobDescriptionResponse>> {
       requireRole(roleId)
+      staleMatch(roleId)
       return startJobDescriptionParsing(roleId, text)
     },
 
@@ -209,6 +221,29 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
       return structuredClone(successfulTask)
     },
 
+    async match(roleId: string): Promise<TaskRecord<MatchingAnalysisResult>> {
+      requireRole(roleId)
+      const task = {
+        status: "running",
+        result: structuredClone(matchResultFixture),
+      } satisfies TaskRecord<MatchingAnalysisResult>
+      matches.set(roleId, task)
+      return structuredClone(task)
+    },
+
+    async getMatch(roleId: string): Promise<MatchRecord | null> {
+      requireRole(roleId)
+      const match = matches.get(roleId)
+      if (!match || match.status !== "running") return structuredClone(match ?? null)
+
+      const successfulMatch = {
+        status: "success",
+        result: structuredClone(matchResultFixture),
+      } satisfies TaskRecord<MatchingAnalysisResult>
+      matches.set(roleId, successfulMatch)
+      return structuredClone(successfulMatch)
+    },
+
     async update(roleId: string, input: UpdateTargetRoleRequest): Promise<TargetRoleResponse> {
       const role = requireRole(roleId)
       return replaceRole({
@@ -230,6 +265,7 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
         activeTargetRoleId: state.activeTargetRoleId === roleId ? null : state.activeTargetRoleId,
       }
       jobDescriptionParsingTasks.delete(roleId)
+      matches.delete(roleId)
     },
 
     async setActive(input: SetActiveTargetRoleRequest): Promise<void> {
@@ -263,7 +299,7 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
       input: UpdateJobDescriptionRequest,
     ): Promise<TargetRoleResponse> {
       const role = requireRole(roleId)
-      return replaceRole({
+      const updatedRole = replaceRole({
         ...role,
         jd: {
           ...role.jd,
@@ -286,6 +322,8 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
         },
         updatedAt: nextTimestamp(),
       })
+      staleMatch(roleId)
+      return updatedRole
     },
   }
 }

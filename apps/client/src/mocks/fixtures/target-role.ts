@@ -4,6 +4,7 @@ import type {
   TargetRoleListResponse,
   TargetRoleResponse,
 } from "@/api/generated/models"
+import type { MatchingAnalysisResult } from "@/models/roles"
 
 export const jobDescriptionParsingFailureInput = "__RIVA_MOCK_JD_PARSING_FAILURE__"
 
@@ -58,6 +59,28 @@ export const parsedJobDescriptionFixture = {
   preferredQualifications: ["Experience with large-scale SaaS products."],
   businessDomains: ["Merchant operations"],
 } satisfies JobDescriptionResponse
+
+export const matchResultFixture = {
+  overallMatchScore: 78,
+  coreRequirementsSummary:
+    "Lead complex React product delivery with strong engineering judgment and measurable impact.",
+  matchedCapabilities: ["React architecture", "TypeScript", "Design systems"],
+  missingCapabilities: ["Large-scale experimentation"],
+  underrepresentedCapabilities: ["Cross-functional technical leadership"],
+  resumeHighlights: [
+    "Led the merchant operations console from architecture through delivery.",
+    "Improved Core Web Vitals pass rate from 71% to 94%.",
+  ],
+  resumeGaps: ["Describe experimentation design and decision-making with more concrete examples."],
+  highRiskQuestions: [
+    "How did you align partner teams when frontend architecture decisions affected delivery scope?",
+    "Which experiment metrics did you use to decide whether a product change should ship?",
+  ],
+  preparationRecommendations: [
+    "Prepare a STAR narrative about balancing delivery speed and frontend quality.",
+    "Quantify the impact of technical leadership across partner teams.",
+  ],
+} satisfies MatchingAnalysisResult
 
 export const targetRoleFixture = {
   id: "11111111-1111-4111-8111-111111111111",

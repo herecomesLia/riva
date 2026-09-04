@@ -5,6 +5,7 @@ import {
   imageRecognitionFixture,
   jobDescriptionParsingFailureInput,
   jobDescriptionParsingFailureReason,
+  matchResultFixture,
   parsedJobDescriptionFixture,
   targetRoleFixture,
   targetRoleListFixture,
@@ -140,5 +141,51 @@ describe("targetRoleFaker", () => {
     await expect(faker.getJobDescriptionParsingStatus(targetRoleFixture.id)).resolves.toEqual(
       failed,
     )
+  })
+
+  it("advances a match from running to an idempotent fixed success", async () => {
+    const faker = createTargetRoleFaker(targetRoleListFixture)
+
+    await expect(faker.getMatch(targetRoleFixture.id)).resolves.toBeNull()
+    await expect(faker.match(targetRoleFixture.id)).resolves.toEqual({
+      status: "running",
+      result: matchResultFixture,
+    })
+
+    const success = await faker.getMatch(targetRoleFixture.id)
+    expect(success).toEqual({ status: "success", result: matchResultFixture })
+    await expect(faker.getMatch(targetRoleFixture.id)).resolves.toEqual(success)
+  })
+
+  it("keeps a successful match stale across JD changes until regeneration", async () => {
+    const faker = createTargetRoleFaker(targetRoleListFixture)
+    await faker.match(targetRoleFixture.id)
+    await faker.getMatch(targetRoleFixture.id)
+
+    await faker.updateJd(targetRoleFixture.id, { softSkills: ["Stakeholder management"] })
+    await expect(faker.getMatch(targetRoleFixture.id)).resolves.toEqual({
+      status: "stale",
+      result: matchResultFixture,
+    })
+
+    await expect(faker.match(targetRoleFixture.id)).resolves.toEqual({
+      status: "running",
+      result: matchResultFixture,
+    })
+    await expect(faker.getMatch(targetRoleFixture.id)).resolves.toEqual({
+      status: "success",
+      result: matchResultFixture,
+    })
+
+    await faker.submitJobDescription(targetRoleFixture.id, "Replacement JD")
+    await expect(faker.getMatch(targetRoleFixture.id)).resolves.toEqual({
+      status: "stale",
+      result: matchResultFixture,
+    })
+
+    await faker.delete(targetRoleFixture.id)
+    await expect(faker.getMatch(targetRoleFixture.id)).rejects.toMatchObject({
+      code: "resource.not_found",
+    })
   })
 })
