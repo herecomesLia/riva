@@ -176,6 +176,11 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
     matches.set(roleId, { status: "stale", result: structuredClone(match.result) })
   }
 
+  async function clear(roleId: string) {
+    jdTasks.delete(roleId)
+    matches.delete(roleId)
+  }
+
   async function create(input: CreateTargetRoleRequest): Promise<TargetRoleResponse> {
     const createdAt = nextTime()
     const role: TargetRoleResponse = {
@@ -206,6 +211,8 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
         activeTargetRoleId: state.activeTargetRoleId,
       }
     },
+
+    clear,
 
     create,
 
@@ -303,8 +310,7 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
         targetRoles: state.targetRoles.filter(({ id }) => id !== roleId),
         activeTargetRoleId: state.activeTargetRoleId === roleId ? null : state.activeTargetRoleId,
       }
-      jdTasks.delete(roleId)
-      matches.delete(roleId)
+      await clear(roleId)
     },
 
     async setActive(input: SetActiveTargetRoleRequest): Promise<void> {

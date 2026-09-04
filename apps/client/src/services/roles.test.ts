@@ -49,6 +49,7 @@ vi.mock("@/api/generated/endpoints/target-roles/target-roles", () => ({
 
 vi.mock("@/mocks/fakers/target-role", () => ({
   targetRoleFaker: {
+    clear: vi.fn(),
     getJd: vi.fn(),
     getMatch: vi.fn(),
     match: vi.fn(),
@@ -130,6 +131,14 @@ describe("roles service", () => {
     expect(archiveTargetRole).toHaveBeenCalledWith(targetRoleFixture.id)
     expect(restoreTargetRole).toHaveBeenCalledWith(targetRoleFixture.id)
     expect(deleteTargetRole).toHaveBeenCalledWith(targetRoleFixture.id)
+    expect(targetRoleFaker.clear).toHaveBeenCalledWith(targetRoleFixture.id)
+  })
+
+  it("keeps workflow state when formal role deletion fails", async () => {
+    vi.mocked(deleteTargetRole).mockRejectedValue(new Error("request failed"))
+
+    await expect(deleteRole(targetRoleFixture.id)).rejects.toThrow("request failed")
+    expect(targetRoleFaker.clear).not.toHaveBeenCalled()
   })
 
   it("recognizes fixture data, creates the formal role, and starts JD parsing", async () => {

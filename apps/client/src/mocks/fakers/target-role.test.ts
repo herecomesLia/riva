@@ -148,6 +148,19 @@ describe("targetRoleFaker", () => {
     await expect(faker.getMatch(targetRoleFixture.id)).resolves.toEqual(success)
   })
 
+  it("clears workflow state without deleting the formal role", async () => {
+    const faker = createRoleFaker({ targetRoles: [], activeTargetRoleId: null })
+    const role = await faker.create({ title: "Staff Platform Engineer" })
+    await faker.parseJd(role.id, "JD text")
+    await faker.match(role.id)
+
+    await faker.clear(role.id)
+
+    await expect(faker.getJd(role)).resolves.toEqual({ status: "missing" })
+    await expect(faker.getMatch(role.id)).resolves.toEqual({ status: "none" })
+    expect((await faker.list()).targetRoles).toContainEqual(role)
+  })
+
   it("keeps a successful match stale across JD changes until regeneration", async () => {
     const faker = createRoleFaker(roleListFixture)
     await faker.match(targetRoleFixture.id)

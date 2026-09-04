@@ -78,8 +78,9 @@ export function restoreRole(roleId: string): Promise<TargetRoleResponse> {
   return restoreTargetRole(roleId)
 }
 
-export function deleteRole(roleId: string): Promise<void> {
-  return deleteTargetRole(roleId)
+export async function deleteRole(roleId: string): Promise<void> {
+  await deleteTargetRole(roleId)
+  await targetRoleFaker.clear(roleId)
 }
 
 export function parseJd(roleId: string, text: string): Promise<JdState> {
