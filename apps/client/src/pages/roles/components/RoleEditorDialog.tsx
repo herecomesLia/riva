@@ -27,36 +27,36 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 import type {
-  CreateTargetRoleInput,
-  TargetRole,
-  TargetRoleRecruitmentType,
-  UpdateTargetRoleInput,
-} from "@/models/roles"
+  CreateTargetRoleRequest,
+  RecruitmentTrack,
+  UpdateTargetRoleRequest,
+} from "@/api/generated/models"
+import type { RoleView } from "@/models/target-role-workflow"
 
 import { getRolesActionErrorCode } from "../roles-errors"
 
 export type RoleDraft = {
   title: string
   company: string
-  recruitmentType: TargetRoleRecruitmentType | "unspecified"
+  recruitmentTrack: RecruitmentTrack | "unspecified"
   location: string
 }
 
 type RoleEditorDialogProps = {
   mode: "create" | "edit"
-  onCreate: (input: CreateTargetRoleInput) => Promise<void>
+  onCreate: (input: CreateTargetRoleRequest) => Promise<void>
   onDirtyChange: (isDirty: boolean) => void
   onOpenChange: (open: boolean) => void
   onSaved: () => void
-  onUpdate: (input: UpdateTargetRoleInput) => Promise<void>
+  onUpdate: (roleId: string, input: UpdateTargetRoleRequest) => Promise<void>
   open: boolean
-  role: TargetRole | null
+  role: RoleView | null
 }
 
 const roleDraftSchema = z.object({
   title: z.string().trim().min(1, "required"),
   company: z.string(),
-  recruitmentType: z.enum(["campus", "experienced", "unspecified"]),
+  recruitmentTrack: z.enum(["campus", "experienced", "unspecified"]),
   location: z.string(),
 })
 
@@ -106,7 +106,7 @@ export function RoleEditorForm({
   role,
 }: Omit<RoleEditorDialogProps, "open"> & { footerStart?: ReactNode; initialDraft?: RoleDraft }) {
   const { t } = useTranslation()
-  const [saveError, setSaveError] = useState<"requestFailed" | "versionConflict" | null>(null)
+  const [saveError, setSaveError] = useState<"requestFailed" | null>(null)
   const form = useForm({
     defaultValues: initialDraft ?? createRoleDraft(role),
     validators: { onSubmit: roleDraftSchema },
@@ -116,7 +116,7 @@ export function RoleEditorForm({
         if (mode === "create") {
           await onCreate(toCreateInput(value))
         } else if (role) {
-          await onUpdate({ ...toBasicInput(value), roleId: role.id, version: role.version })
+          await onUpdate(role.id, toBasicInput(value))
         }
         onSaved()
       } catch (error) {
@@ -144,7 +144,7 @@ export function RoleEditorForm({
           <SelectField
             form={form}
             label={t("roles.editor.fields.recruitmentType")}
-            name="recruitmentType"
+            name="recruitmentTrack"
             options={[
               ["unspecified", t("roles.editor.options.unspecified")],
               ["campus", t("roles.recruitmentType.campus")],
@@ -250,11 +250,11 @@ function DraftStateSync({
   return null
 }
 
-function createRoleDraft(role: TargetRole | null): RoleDraft {
+function createRoleDraft(role: RoleView | null): RoleDraft {
   return {
     title: role?.title ?? "",
     company: role?.company ?? "",
-    recruitmentType: role?.recruitmentType ?? "unspecified",
+    recruitmentTrack: role?.recruitmentTrack ?? "unspecified",
     location: role?.location ?? "",
   }
 }
@@ -263,11 +263,11 @@ function toBasicInput(value: RoleDraft) {
   return {
     title: value.title.trim(),
     company: value.company.trim() || null,
-    recruitmentType: value.recruitmentType === "unspecified" ? null : value.recruitmentType,
+    recruitmentTrack: value.recruitmentTrack === "unspecified" ? null : value.recruitmentTrack,
     location: value.location.trim() || null,
   }
 }
 
-function toCreateInput(value: RoleDraft): CreateTargetRoleInput {
+function toCreateInput(value: RoleDraft): CreateTargetRoleRequest {
   return toBasicInput(value)
 }

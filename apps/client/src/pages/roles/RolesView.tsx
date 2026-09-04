@@ -15,21 +15,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import type {
-  ArchiveTargetRoleInput,
-  CreateTargetRoleInput,
-  DeleteTargetRoleInput,
-  GenerateOrRegenerateMatchingAnalysisInput,
-  GetJobDescriptionParsingStatusInput,
-  GetMatchingAnalysisStatusInput,
-  JobDescriptionAnalysisModuleField,
-  RolesPageResponse,
-  RecognizeTargetRoleInput,
-  RestoreTargetRoleInput,
-  SaveTargetRoleJobDescriptionInput,
-  SetCurrentTargetRoleInput,
-  UpdateTargetRoleInput,
-  UpdateJobDescriptionAnalysisModuleInput,
-} from "@/models/roles"
+  CreateTargetRoleRequest,
+  TargetRoleResponse,
+  UpdateJobDescriptionRequest,
+  UpdateTargetRoleRequest,
+} from "@/api/generated/models"
+import type { JdField, RecognizeRoleInput, RolesData } from "@/models/target-role-workflow"
 import type { Loadable } from "@/types"
 
 import { MobileTargetRoleSelector } from "./components/MobileTargetRoleSelector"
@@ -51,37 +42,29 @@ import { TargetRoleProgressSummary } from "./components/TargetRoleProgressSummar
 import { getRolesActionErrorCode, type RolesActionErrorCode } from "./roles-errors"
 
 export type RolesViewActions = {
-  archiveTargetRole: (input: ArchiveTargetRoleInput) => Promise<RolesPageResponse>
-  createTargetRole: (input: CreateTargetRoleInput) => Promise<RolesPageResponse>
-  deleteTargetRole: (input: DeleteTargetRoleInput) => Promise<RolesPageResponse>
-  generateMatchingAnalysis: (
-    input: GenerateOrRegenerateMatchingAnalysisInput,
-  ) => Promise<RolesPageResponse>
-  retryJobDescriptionSynchronization: (
-    input: GetJobDescriptionParsingStatusInput,
-  ) => Promise<RolesPageResponse>
-  retryMatchingAnalysisSynchronization: (
-    input: GetMatchingAnalysisStatusInput,
-  ) => Promise<RolesPageResponse>
-  recognizeTargetRole: (input: RecognizeTargetRoleInput) => Promise<RolesPageResponse>
-  restoreTargetRole: (input: RestoreTargetRoleInput) => Promise<RolesPageResponse>
-  saveJobDescription: (input: SaveTargetRoleJobDescriptionInput) => Promise<RolesPageResponse>
-  setCurrentTargetRole: (input: SetCurrentTargetRoleInput) => Promise<RolesPageResponse>
-  updateJobDescriptionAnalysisModule: (
-    input: UpdateJobDescriptionAnalysisModuleInput,
-  ) => Promise<RolesPageResponse>
-  updateTargetRole: (input: UpdateTargetRoleInput) => Promise<RolesPageResponse>
+  archiveRole: (roleId: string) => Promise<unknown>
+  createRole: (input: CreateTargetRoleRequest) => Promise<unknown>
+  deleteRole: (roleId: string) => Promise<unknown>
+  match: (roleId: string) => Promise<unknown>
+  retryJdSynchronization: (roleId: string) => Promise<unknown>
+  retryMatchSynchronization: (roleId: string) => Promise<unknown>
+  recognizeRole: (input: RecognizeRoleInput) => Promise<TargetRoleResponse>
+  restoreRole: (roleId: string) => Promise<unknown>
+  parseJd: (roleId: string, text: string) => Promise<unknown>
+  setActiveRole: (roleId: string) => Promise<unknown>
+  updateJd: (roleId: string, input: UpdateJobDescriptionRequest) => Promise<unknown>
+  updateRole: (roleId: string, input: UpdateTargetRoleRequest) => Promise<unknown>
 }
 
 export type RolesViewProps =
   | {
       variant: "default"
-      content: Loadable<RolesPageResponse>
+      content: Loadable<RolesData>
       actions?: RolesViewActions
       initialActiveTab?: TargetRoleTab
       initialSelectedRoleId?: string
-      jobDescriptionSynchronizationErrorRoleIds?: string[]
-      matchingAnalysisSynchronizationErrorRoleIds?: string[]
+      jdSynchronizationErrorRoleIds?: string[]
+      matchSynchronizationErrorRoleIds?: string[]
     }
   | {
       variant: "error"
@@ -107,12 +90,8 @@ export function RolesView(props: RolesViewProps) {
           data={props.content.data}
           initialActiveTab={props.initialActiveTab}
           initialSelectedRoleId={props.initialSelectedRoleId}
-          jobDescriptionSynchronizationErrorRoleIds={
-            props.jobDescriptionSynchronizationErrorRoleIds ?? []
-          }
-          matchingAnalysisSynchronizationErrorRoleIds={
-            props.matchingAnalysisSynchronizationErrorRoleIds ?? []
-          }
+          jdSynchronizationErrorRoleIds={props.jdSynchronizationErrorRoleIds ?? []}
+          matchSynchronizationErrorRoleIds={props.matchSynchronizationErrorRoleIds ?? []}
         />
       )}
     </div>
@@ -124,30 +103,29 @@ function RolesReadyView({
   data,
   initialActiveTab,
   initialSelectedRoleId,
-  jobDescriptionSynchronizationErrorRoleIds,
-  matchingAnalysisSynchronizationErrorRoleIds,
+  jdSynchronizationErrorRoleIds,
+  matchSynchronizationErrorRoleIds,
 }: {
   actions?: RolesViewActions
-  data: RolesPageResponse
+  data: RolesData
   initialActiveTab?: TargetRoleTab
   initialSelectedRoleId?: string
-  jobDescriptionSynchronizationErrorRoleIds: string[]
-  matchingAnalysisSynchronizationErrorRoleIds: string[]
+  jdSynchronizationErrorRoleIds: string[]
+  matchSynchronizationErrorRoleIds: string[]
 }) {
   const { t } = useTranslation()
   const defaultSelectedRoleId =
-    initialSelectedRoleId ?? data.currentRoleId ?? data.roles[0]?.id ?? null
+    initialSelectedRoleId ?? data.activeRoleId ?? data.roles[0]?.id ?? null
   const initiallySelectedRole = data.roles.find((role) => role.id === defaultSelectedRoleId)
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(defaultSelectedRoleId)
   const [roleCategory, setRoleCategory] = useState<TargetRoleListCategory>(
-    initiallySelectedRole?.status === "archived" ? "archived" : "active",
+    initiallySelectedRole?.isArchived ? "archived" : "active",
   )
   const [activeTab, setActiveTab] = useState<TargetRoleTab>(initialActiveTab ?? "overview")
   const [editorMode, setEditorMode] = useState<"edit" | null>(null)
   const [isCreationDialogOpen, setIsCreationDialogOpen] = useState(false)
   const [isJobDescriptionEditorOpen, setIsJobDescriptionEditorOpen] = useState(false)
-  const [jobDescriptionAnalysisEditorField, setJobDescriptionAnalysisEditorField] =
-    useState<JobDescriptionAnalysisModuleField | null>(null)
+  const [jdEditorField, setJdEditorField] = useState<JdField | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false)
   const [confirmation, setConfirmation] = useState<"archive" | "delete" | null>(null)
@@ -166,7 +144,7 @@ function RolesReadyView({
     setEditorMode(null)
     setIsCreationDialogOpen(false)
     setIsJobDescriptionEditorOpen(false)
-    setJobDescriptionAnalysisEditorField(null)
+    setJdEditorField(null)
     setIsDirty(false)
   }
 
@@ -175,7 +153,7 @@ function RolesReadyView({
     else closeEditor()
   }
 
-  async function runAction(action: () => Promise<RolesPageResponse>) {
+  async function runAction(action: () => Promise<unknown>) {
     if (pendingAction) return false
     setPendingAction(true)
     setActionError(null)
@@ -193,7 +171,7 @@ function RolesReadyView({
   const visibleRoles = getRolesForCategory(data.roles, roleCategory)
   const selectedRole =
     visibleRoles.find((role) => role.id === selectedRoleId) ??
-    visibleRoles.find((role) => role.id === data.currentRoleId) ??
+    visibleRoles.find((role) => role.id === data.activeRoleId) ??
     visibleRoles[0] ??
     null
 
@@ -213,7 +191,7 @@ function RolesReadyView({
         <RolesEmptyState />
       ) : (
         <>
-          {data.currentRoleId === null && (
+          {data.activeRoleId === null && (
             <Alert data-testid="roles-no-current-alert">
               <AlertCircleIcon />
               <AlertTitle>{t("roles.noCurrentRole")}</AlertTitle>
@@ -234,7 +212,7 @@ function RolesReadyView({
               <RolesList
                 category={roleCategory}
                 className="shrink-0"
-                currentRoleId={data.currentRoleId}
+                activeRoleId={data.activeRoleId}
                 onCategoryChange={handleRoleCategoryChange}
                 onSelectRole={setSelectedRoleId}
                 roles={data.roles}
@@ -242,7 +220,7 @@ function RolesReadyView({
               />
               {selectedRole && (
                 <TargetRoleProgressSummary
-                  isCurrent={selectedRole.id === data.currentRoleId}
+                  isCurrent={selectedRole.id === data.activeRoleId}
                   role={selectedRole}
                 />
               )}
@@ -250,7 +228,7 @@ function RolesReadyView({
             <section className="flex min-w-0 flex-col gap-4">
               <MobileTargetRoleSelector
                 category={roleCategory}
-                currentRoleId={data.currentRoleId}
+                activeRoleId={data.activeRoleId}
                 onCategoryChange={handleRoleCategoryChange}
                 onSelectRole={setSelectedRoleId}
                 roles={data.roles}
@@ -259,7 +237,7 @@ function RolesReadyView({
               {selectedRole && (
                 <div className="lg:hidden">
                   <TargetRoleProgressSummary
-                    isCurrent={selectedRole.id === data.currentRoleId}
+                    isCurrent={selectedRole.id === data.activeRoleId}
                     role={selectedRole}
                   />
                 </div>
@@ -273,78 +251,50 @@ function RolesReadyView({
                           archive: () => setConfirmation("archive"),
                           delete: () => setConfirmation("delete"),
                           edit: () => setEditorMode("edit"),
-                          editJobDescription: () => setIsJobDescriptionEditorOpen(true),
-                          editJobDescriptionAnalysisModule: (field) =>
-                            setJobDescriptionAnalysisEditorField(field),
-                          generateMatchingAnalysis: () => {
+                          editJd: () => setIsJobDescriptionEditorOpen(true),
+                          editJdField: setJdEditorField,
+                          generateMatch: () => {
                             if (
-                              !data.profileContext.exists ||
-                              !data.profileContext.completed ||
-                              selectedRole.jobDescription.status !== "ready" ||
-                              selectedRole.matchingAnalysis?.status === "generating" ||
-                              selectedRole.matchingAnalysis?.status === "current"
+                              !data.profile.exists ||
+                              !data.profile.complete ||
+                              selectedRole.jdState.status !== "ready" ||
+                              selectedRole.matchState.status === "generating" ||
+                              selectedRole.matchState.status === "current"
                             ) {
                               return
                             }
-                            void runAction(() =>
-                              actions.generateMatchingAnalysis({
-                                roleId: selectedRole.id,
-                                version: selectedRole.version,
-                              }),
-                            )
+                            void runAction(() => actions.match(selectedRole.id))
                           },
-                          retryJobDescriptionSynchronization: () => {
-                            if (selectedRole.jobDescription.status !== "parsing") return
-                            const jobDescriptionVersion = selectedRole.jobDescription.version
-                            void runAction(() =>
-                              actions.retryJobDescriptionSynchronization({
-                                roleId: selectedRole.id,
-                                version: selectedRole.version,
-                                jobDescriptionVersion,
-                              }),
-                            )
+                          retryJdSynchronization: () => {
+                            if (selectedRole.jdState.status !== "parsing") return
+                            void runAction(() => actions.retryJdSynchronization(selectedRole.id))
                           },
-                          retryMatchingAnalysisSynchronization: () => {
-                            if (selectedRole.matchingAnalysis?.status !== "generating") return
-                            void runAction(() =>
-                              actions.retryMatchingAnalysisSynchronization({
-                                roleId: selectedRole.id,
-                                version: selectedRole.version,
-                              }),
-                            )
+                          retryMatchSynchronization: () => {
+                            if (selectedRole.matchState.status !== "generating") return
+                            void runAction(() => actions.retryMatchSynchronization(selectedRole.id))
                           },
                           restore: () => {
                             const restoredRoleId = selectedRole.id
-                            void runAction(() =>
-                              actions.restoreTargetRole({
-                                roleId: restoredRoleId,
-                                version: selectedRole.version,
-                              }),
-                            ).then((succeeded) => {
-                              if (!succeeded) return
-                              setRoleCategory("active")
-                              setSelectedRoleId(restoredRoleId)
-                            })
+                            void runAction(() => actions.restoreRole(restoredRoleId)).then(
+                              (succeeded) => {
+                                if (!succeeded) return
+                                setRoleCategory("active")
+                                setSelectedRoleId(restoredRoleId)
+                              },
+                            )
                           },
                           setCurrent: () =>
-                            void runAction(() =>
-                              actions.setCurrentTargetRole({
-                                roleId: selectedRole.id,
-                                version: selectedRole.version,
-                              }),
-                            ),
+                            void runAction(() => actions.setActiveRole(selectedRole.id)),
                         }
                       : undefined
                   }
-                  currentRoleId={data.currentRoleId}
+                  activeRoleId={data.activeRoleId}
                   onTabChange={setActiveTab}
                   pending={pendingAction}
-                  profileContext={data.profileContext}
+                  profile={data.profile}
                   role={selectedRole}
-                  jobDescriptionSynchronizationError={jobDescriptionSynchronizationErrorRoleIds.includes(
-                    selectedRole.id,
-                  )}
-                  matchingAnalysisSynchronizationError={matchingAnalysisSynchronizationErrorRoleIds.includes(
+                  jdSynchronizationError={jdSynchronizationErrorRoleIds.includes(selectedRole.id)}
+                  matchSynchronizationError={matchSynchronizationErrorRoleIds.includes(
                     selectedRole.id,
                   )}
                 />
@@ -361,19 +311,14 @@ function RolesReadyView({
           <TargetRoleCreationDialog
             onDirtyChange={handleDirtyChange}
             onManualCreate={async (input) => {
-              await actions.createTargetRole(input)
+              await actions.createRole(input)
             }}
             onOpenChange={(open) => !open && requestCloseEditor()}
             onRecognize={async (input) => {
-              const response = await actions.recognizeTargetRole(input)
-              const createdRole = response.roles.find(
-                (role) => !data.roles.some((existing) => existing.id === role.id),
-              )
-              if (createdRole) {
-                setRoleCategory("active")
-                setSelectedRoleId(createdRole.id)
-                setActiveTab("job-description")
-              }
+              const createdRole = await actions.recognizeRole(input)
+              setRoleCategory("active")
+              setSelectedRoleId(createdRole.id)
+              setActiveTab("job-description")
             }}
             onSaved={closeEditor}
             open={isCreationDialogOpen}
@@ -381,13 +326,13 @@ function RolesReadyView({
           <RoleEditorDialog
             mode="edit"
             onCreate={async (input) => {
-              await actions.createTargetRole(input)
+              await actions.createRole(input)
             }}
             onDirtyChange={handleDirtyChange}
             onOpenChange={(open) => !open && requestCloseEditor()}
             onSaved={closeEditor}
-            onUpdate={async (input) => {
-              await actions.updateTargetRole(input)
+            onUpdate={async (roleId, input) => {
+              await actions.updateRole(roleId, input)
             }}
             open={editorMode === "edit"}
             role={selectedRole}
@@ -395,19 +340,19 @@ function RolesReadyView({
           <JobDescriptionEditorDialog
             onDirtyChange={handleDirtyChange}
             onOpenChange={(open) => !open && requestCloseEditor()}
-            onSave={async (input) => {
-              await actions.saveJobDescription(input)
+            onSave={async (roleId, text) => {
+              await actions.parseJd(roleId, text)
             }}
             onSaved={closeEditor}
             open={isJobDescriptionEditorOpen}
             role={selectedRole}
           />
           <JobDescriptionAnalysisEditorDialog
-            field={jobDescriptionAnalysisEditorField}
+            field={jdEditorField}
             onDirtyChange={handleDirtyChange}
             onOpenChange={(open) => !open && requestCloseEditor()}
-            onSave={async (input) => {
-              await actions.updateJobDescriptionAnalysisModule(input)
+            onSave={async (roleId, input) => {
+              await actions.updateJd(roleId, input)
             }}
             onSaved={closeEditor}
             role={selectedRole}
@@ -424,14 +369,8 @@ function RolesReadyView({
           const action = confirmation
           void runAction(() =>
             action === "archive"
-              ? actions.archiveTargetRole({
-                  roleId: selectedRole.id,
-                  version: selectedRole.version,
-                })
-              : actions.deleteTargetRole({
-                  roleId: selectedRole.id,
-                  version: selectedRole.version,
-                }),
+              ? actions.archiveRole(selectedRole.id)
+              : actions.deleteRole(selectedRole.id),
           ).then((succeeded) => succeeded && setConfirmation(null))
         }}
       />

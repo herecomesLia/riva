@@ -63,7 +63,7 @@ export const NoCurrentRole = meta.story({
 })
 
 const archivedRoles = createRoleStoryResponse("archivedRoles")
-const archivedRole = archivedRoles.roles.find((role) => role.status === "archived")!
+const archivedRole = archivedRoles.roles.find((role) => role.isArchived)!
 
 export const ArchivedRoleSelected = meta.story({
   args: {
@@ -75,10 +75,10 @@ export const ArchivedRoleSelected = meta.story({
 
 const selectedDifferent = createRoleStoryResponse("multipleRoles")
 const currentRole = selectedDifferent.roles.find(
-  (role) => role.id === selectedDifferent.currentRoleId,
+  (role) => role.id === selectedDifferent.activeRoleId,
 )!
 const selectedRole = selectedDifferent.roles.find(
-  (role) => role.id !== selectedDifferent.currentRoleId,
+  (role) => role.id !== selectedDifferent.activeRoleId,
 )!
 
 export const SelectedRoleDifferentFromCurrent = meta.story({

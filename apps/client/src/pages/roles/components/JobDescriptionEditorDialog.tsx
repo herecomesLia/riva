@@ -16,7 +16,7 @@ import {
 import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
-import type { SaveTargetRoleJobDescriptionInput, TargetRole } from "@/models/roles"
+import type { RoleView } from "@/models/target-role-workflow"
 
 import { getRolesActionErrorCode } from "../roles-errors"
 
@@ -32,10 +32,10 @@ export function JobDescriptionEditorDialog({
 }: {
   onDirtyChange: (isDirty: boolean) => void
   onOpenChange: (open: boolean) => void
-  onSave: (input: SaveTargetRoleJobDescriptionInput) => Promise<void>
+  onSave: (roleId: string, text: string) => Promise<void>
   onSaved: () => void
   open: boolean
-  role: TargetRole | null
+  role: RoleView | null
 }) {
   const { t } = useTranslation()
 
@@ -45,7 +45,7 @@ export function JobDescriptionEditorDialog({
         <DialogHeader className="border-b px-6 py-5 pr-14">
           <DialogTitle className="text-xl font-medium leading-tight">
             {t(
-              role?.jobDescription.status === "missing"
+              role?.jdState.status === "missing"
                 ? "roles.jd.editor.addTitle"
                 : "roles.jd.editor.replaceTitle",
             )}
@@ -54,7 +54,7 @@ export function JobDescriptionEditorDialog({
         </DialogHeader>
         {role && (
           <JobDescriptionEditorForm
-            key={`${role.id}-${role.jobDescription.version ?? "missing"}`}
+            key={`${role.id}-${role.jdState.status}`}
             onDirtyChange={onDirtyChange}
             onOpenChange={onOpenChange}
             onSave={onSave}
@@ -76,19 +76,19 @@ function JobDescriptionEditorForm({
 }: {
   onDirtyChange: (isDirty: boolean) => void
   onOpenChange: (open: boolean) => void
-  onSave: (input: SaveTargetRoleJobDescriptionInput) => Promise<void>
+  onSave: (roleId: string, text: string) => Promise<void>
   onSaved: () => void
-  role: TargetRole
+  role: RoleView
 }) {
   const { t } = useTranslation()
-  const [saveError, setSaveError] = useState<"requestFailed" | "versionConflict" | null>(null)
+  const [saveError, setSaveError] = useState<"requestFailed" | null>(null)
   const form = useForm({
     defaultValues: { text: "" },
     validators: { onSubmit: jobDescriptionSchema },
     onSubmit: async ({ value }) => {
       setSaveError(null)
       try {
-        await onSave({ roleId: role.id, version: role.version, text: value.text.trim() })
+        await onSave(role.id, value.text.trim())
         onSaved()
       } catch (error) {
         setSaveError(getRolesActionErrorCode(error))

@@ -1,18 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import type { RolesPageResponse } from "@/models/roles"
 import {
-  archiveTargetRole,
-  createTargetRole,
-  deleteTargetRole,
-  generateMatchingAnalysis,
-  getRolesPage,
-  saveJobDescription,
-  recognizeTargetRole,
-  restoreTargetRole,
-  setCurrentTargetRole,
-  updateJobDescriptionAnalysisModule,
-  updateTargetRole,
+  archiveRole,
+  createRole,
+  deleteRole,
+  getRoles,
+  match,
+  parseJd,
+  recognizeRole,
+  restoreRole,
+  setActiveRole,
+  updateJd,
+  updateRole,
 } from "@/services/roles"
 
 import { RolesView, type RolesViewActions } from "./RolesView"
@@ -25,101 +24,99 @@ import { RolesActionError } from "./roles-errors"
 
 export function RolesPage() {
   const queryClient = useQueryClient()
-  const rolesQuery = useQuery({
-    queryFn: getRolesPage,
-    queryKey: ROLES_QUERY_KEY,
-    retry: false,
-  })
+  const rolesQuery = useQuery({ queryFn: getRoles, queryKey: ROLES_QUERY_KEY, retry: false })
   const { clearSynchronizationError, restartSynchronization, synchronizationErrorRoleIds } =
     useJobDescriptionSynchronization(rolesQuery.data)
   const {
-    clearSynchronizationError: clearMatchingAnalysisSynchronizationError,
-    restartSynchronization: restartMatchingAnalysisSynchronization,
-    synchronizationErrorRoleIds: matchingAnalysisSynchronizationErrorRoleIds,
+    clearSynchronizationError: clearMatchSynchronizationError,
+    restartSynchronization: restartMatchSynchronization,
+    synchronizationErrorRoleIds: matchSynchronizationErrorRoleIds,
   } = useMatchingAnalysisSynchronization(rolesQuery.data)
 
-  function setRolesResponse(response: RolesPageResponse) {
-    queryClient.setQueryData(ROLES_QUERY_KEY, response)
-    return response
-  }
-
-  const createMutation = useMutation({ mutationFn: createTargetRole, onSuccess: setRolesResponse })
-  const updateMutation = useMutation({ mutationFn: updateTargetRole, onSuccess: setRolesResponse })
-  const setCurrentMutation = useMutation({
-    mutationFn: setCurrentTargetRole,
-    onSuccess: setRolesResponse,
+  const refreshRoles = () => queryClient.invalidateQueries({ queryKey: ROLES_QUERY_KEY })
+  const createMutation = useMutation({
+    mutationFn: (input: Parameters<typeof createRole>[0]) => createRole(input),
+    onSuccess: refreshRoles,
+  })
+  const updateMutation = useMutation({
+    mutationFn: ({ roleId, input }: { roleId: string; input: Parameters<typeof updateRole>[1] }) =>
+      updateRole(roleId, input),
+    onSuccess: refreshRoles,
+  })
+  const setActiveMutation = useMutation({
+    mutationFn: (roleId: string) => setActiveRole(roleId),
+    onSuccess: refreshRoles,
   })
   const archiveMutation = useMutation({
-    mutationFn: archiveTargetRole,
-    onSuccess: setRolesResponse,
+    mutationFn: (roleId: string) => archiveRole(roleId),
+    onSuccess: refreshRoles,
   })
   const restoreMutation = useMutation({
-    mutationFn: restoreTargetRole,
-    onSuccess: setRolesResponse,
+    mutationFn: (roleId: string) => restoreRole(roleId),
+    onSuccess: refreshRoles,
   })
-  const deleteMutation = useMutation({ mutationFn: deleteTargetRole, onSuccess: setRolesResponse })
-  const generateMatchingAnalysisMutation = useMutation({ mutationFn: generateMatchingAnalysis })
-  const updateJobDescriptionAnalysisModuleMutation = useMutation({
-    mutationFn: updateJobDescriptionAnalysisModule,
+  const deleteMutation = useMutation({
+    mutationFn: (roleId: string) => deleteRole(roleId),
+    onSuccess: refreshRoles,
   })
-  async function runMutation<Input>(
-    mutate: (input: Input) => Promise<RolesPageResponse>,
+  const recognizeMutation = useMutation({
+    mutationFn: (input: Parameters<typeof recognizeRole>[0]) => recognizeRole(input),
+    onSuccess: refreshRoles,
+  })
+  const parseMutation = useMutation({
+    mutationFn: ({ roleId, text }: { roleId: string; text: string }) => parseJd(roleId, text),
+    onSuccess: refreshRoles,
+  })
+  const matchMutation = useMutation({
+    mutationFn: (roleId: string) => match(roleId),
+    onSuccess: refreshRoles,
+  })
+  const updateJdMutation = useMutation({
+    mutationFn: ({ roleId, input }: { roleId: string; input: Parameters<typeof updateJd>[1] }) =>
+      updateJd(roleId, input),
+    onSuccess: refreshRoles,
+  })
+
+  async function runMutation<Input, Output>(
+    mutate: (input: Input) => Promise<Output>,
     input: Input,
-  ) {
+  ): Promise<Output> {
     try {
       return await mutate(input)
-    } catch (error) {
-      throw new RolesActionError(
-        error instanceof Error && error.message.endsWith("version is out of date.")
-          ? "versionConflict"
-          : "requestFailed",
-      )
+    } catch {
+      throw new RolesActionError("requestFailed")
     }
   }
 
   const actions: RolesViewActions = {
-    archiveTargetRole: (input) => runMutation(archiveMutation.mutateAsync, input),
-    createTargetRole: (input) => runMutation(createMutation.mutateAsync, input),
-    deleteTargetRole: (input) => runMutation(deleteMutation.mutateAsync, input),
-    generateMatchingAnalysis: async (input) => {
-      const response = await runMutation(generateMatchingAnalysisMutation.mutateAsync, input)
-      setRolesResponse(response)
-      clearMatchingAnalysisSynchronizationError(input.roleId)
-      return response
+    archiveRole: (roleId) => runMutation(archiveMutation.mutateAsync, roleId),
+    createRole: (input) => runMutation(createMutation.mutateAsync, input),
+    deleteRole: (roleId) => runMutation(deleteMutation.mutateAsync, roleId),
+    match: async (roleId) => {
+      const result = await runMutation(matchMutation.mutateAsync, roleId)
+      clearMatchSynchronizationError(roleId)
+      return result
     },
-    retryJobDescriptionSynchronization: async (input) => {
-      const response = restartSynchronization(input)
-      if (!response) throw new RolesActionError("requestFailed")
-      return response
+    retryJdSynchronization: async (roleId) => {
+      if (!restartSynchronization(roleId)) throw new RolesActionError("requestFailed")
     },
-    retryMatchingAnalysisSynchronization: async (input) => {
-      const response = restartMatchingAnalysisSynchronization(input)
-      if (!response) throw new RolesActionError("requestFailed")
-      return response
+    retryMatchSynchronization: async (roleId) => {
+      if (!restartMatchSynchronization(roleId)) throw new RolesActionError("requestFailed")
     },
-    recognizeTargetRole: async (input) => {
-      const response = await runMutation(recognizeTargetRole, input)
-      setRolesResponse(response)
-      return response
+    recognizeRole: (input) => runMutation(recognizeMutation.mutateAsync, input),
+    restoreRole: (roleId) => runMutation(restoreMutation.mutateAsync, roleId),
+    parseJd: async (roleId, text) => {
+      const result = await runMutation(parseMutation.mutateAsync, { roleId, text })
+      clearSynchronizationError(roleId)
+      return result
     },
-    restoreTargetRole: (input) => runMutation(restoreMutation.mutateAsync, input),
-    saveJobDescription: async (input) => {
-      const response = await runMutation(saveJobDescription, input)
-      setRolesResponse(response)
-      clearSynchronizationError(input.roleId)
-      return response
+    setActiveRole: (roleId) => runMutation(setActiveMutation.mutateAsync, roleId),
+    updateJd: async (roleId, input) => {
+      const result = await runMutation(updateJdMutation.mutateAsync, { roleId, input })
+      clearMatchSynchronizationError(roleId)
+      return result
     },
-    setCurrentTargetRole: (input) => runMutation(setCurrentMutation.mutateAsync, input),
-    updateJobDescriptionAnalysisModule: async (input) => {
-      const response = await runMutation(
-        updateJobDescriptionAnalysisModuleMutation.mutateAsync,
-        input,
-      )
-      setRolesResponse(response)
-      clearMatchingAnalysisSynchronizationError(input.roleId)
-      return response
-    },
-    updateTargetRole: (input) => runMutation(updateMutation.mutateAsync, input),
+    updateRole: (roleId, input) => runMutation(updateMutation.mutateAsync, { roleId, input }),
   }
 
   if (rolesQuery.data !== undefined) {
@@ -127,8 +124,8 @@ export function RolesPage() {
       <RolesView
         actions={actions}
         content={{ status: "ready", data: rolesQuery.data }}
-        jobDescriptionSynchronizationErrorRoleIds={synchronizationErrorRoleIds}
-        matchingAnalysisSynchronizationErrorRoleIds={matchingAnalysisSynchronizationErrorRoleIds}
+        jdSynchronizationErrorRoleIds={synchronizationErrorRoleIds}
+        matchSynchronizationErrorRoleIds={matchSynchronizationErrorRoleIds}
         variant="default"
       />
     )

@@ -13,22 +13,20 @@ const multipleRoles = createRoleStoryResponse("multipleRoles")
 export const CurrentActive = meta.story({
   args: {
     isCurrent: true,
-    role: multipleRoles.roles.find((role) => role.id === multipleRoles.currentRoleId)!,
+    role: multipleRoles.roles.find((role) => role.id === multipleRoles.activeRoleId)!,
   },
 })
 
 export const Active = meta.story({
   args: {
     isCurrent: false,
-    role: multipleRoles.roles.find((role) => role.id !== multipleRoles.currentRoleId)!,
+    role: multipleRoles.roles.find((role) => role.id !== multipleRoles.activeRoleId)!,
   },
 })
 
 export const Archived = meta.story({
   args: {
     isCurrent: false,
-    role: createRoleStoryResponse("archivedRoles").roles.find(
-      (role) => role.status === "archived",
-    )!,
+    role: createRoleStoryResponse("archivedRoles").roles.find((role) => role.isArchived)!,
   },
 })

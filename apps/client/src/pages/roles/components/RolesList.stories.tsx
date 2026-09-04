@@ -12,27 +12,27 @@ const meta = preview.meta({
 const singleRoleResponse = createRoleStoryResponse("singleRoleWithoutJobDescription")
 const multipleRolesResponse = createRoleStoryResponse("multipleRoles")
 const currentRole = multipleRolesResponse.roles.find(
-  (role) => role.id === multipleRolesResponse.currentRoleId,
+  (role) => role.id === multipleRolesResponse.activeRoleId,
 )!
 const selectedRole = multipleRolesResponse.roles.find(
-  (role) => role.id !== multipleRolesResponse.currentRoleId,
+  (role) => role.id !== multipleRolesResponse.activeRoleId,
 )!
 
 export const SavedRoles = meta.story({
   args: {
     category: "active",
-    currentRoleId: singleRoleResponse.currentRoleId,
+    activeRoleId: singleRoleResponse.activeRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: singleRoleResponse.roles,
-    selectedRoleId: singleRoleResponse.currentRoleId,
+    selectedRoleId: singleRoleResponse.activeRoleId,
   },
 })
 
 export const MixedRoles = meta.story({
   args: {
     category: "active",
-    currentRoleId: multipleRolesResponse.currentRoleId,
+    activeRoleId: multipleRolesResponse.activeRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: multipleRolesResponse.roles,
@@ -45,7 +45,7 @@ const onSelectRole = fn()
 export const SelectedRoleDifferentFromCurrent = meta.story({
   args: {
     category: "active",
-    currentRoleId: multipleRolesResponse.currentRoleId,
+    activeRoleId: multipleRolesResponse.activeRoleId,
     onCategoryChange: fn(),
     onSelectRole,
     roles: multipleRolesResponse.roles,
@@ -66,12 +66,12 @@ export const SelectedRoleDifferentFromCurrent = meta.story({
 })
 
 const archivedRolesResponse = createRoleStoryResponse("archivedRoles")
-const archivedRole = archivedRolesResponse.roles.find((role) => role.status === "archived")!
+const archivedRole = archivedRolesResponse.roles.find((role) => role.isArchived)!
 
 export const ArchivedRoles = meta.story({
   args: {
     category: "archived",
-    currentRoleId: archivedRolesResponse.currentRoleId,
+    activeRoleId: archivedRolesResponse.activeRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: archivedRolesResponse.roles,
@@ -82,7 +82,7 @@ export const ArchivedRoles = meta.story({
 export const ScrollableRolesList = meta.story({
   args: {
     category: "active",
-    currentRoleId: multipleRolesResponse.currentRoleId,
+    activeRoleId: multipleRolesResponse.activeRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: createManyRolesResponse().roles,
@@ -98,7 +98,7 @@ roleWithoutScore.title = "Platform Product Manager"
 export const RolesWithAndWithoutMatchScore = meta.story({
   args: {
     category: "active",
-    currentRoleId: scoreResponse.currentRoleId,
+    activeRoleId: scoreResponse.activeRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: [scoreResponse.roles[0]!, roleWithoutScore],

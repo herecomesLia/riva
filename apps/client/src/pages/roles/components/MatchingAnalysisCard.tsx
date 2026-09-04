@@ -20,30 +20,34 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
-import type { MatchingAnalysisResult, ProfileContext, TargetRole } from "@/models/roles"
+import type {
+  JdState,
+  MatchingAnalysisResult,
+  ProfileState,
+  RoleView,
+} from "@/models/target-role-workflow"
 
 export function MatchingAnalysisCard({
   onGenerate,
   onRetrySynchronization,
   pending,
-  profileContext,
+  profile,
   role,
   synchronizationError,
 }: {
   onGenerate?: () => void
   onRetrySynchronization?: () => void
   pending?: boolean
-  profileContext: ProfileContext
-  role: TargetRole
+  profile: ProfileState
+  role: RoleView
   synchronizationError: boolean
 }) {
   const { t } = useTranslation()
-  const analysis = role.matchingAnalysis
-  const status = analysis?.status ?? "none"
+  const analysis = role.matchState
+  const status = analysis.status
   const result =
-    analysis?.status === "current" || analysis?.status === "stale" ? analysis.result : null
-  const canGenerate =
-    profileContext.exists && profileContext.completed && role.jobDescription.status === "ready"
+    analysis.status === "current" || analysis.status === "stale" ? analysis.result : null
+  const canGenerate = profile.exists && profile.complete && role.jdState.status === "ready"
 
   return (
     <Card
@@ -83,18 +87,18 @@ export function MatchingAnalysisCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        {analysis?.status === "stale" ? (
+        {analysis.status === "stale" ? (
           <>
             <Alert>
               <AlertTitle>{t("roles.matching.stale.title")}</AlertTitle>
               <AlertDescription>{t("roles.matching.stale.description")}</AlertDescription>
             </Alert>
-            {!profileContext.exists ? (
+            {!profile.exists ? (
               <ProfilePrerequisite exists={false} />
-            ) : !profileContext.completed ? (
+            ) : !profile.complete ? (
               <ProfilePrerequisite exists />
-            ) : role.jobDescription.status !== "ready" ? (
-              <JobDescriptionPrerequisite status={role.jobDescription.status} />
+            ) : role.jdState.status !== "ready" ? (
+              <JobDescriptionPrerequisite status={role.jdState.status} />
             ) : null}
             {canGenerate && onGenerate && (
               <div className="flex justify-end">
@@ -110,13 +114,13 @@ export function MatchingAnalysisCard({
             )}
             <MatchingAnalysisResultView result={analysis.result} />
           </>
-        ) : !profileContext.exists ? (
+        ) : !profile.exists ? (
           <ProfilePrerequisite exists={false} />
-        ) : !profileContext.completed ? (
+        ) : !profile.complete ? (
           <ProfilePrerequisite exists />
-        ) : role.jobDescription.status !== "ready" ? (
-          <JobDescriptionPrerequisite status={role.jobDescription.status} />
-        ) : analysis === null ? (
+        ) : role.jdState.status !== "ready" ? (
+          <JobDescriptionPrerequisite status={role.jdState.status} />
+        ) : analysis.status === "none" ? (
           <AnalysisEmpty onGenerate={onGenerate} pending={pending} />
         ) : analysis.status === "generating" ? (
           <AnalysisGenerating
@@ -125,11 +129,7 @@ export function MatchingAnalysisCard({
             synchronizationError={synchronizationError}
           />
         ) : analysis.status === "failed" ? (
-          <AnalysisFailed
-            failureReason={analysis.failureReason}
-            onRetry={onGenerate}
-            pending={pending}
-          />
+          <AnalysisFailed failureReason={analysis.reason} onRetry={onGenerate} pending={pending} />
         ) : (
           <MatchingAnalysisResultView result={analysis.result} />
         )}
@@ -155,11 +155,7 @@ function ProfilePrerequisite({ exists }: { exists: boolean }) {
   )
 }
 
-function JobDescriptionPrerequisite({
-  status,
-}: {
-  status: Exclude<TargetRole["jobDescription"]["status"], "ready">
-}) {
+function JobDescriptionPrerequisite({ status }: { status: Exclude<JdState["status"], "ready"> }) {
   const { t } = useTranslation()
   return (
     <Alert>

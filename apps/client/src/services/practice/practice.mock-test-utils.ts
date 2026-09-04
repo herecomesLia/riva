@@ -2,7 +2,14 @@ import { afterEach, beforeEach, vi } from "vitest"
 
 import { createPracticeMockResponse, getPracticeFollowUpPlan } from "@/mocks/data/practice"
 import { reconcilePracticeSetupSelection, resetPracticeMockState } from "@/mocks/services/practice"
-import { resetRolesMockState } from "@/mocks/services/roles"
+import {
+  createTargetRole,
+  deleteTargetRole,
+  getRolesPage,
+  resetRolesMockState,
+  setCurrentTargetRole,
+  updateTargetRole,
+} from "@/mocks/services/roles"
 import {
   endPracticeFollowUps,
   getPracticePage,
@@ -28,13 +35,6 @@ import {
   submitFollowUpAnswer,
   submitPrimaryAnswer,
 } from "@/services/practice"
-import {
-  createTargetRole,
-  deleteTargetRole,
-  getRolesPage,
-  setCurrentTargetRole,
-  updateTargetRole,
-} from "@/services/roles"
 import type {
   PracticeAnsweringState,
   PracticeQuestionType,

@@ -4,7 +4,7 @@ import type {
   TargetRoleListResponse,
   TargetRoleResponse,
 } from "@/api/generated/models"
-import type { MatchingAnalysisResult } from "@/models/roles"
+import type { MatchingAnalysisResult } from "@/models/target-role-workflow"
 
 export const jdFailInput = "__RIVA_MOCK_JD_PARSING_FAILURE__"
 

@@ -2,10 +2,11 @@ import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import type { TargetRole } from "@/models/roles"
+import type { RoleView } from "@/models/target-role-workflow"
 
-export function RoleStatusBadges({ isCurrent, role }: { isCurrent: boolean; role: TargetRole }) {
+export function RoleStatusBadges({ isCurrent, role }: { isCurrent: boolean; role: RoleView }) {
   const { t } = useTranslation()
+  const status = role.isArchived ? "archived" : "active"
 
   return (
     <div className="flex flex-wrap gap-1.5" data-testid="role-status-badges">
@@ -16,14 +17,14 @@ export function RoleStatusBadges({ isCurrent, role }: { isCurrent: boolean; role
       )}
       <Badge
         className={cn(
-          role.status === "archived"
+          role.isArchived
             ? "border-border bg-muted text-muted-foreground"
             : "border-primary/20 bg-primary/10 text-primary",
         )}
-        data-role-status={role.status}
+        data-role-status={status}
         variant="outline"
       >
-        {t(`roles.status.${role.status}`)}
+        {t(`roles.status.${status}`)}
       </Badge>
     </div>
   )

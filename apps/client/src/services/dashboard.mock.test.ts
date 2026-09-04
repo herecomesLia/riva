@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { dashboardResponseMock } from "@/mocks/data/dashboard"
-import { resetRolesMockState } from "@/mocks/services/roles"
+import { getRolesPage, resetRolesMockState, setCurrentTargetRole } from "@/mocks/services/roles"
 import { resetTrainingRecordsMockState } from "@/mocks/services/training-records"
 import { getDashboardData } from "@/services/dashboard"
-import { getRolesPage, setCurrentTargetRole } from "@/services/roles"
 
 beforeEach(() => {
   vi.useFakeTimers()

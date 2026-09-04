@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import type { TargetRole } from "@/models/roles"
+import type { RoleView } from "@/models/target-role-workflow"
 
 import type { RoleDetailsActions } from "./RoleDetails"
 
@@ -26,7 +26,7 @@ export function TargetRoleOverview({
   actions?: RoleDetailsActions
   isCurrent: boolean
   pending?: boolean
-  role: TargetRole
+  role: RoleView
 }) {
   const { t } = useTranslation()
 
@@ -54,19 +54,19 @@ export function TargetRoleOverview({
               <PencilIcon className="size-4" data-icon="inline-start" />
               {t("roles.actions.edit")}
             </Button>
-            {!isCurrent && role.status !== "archived" && (
+            {!isCurrent && !role.isArchived && (
               <Button disabled={pending} onClick={actions.setCurrent} size="sm" variant="outline">
                 <StarIcon data-icon="inline-start" />
                 {t("roles.actions.setCurrent")}
               </Button>
             )}
-            {role.status !== "archived" && (
+            {!role.isArchived && (
               <Button disabled={pending} onClick={actions.archive} size="sm" variant="outline">
                 <ArchiveIcon data-icon="inline-start" />
                 {t("roles.actions.archive")}
               </Button>
             )}
-            {role.status === "archived" && (
+            {role.isArchived && (
               <Button disabled={pending} onClick={actions.restore} size="sm" variant="outline">
                 <ArchiveRestoreIcon data-icon="inline-start" />
                 {t("roles.actions.restore")}
@@ -91,8 +91,8 @@ export function TargetRoleOverview({
             icon={BriefcaseBusinessIcon}
             label={t("roles.details.fields.recruitmentType")}
             value={
-              role.recruitmentType
-                ? t(`roles.recruitmentType.${role.recruitmentType}`)
+              role.recruitmentTrack
+                ? t(`roles.recruitmentType.${role.recruitmentTrack}`)
                 : t("roles.fallbackValue")
             }
           />

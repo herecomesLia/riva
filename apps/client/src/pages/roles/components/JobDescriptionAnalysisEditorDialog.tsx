@@ -15,12 +15,12 @@ import {
 import { FieldGroup } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
 import type {
-  JobDescriptionAnalysisModuleField,
-  QualificationRequirements,
-  RequiredSkillGroups,
-  TargetRole,
-  UpdateJobDescriptionAnalysisModuleInput,
-} from "@/models/roles"
+  HardSkillsRequest,
+  JobDescriptionResponse,
+  JobRequirementsRequest,
+  UpdateJobDescriptionRequest,
+} from "@/api/generated/models"
+import type { JdField, RoleView } from "@/models/target-role-workflow"
 
 import { getRolesActionErrorCode } from "../roles-errors"
 import { JobDescriptionBulletListEditor } from "./JobDescriptionBulletListEditor"
@@ -33,7 +33,7 @@ const qualificationFields = [
   "languages",
   "certifications",
   "other",
-] as const satisfies (keyof QualificationRequirements)[]
+] as const satisfies (keyof JobRequirementsRequest)[]
 
 const skillFields = [
   "programmingLanguages",
@@ -43,16 +43,9 @@ const skillFields = [
   "conceptsAndMethods",
   "databasesAndMiddleware",
   "other",
-] as const satisfies (keyof RequiredSkillGroups)[]
+] as const satisfies (keyof HardSkillsRequest)[]
 
 type EditorValues = Record<string, string[]>
-type ModuleUpdateContext = {
-  roleId: string
-  version: number
-  jobDescriptionVersion: number
-  analysisVersion: number
-  field: JobDescriptionAnalysisModuleField
-}
 
 export function JobDescriptionAnalysisEditorDialog({
   field,
@@ -62,33 +55,30 @@ export function JobDescriptionAnalysisEditorDialog({
   onSaved,
   role,
 }: {
-  field: JobDescriptionAnalysisModuleField | null
+  field: JdField | null
   onDirtyChange: (isDirty: boolean) => void
   onOpenChange: (open: boolean) => void
-  onSave: (input: UpdateJobDescriptionAnalysisModuleInput) => Promise<void>
+  onSave: (roleId: string, input: UpdateJobDescriptionRequest) => Promise<void>
   onSaved: () => void
-  role: TargetRole | null
+  role: RoleView | null
 }) {
   const { t } = useTranslation()
-  const analysis = role?.jobDescriptionAnalysis
-  const isOpen = field !== null && role?.jobDescription.status === "ready" && analysis !== null
+  const isOpen = field !== null && role?.jdState.status === "ready"
 
   return (
     <Dialog onOpenChange={onOpenChange} open={isOpen}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] gap-0 overflow-hidden p-0 sm:max-w-xl">
-        {role && analysis && field && (
+        {role && field && (
           <JobDescriptionAnalysisEditorForm
-            key={`${role.id}:${analysis.analysisVersion}:${field}`}
-            analysisVersion={analysis.analysisVersion}
+            key={`${role.id}:${role.updatedAt}:${field}`}
             field={field}
-            initialValues={getInitialValues(analysis, field)}
-            jobDescriptionVersion={analysis.jobDescriptionVersion}
+            initialValues={getInitialValues(role.jd, field)}
             onDirtyChange={onDirtyChange}
             onOpenChange={onOpenChange}
             onSave={onSave}
             onSaved={onSaved}
             role={role}
-            title={t(`roles.jd.analysis.${field}`)}
+            title={t(getTitleKey(field))}
           />
         )}
       </DialogContent>
@@ -97,10 +87,8 @@ export function JobDescriptionAnalysisEditorDialog({
 }
 
 function JobDescriptionAnalysisEditorForm({
-  analysisVersion,
   field,
   initialValues,
-  jobDescriptionVersion,
   onDirtyChange,
   onOpenChange,
   onSave,
@@ -108,36 +96,23 @@ function JobDescriptionAnalysisEditorForm({
   role,
   title,
 }: {
-  analysisVersion: number
-  field: JobDescriptionAnalysisModuleField
+  field: JdField
   initialValues: EditorValues
-  jobDescriptionVersion: number
   onDirtyChange: (isDirty: boolean) => void
   onOpenChange: (open: boolean) => void
-  onSave: (input: UpdateJobDescriptionAnalysisModuleInput) => Promise<void>
+  onSave: (roleId: string, input: UpdateJobDescriptionRequest) => Promise<void>
   onSaved: () => void
-  role: TargetRole
+  role: RoleView
   title: string
 }) {
   const { t } = useTranslation()
-  const [saveError, setSaveError] = useState<"requestFailed" | "versionConflict" | null>(null)
+  const [saveError, setSaveError] = useState<"requestFailed" | null>(null)
   const form = useForm({
     defaultValues: initialValues,
     onSubmit: async ({ value }) => {
       setSaveError(null)
       try {
-        await onSave(
-          createSubmissionInput(
-            {
-              roleId: role.id,
-              version: role.version,
-              jobDescriptionVersion,
-              analysisVersion,
-              field,
-            },
-            value,
-          ),
-        )
+        await onSave(role.id, createSubmissionInput(field, value))
         onSaved()
       } catch (error) {
         setSaveError(getRolesActionErrorCode(error))
@@ -209,11 +184,8 @@ function JobDescriptionAnalysisEditorForm({
   )
 }
 
-function getInitialValues(
-  analysis: NonNullable<TargetRole["jobDescriptionAnalysis"]>,
-  field: JobDescriptionAnalysisModuleField,
-): EditorValues {
-  if (field === "qualificationRequirements" || field === "requiredSkills") {
+function getInitialValues(analysis: JobDescriptionResponse, field: JdField): EditorValues {
+  if (field === "requirements" || field === "hardSkills") {
     return Object.fromEntries(
       Object.entries(analysis[field]).map(([key, items]) => [key, [...items]]),
     )
@@ -221,24 +193,17 @@ function getInitialValues(
   return { value: [...analysis[field]] }
 }
 
-function createSubmissionInput(
-  context: ModuleUpdateContext,
-  values: EditorValues,
-): UpdateJobDescriptionAnalysisModuleInput {
-  if (context.field === "qualificationRequirements") {
-    return {
-      ...context,
-      field: "qualificationRequirements",
-      value: createQualificationRequirements(values),
-    }
+function createSubmissionInput(field: JdField, values: EditorValues): UpdateJobDescriptionRequest {
+  if (field === "requirements") {
+    return { requirements: createRequirements(values) }
   }
-  if (context.field === "requiredSkills") {
-    return { ...context, field: "requiredSkills", value: createRequiredSkillGroups(values) }
+  if (field === "hardSkills") {
+    return { hardSkills: createHardSkills(values) }
   }
-  return { ...context, field: context.field, value: normalizeItems(values.value ?? []) }
+  return { [field]: normalizeItems(values.value ?? []) }
 }
 
-function createQualificationRequirements(values: EditorValues): QualificationRequirements {
+function createRequirements(values: EditorValues): JobRequirementsRequest {
   return {
     education: normalizeItems(values.education ?? []),
     graduationCohorts: normalizeItems(values.graduationCohorts ?? []),
@@ -250,7 +215,7 @@ function createQualificationRequirements(values: EditorValues): QualificationReq
   }
 }
 
-function createRequiredSkillGroups(values: EditorValues): RequiredSkillGroups {
+function createHardSkills(values: EditorValues): HardSkillsRequest {
   return {
     programmingLanguages: normalizeItems(values.programmingLanguages ?? []),
     frameworksAndLibraries: normalizeItems(values.frameworksAndLibraries ?? []),
@@ -262,25 +227,27 @@ function createRequiredSkillGroups(values: EditorValues): RequiredSkillGroups {
   }
 }
 
-function getFields(
-  field: JobDescriptionAnalysisModuleField,
-  t: ReturnType<typeof useTranslation>["t"],
-) {
-  if (field === "qualificationRequirements") {
+function getFields(field: JdField, t: ReturnType<typeof useTranslation>["t"]) {
+  if (field === "requirements") {
     return qualificationFields.map((key) => ({
       key,
       label: t(`roles.jd.analysis.qualificationCategories.${key}`),
     }))
   }
-  if (field === "requiredSkills") {
+  if (field === "hardSkills") {
     return skillFields.map((key) => ({ key, label: t(`roles.jd.analysis.skillCategories.${key}`) }))
   }
   return [{ key: "value", label: t(`roles.jd.analysis.${field}`) }]
 }
 
-function getDescriptionKey(field: JobDescriptionAnalysisModuleField) {
-  if (field === "qualificationRequirements")
-    return "roles.jd.analysisEditor.qualificationsDescription"
+function getTitleKey(field: JdField) {
+  if (field === "requirements") return "roles.jd.analysis.qualificationRequirements"
+  if (field === "hardSkills") return "roles.jd.analysis.requiredSkills"
+  return `roles.jd.analysis.${field}` as const
+}
+
+function getDescriptionKey(field: JdField) {
+  if (field === "requirements") return "roles.jd.analysisEditor.qualificationsDescription"
   if (field === "preferredQualifications")
     return "roles.jd.analysisEditor.preferredQualificationsDescription"
   return "roles.jd.analysisEditor.listDescription"

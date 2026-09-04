@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { JobDescriptionAnalysisModuleField, ProfileContext, TargetRole } from "@/models/roles"
+import type { JdField, ProfileState, RoleView } from "@/models/target-role-workflow"
 
 import { JobDescriptionCard } from "./JobDescriptionCard"
 import { MatchingAnalysisCard } from "./MatchingAnalysisCard"
@@ -17,36 +17,36 @@ export type RoleDetailsActions = {
   edit: () => void
   restore: () => void
   setCurrent: () => void
-  editJobDescription: () => void
-  editJobDescriptionAnalysisModule: (field: JobDescriptionAnalysisModuleField) => void
-  retryJobDescriptionSynchronization: () => void
-  generateMatchingAnalysis: () => void
-  retryMatchingAnalysisSynchronization: () => void
+  editJd: () => void
+  editJdField: (field: JdField) => void
+  retryJdSynchronization: () => void
+  generateMatch: () => void
+  retryMatchSynchronization: () => void
 }
 
 export function RoleDetails({
   actions,
   activeTab,
-  currentRoleId,
+  activeRoleId,
   onTabChange,
   pending,
-  profileContext,
+  profile,
   role,
-  jobDescriptionSynchronizationError = false,
-  matchingAnalysisSynchronizationError = false,
+  jdSynchronizationError = false,
+  matchSynchronizationError = false,
 }: {
   actions?: RoleDetailsActions
   activeTab: TargetRoleTab
-  currentRoleId: string | null
-  jobDescriptionSynchronizationError?: boolean
-  matchingAnalysisSynchronizationError?: boolean
+  activeRoleId: string | null
+  jdSynchronizationError?: boolean
+  matchSynchronizationError?: boolean
   onTabChange: (tab: TargetRoleTab) => void
   pending?: boolean
-  profileContext: ProfileContext
-  role: TargetRole
+  profile: ProfileState
+  role: RoleView
 }) {
   const { t } = useTranslation()
-  const isCurrent = role.id === currentRoleId
+  const isCurrent = role.id === activeRoleId
 
   return (
     <Card className="min-w-0 bg-card shadow-sm" data-testid="role-details-card">
@@ -107,24 +107,24 @@ export function RoleDetails({
           <TabsContent value="job-description">
             {activeTab === "job-description" && (
               <JobDescriptionCard
-                onEdit={actions?.editJobDescription}
-                onEditAnalysisModule={actions?.editJobDescriptionAnalysisModule}
-                onRetrySynchronization={actions?.retryJobDescriptionSynchronization}
+                onEdit={actions?.editJd}
+                onEditAnalysisModule={actions?.editJdField}
+                onRetrySynchronization={actions?.retryJdSynchronization}
                 pending={pending}
                 role={role}
-                synchronizationError={jobDescriptionSynchronizationError}
+                synchronizationError={jdSynchronizationError}
               />
             )}
           </TabsContent>
           <TabsContent value="matching-analysis">
             {activeTab === "matching-analysis" && (
               <MatchingAnalysisCard
-                onGenerate={actions?.generateMatchingAnalysis}
-                onRetrySynchronization={actions?.retryMatchingAnalysisSynchronization}
+                onGenerate={actions?.generateMatch}
+                onRetrySynchronization={actions?.retryMatchSynchronization}
                 pending={pending}
-                profileContext={profileContext}
+                profile={profile}
                 role={role}
-                synchronizationError={matchingAnalysisSynchronizationError}
+                synchronizationError={matchSynchronizationError}
               />
             )}
           </TabsContent>

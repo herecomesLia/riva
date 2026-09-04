@@ -18,12 +18,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
 import type {
-  JobDescriptionAnalysis,
-  JobDescriptionAnalysisModuleField,
-  QualificationRequirements,
-  RequiredSkillGroups,
-  TargetRole,
-} from "@/models/roles"
+  HardSkillsResponse,
+  JobDescriptionResponse,
+  JobRequirementsResponse,
+} from "@/api/generated/models"
+import type { JdField, RoleView } from "@/models/target-role-workflow"
 
 export function JobDescriptionCard({
   onEdit,
@@ -34,14 +33,14 @@ export function JobDescriptionCard({
   synchronizationError,
 }: {
   onEdit?: () => void
-  onEditAnalysisModule?: (field: JobDescriptionAnalysisModuleField) => void
+  onEditAnalysisModule?: (field: JdField) => void
   onRetrySynchronization?: () => void
   pending?: boolean
-  role: TargetRole
+  role: RoleView
   synchronizationError: boolean
 }) {
   const { t } = useTranslation()
-  const { jobDescription } = role
+  const { jdState } = role
 
   return (
     <Card
@@ -55,7 +54,7 @@ export function JobDescriptionCard({
             <CardTitle>
               <h3>{t("roles.details.sections.jobDescription")}</h3>
             </CardTitle>
-            {jobDescription.status === "ready" && onEdit && (
+            {jdState.status === "ready" && onEdit && (
               <Button
                 className="h-9 gap-2 border-primary px-3 text-sm text-primary translate-y-3 hover:bg-primary/10 hover:text-primary"
                 disabled={pending}
@@ -74,27 +73,21 @@ export function JobDescriptionCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        {jobDescription.status === "missing" && (
-          <JobDescriptionEmpty onEdit={onEdit} pending={pending} />
-        )}
-        {jobDescription.status === "parsing" && (
+        {jdState.status === "missing" && <JobDescriptionEmpty onEdit={onEdit} pending={pending} />}
+        {jdState.status === "parsing" && (
           <ParsingState
             onRetrySynchronization={onRetrySynchronization}
             pending={pending}
             synchronizationError={synchronizationError}
           />
         )}
-        {jobDescription.status === "failed" && (
-          <FailedState
-            failureReason={jobDescription.parsingFailureReason}
-            onEdit={onEdit}
-            pending={pending}
-          />
+        {jdState.status === "failed" && (
+          <FailedState failureReason={jdState.reason} onEdit={onEdit} pending={pending} />
         )}
-        {jobDescription.status === "ready" && role.jobDescriptionAnalysis && (
+        {jdState.status === "ready" && (
           <ReadyState
-            analysis={role.jobDescriptionAnalysis}
-            canEditAnalysis={role.status !== "archived"}
+            analysis={role.jd}
+            canEditAnalysis={!role.isArchived}
             onEditAnalysisModule={onEditAnalysisModule}
           />
         )}
@@ -202,9 +195,9 @@ function ReadyState({
   canEditAnalysis,
   onEditAnalysisModule,
 }: {
-  analysis: JobDescriptionAnalysis
+  analysis: JobDescriptionResponse
   canEditAnalysis: boolean
-  onEditAnalysisModule?: (field: JobDescriptionAnalysisModuleField) => void
+  onEditAnalysisModule?: (field: JdField) => void
 }) {
   const { t } = useTranslation()
   return (
@@ -218,8 +211,8 @@ function ReadyState({
       />
       <div className="grid gap-4 lg:grid-cols-2">
         <AnalysisCategorizedList
-          field="qualificationRequirements"
-          groups={analysis.qualificationRequirements}
+          field="requirements"
+          groups={analysis.requirements}
           icon={GraduationCapIcon}
           labels={{
             education: t("roles.jd.analysis.qualificationCategories.education"),
@@ -234,8 +227,8 @@ function ReadyState({
           title={t("roles.jd.analysis.qualificationRequirements")}
         />
         <AnalysisCategorizedList
-          field="requiredSkills"
-          groups={analysis.requiredSkills}
+          field="hardSkills"
+          groups={analysis.hardSkills}
           icon={CodeXmlIcon}
           labels={{
             programmingLanguages: t("roles.jd.analysis.skillCategories.programmingLanguages"),
@@ -285,9 +278,9 @@ function AnalysisSection({
   title,
 }: {
   children: ReactNode
-  field?: JobDescriptionAnalysisModuleField
+  field?: JdField
   icon: LucideIcon
-  onEdit?: (field: JobDescriptionAnalysisModuleField) => void
+  onEdit?: (field: JdField) => void
   title: string
 }) {
   const { t } = useTranslation()
@@ -324,11 +317,11 @@ function AnalysisCategorizedList({
   onEdit,
   title,
 }: {
-  field: "qualificationRequirements" | "requiredSkills"
-  groups: QualificationRequirements | RequiredSkillGroups
+  field: "requirements" | "hardSkills"
+  groups: JobRequirementsResponse | HardSkillsResponse
   icon: LucideIcon
   labels: Record<string, string>
-  onEdit?: (field: JobDescriptionAnalysisModuleField) => void
+  onEdit?: (field: JdField) => void
   title: string
 }) {
   const entries = Object.keys(labels).filter((key) => groups[key as keyof typeof groups].length > 0)
@@ -360,10 +353,10 @@ function AnalysisList({
   onEdit,
   title,
 }: {
-  field: JobDescriptionAnalysisModuleField
+  field: JdField
   icon: LucideIcon
   items: string[]
-  onEdit?: (field: JobDescriptionAnalysisModuleField) => void
+  onEdit?: (field: JdField) => void
   title: string
 }) {
   if (!items.length) return null

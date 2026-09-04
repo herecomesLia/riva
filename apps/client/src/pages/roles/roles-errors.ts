@@ -1,4 +1,4 @@
-export type RolesActionErrorCode = "requestFailed" | "versionConflict"
+export type RolesActionErrorCode = "requestFailed"
 
 export class RolesActionError extends Error {
   readonly code: RolesActionErrorCode

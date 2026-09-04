@@ -11,8 +11,8 @@ const meta = preview.meta({
 
 function dialogArgs(
   field:
-    | "qualificationRequirements"
-    | "requiredSkills"
+    | "requirements"
+    | "hardSkills"
     | "preferredQualifications"
     | "businessDomains"
     | "responsibilities",
@@ -28,14 +28,14 @@ function dialogArgs(
 }
 
 export const EditQualifications = meta.story({
-  args: dialogArgs("qualificationRequirements"),
+  args: dialogArgs("requirements"),
   play: async () => {
     const dialog = await screen.findByRole("dialog")
     await expect(within(dialog).getAllByRole("textbox")[0]!).toBeInTheDocument()
   },
 })
 
-export const EditRequiredSkills = meta.story({ args: dialogArgs("requiredSkills") })
+export const EditRequiredSkills = meta.story({ args: dialogArgs("hardSkills") })
 
 export const EditPreferredQualifications = meta.story({
   args: dialogArgs("preferredQualifications"),

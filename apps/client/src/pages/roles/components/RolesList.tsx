@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import type { TargetRole } from "@/models/roles"
+import type { RoleView } from "@/models/target-role-workflow"
 
 import { RoleStatusBadges } from "./RoleStatusBadges"
 import { getRolesForCategory, type TargetRoleListCategory } from "./roles-list-utils"
@@ -11,7 +11,7 @@ import { getRolesForCategory, type TargetRoleListCategory } from "./roles-list-u
 export function RolesList({
   category,
   className,
-  currentRoleId,
+  activeRoleId,
   onCategoryChange,
   roles,
   selectedRoleId,
@@ -19,9 +19,9 @@ export function RolesList({
 }: {
   category: TargetRoleListCategory
   className?: string
-  currentRoleId: string | null
+  activeRoleId: string | null
   onCategoryChange: (category: TargetRoleListCategory) => void
-  roles: TargetRole[]
+  roles: RoleView[]
   selectedRoleId: string | null
   onSelectRole: (roleId: string) => void
 }) {
@@ -75,7 +75,7 @@ export function RolesList({
           {visibleRoles.map((role) => (
             <div key={role.id} role="listitem">
               <RoleListItem
-                isCurrent={role.id === currentRoleId}
+                isCurrent={role.id === activeRoleId}
                 onSelectRole={onSelectRole}
                 role={role}
                 selected={selectedRoleId === role.id}
@@ -101,11 +101,11 @@ function RoleListItem({
 }: {
   isCurrent: boolean
   onSelectRole: (roleId: string) => void
-  role: TargetRole
+  role: RoleView
   selected: boolean
 }) {
   const { t } = useTranslation()
-  const isArchived = role.status === "archived"
+  const isArchived = role.isArchived
   const score = getRoleMatchScore(role)
 
   return (
@@ -178,9 +178,9 @@ function RoleMatchScoreRing({ archived, score }: { archived: boolean; score: num
   )
 }
 
-function getRoleMatchScore(role: TargetRole): number | null {
-  const analysis = role.matchingAnalysis
-  return analysis?.status === "current" || analysis?.status === "stale"
-    ? analysis.result.overallMatchScore
+function getRoleMatchScore(role: RoleView): number | null {
+  const match = role.matchState
+  return match.status === "current" || match.status === "stale"
+    ? match.result.overallMatchScore
     : null
 }

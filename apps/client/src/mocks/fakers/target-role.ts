@@ -11,8 +11,12 @@ import type {
   UpdateJobDescriptionRequest,
   UpdateTargetRoleRequest,
 } from "@/api/generated/models"
-import type { MatchingAnalysisResult, RecognizeTargetRoleInput } from "@/models/roles"
-import type { JdState, MatchState } from "@/models/target-role-workflow"
+import type {
+  JdState,
+  MatchingAnalysisResult,
+  MatchState,
+  RecognizeRoleInput,
+} from "@/models/target-role-workflow"
 import {
   imageRoleFixture,
   jdFailInput,
@@ -166,7 +170,7 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
     jdTasks.set(roleId, task)
   }
 
-  function staleMatch(roleId: string) {
+  async function staleMatch(roleId: string) {
     const match = matches.get(roleId)
     if (match?.status !== "success") return
     matches.set(roleId, { status: "stale", result: structuredClone(match.result) })
@@ -205,7 +209,7 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
 
     create,
 
-    async recognize(input: RecognizeTargetRoleInput): Promise<TargetRoleResponse> {
+    async recognize(input: RecognizeRoleInput): Promise<CreateTargetRoleRequest> {
       let fixture: CreateTargetRoleRequest
       switch (input.sourceType) {
         case "text":
@@ -218,21 +222,21 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
           fixture = urlRoleFixture
       }
 
-      const role = await create(fixture)
-      startJdTask(role.id, input.sourceType === "text" ? input.text : undefined)
-      return role
+      return structuredClone(fixture)
     },
 
     async parseJd(roleId: string, text: string): Promise<JdState> {
-      requireRole(roleId)
-      staleMatch(roleId)
+      await staleMatch(roleId)
       startJdTask(roleId, text)
       return { status: "parsing" }
     },
 
-    async getJd(roleId: string): Promise<JdState> {
-      const role = requireRole(roleId)
-      const task = jdTasks.get(roleId)
+    async getJd(role: TargetRoleResponse): Promise<JdState> {
+      return toJdState(jdTasks.get(role.id), role.jd)
+    },
+
+    async pollJd(role: TargetRoleResponse): Promise<JdState> {
+      const task = jdTasks.get(role.id)
       if (!task || task.status !== "running") return toJdState(task, role.jd)
 
       if (typeof task.result === "string") {
@@ -240,25 +244,19 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
           status: "failed",
           result: task.result,
         } satisfies TaskRecord<JobDescriptionResponse>
-        jdTasks.set(roleId, failedTask)
+        jdTasks.set(role.id, failedTask)
         return toJdState(failedTask, role.jd)
       }
 
-      const updatedRole = replaceRole({
-        ...role,
-        jd: structuredClone(task.result),
-        updatedAt: nextTime(),
-      })
       const doneTask = {
         status: "success",
         result: task.result,
       } satisfies TaskRecord<JobDescriptionResponse>
-      jdTasks.set(roleId, doneTask)
-      return toJdState(doneTask, updatedRole.jd)
+      jdTasks.set(role.id, doneTask)
+      return toJdState(doneTask, role.jd)
     },
 
     async match(roleId: string): Promise<MatchState> {
-      requireRole(roleId)
       const task = {
         status: "running",
         result: structuredClone(matchResultFixture),
@@ -268,7 +266,10 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
     },
 
     async getMatch(roleId: string): Promise<MatchState> {
-      requireRole(roleId)
+      return toMatchState(matches.get(roleId))
+    },
+
+    async pollMatch(roleId: string): Promise<MatchState> {
       const match = matches.get(roleId)
       if (!match || match.status !== "running") return toMatchState(match)
 
@@ -279,6 +280,8 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
       matches.set(roleId, doneMatch)
       return toMatchState(doneMatch)
     },
+
+    staleMatch,
 
     async update(roleId: string, input: UpdateTargetRoleRequest): Promise<TargetRoleResponse> {
       const role = requireRole(roleId)
@@ -358,7 +361,6 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
         },
         updatedAt: nextTime(),
       })
-      staleMatch(roleId)
       return updatedRole
     },
   }

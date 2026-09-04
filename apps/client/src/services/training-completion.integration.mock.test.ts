@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 import { resetInterviewMockState } from "@/mocks/services/interview"
 import { resetPracticeMockState } from "@/mocks/services/practice"
-import { resetRolesMockState } from "@/mocks/services/roles"
+import { getRolesPage, resetRolesMockState, updateTargetRole } from "@/mocks/services/roles"
 import { resetTrainingRecordsMockState } from "@/mocks/services/training-records"
 import {
   beginInterviewQuestions,
@@ -17,7 +17,6 @@ import {
 import { getDashboardData } from "@/services/dashboard"
 import { endPracticeSession, getPracticePage, requestEndPracticeSession } from "@/services/practice"
 import { getProfile } from "@/services/profile"
-import { getRolesPage, updateTargetRole } from "@/services/roles"
 import {
   getMockInterviewRecord,
   getTargetedPracticeRecord,

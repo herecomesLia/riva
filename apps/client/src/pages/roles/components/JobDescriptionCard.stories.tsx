@@ -3,7 +3,7 @@ import { useState } from "react"
 import preview from "#storybook/preview"
 import { expect, fn, screen } from "storybook/test"
 
-import type { TargetRole } from "@/models/roles"
+import type { RoleView } from "@/models/target-role-workflow"
 
 import {
   createLongJobDescriptionResponse,
@@ -39,7 +39,7 @@ export const SynchronizationError = meta.story({
 function SynchronizationRetryHarness() {
   const parsing = createRoleStoryResponse("roleWithJobDescriptionParsing")
   const ready = createRoleStoryResponse("roleWithParsedJobDescription")
-  const [role, setRole] = useState<TargetRole>(parsing.roles[0]!)
+  const [role, setRole] = useState<RoleView>(parsing.roles[0]!)
   const [synchronizationError, setSynchronizationError] = useState(true)
   return (
     <JobDescriptionCard
@@ -90,7 +90,7 @@ export const EditAnalysisModule = meta.story({
     await userEvent.click(
       screen.getByRole("button", { name: /编辑 任职资格|edit qualifications/i }),
     )
-    await expect(onEditAnalysisModule).toHaveBeenCalledWith("qualificationRequirements")
+    await expect(onEditAnalysisModule).toHaveBeenCalledWith("requirements")
   },
 })
 
@@ -105,13 +105,13 @@ export const LongContent = meta.story({
 export const InternshipJobDescription = meta.story({
   args: (() => {
     const role = roleFor("roleWithParsedJobDescription")
-    if (role.jobDescriptionAnalysis) {
-      role.jobDescriptionAnalysis.qualificationRequirements = {
-        ...role.jobDescriptionAnalysis.qualificationRequirements,
+    if (role.jd) {
+      role.jd.requirements = {
+        ...role.jd.requirements,
         graduationCohorts: ["2027 届"],
         experience: ["有三个月以上前端实习经验"],
       }
-      role.jobDescriptionAnalysis.requiredSkills.platforms = ["云原生平台"]
+      role.jd.hardSkills.platforms = ["云原生平台"]
     }
     return { onEditAnalysisModule: fn(), role, synchronizationError: false }
   })(),
@@ -120,13 +120,13 @@ export const InternshipJobDescription = meta.story({
 export const CampusJobDescription = meta.story({
   args: (() => {
     const role = roleFor("roleWithParsedJobDescription")
-    if (role.jobDescriptionAnalysis) {
-      role.jobDescriptionAnalysis.qualificationRequirements = {
-        ...role.jobDescriptionAnalysis.qualificationRequirements,
+    if (role.jd) {
+      role.jd.requirements = {
+        ...role.jd.requirements,
         graduationCohorts: ["2027 届"],
         experience: ["有 AI Agent 或 LLM 项目经验"],
       }
-      role.jobDescriptionAnalysis.preferredQualifications = ["有开源项目贡献", "有相关竞赛经历"]
+      role.jd.preferredQualifications = ["有开源项目贡献", "有相关竞赛经历"]
     }
     return { onEditAnalysisModule: fn(), role, synchronizationError: false }
   })(),
@@ -143,10 +143,10 @@ export const SocialRecruitmentJobDescription = meta.story({
 export const EmptyOptionalModules = meta.story({
   args: (() => {
     const role = roleFor("roleWithParsedJobDescription")
-    if (role.jobDescriptionAnalysis) {
-      role.jobDescriptionAnalysis.preferredQualifications = []
-      role.jobDescriptionAnalysis.softSkills = []
-      role.jobDescriptionAnalysis.businessDomains = []
+    if (role.jd) {
+      role.jd.preferredQualifications = []
+      role.jd.softSkills = []
+      role.jd.businessDomains = []
     }
     return { onEditAnalysisModule: fn(), role, synchronizationError: false }
   })(),

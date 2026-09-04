@@ -9,25 +9,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { TargetRole } from "@/models/roles"
+import type { RoleView } from "@/models/target-role-workflow"
 
 import { RoleStatusBadges } from "./RoleStatusBadges"
 import { getRolesForCategory, type TargetRoleListCategory } from "./roles-list-utils"
 
 export function MobileTargetRoleSelector({
   category,
-  currentRoleId,
+  activeRoleId,
   onCategoryChange,
   onSelectRole,
   roles,
   selectedRole,
 }: {
   category: TargetRoleListCategory
-  currentRoleId: string | null
+  activeRoleId: string | null
   onCategoryChange: (category: TargetRoleListCategory) => void
   onSelectRole: (roleId: string) => void
-  roles: TargetRole[]
-  selectedRole: TargetRole | null
+  roles: RoleView[]
+  selectedRole: RoleView | null
 }) {
   const { t } = useTranslation()
   const activeCount = getRolesForCategory(roles, "active").length
@@ -78,7 +78,7 @@ export function MobileTargetRoleSelector({
                 <SelectItem key={role.id} value={role.id}>
                   <span className="flex min-w-0 flex-col items-start gap-1.5 py-1">
                     <span className="max-w-56 truncate font-medium">{role.title}</span>
-                    <RoleStatusBadges isCurrent={role.id === currentRoleId} role={role} />
+                    <RoleStatusBadges isCurrent={role.id === activeRoleId} role={role} />
                   </span>
                 </SelectItem>
               ))}

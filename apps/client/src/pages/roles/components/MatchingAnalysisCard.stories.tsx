@@ -23,7 +23,7 @@ const meta = preview.meta({
 function argsFor(scenario: Parameters<typeof createRoleStoryResponse>[0]) {
   const response = createRoleStoryResponse(scenario)
   return {
-    profileContext: response.profileContext,
+    profile: response.profile,
     role: response.roles[0]!,
     synchronizationError: false,
   }
@@ -58,7 +58,7 @@ function SynchronizationRetryHarness() {
         setSynchronizationError(false)
         setResponse(completed)
       }}
-      profileContext={response.profileContext}
+      profile={response.profile}
       role={response.roles[0]!}
       synchronizationError={synchronizationError}
     />
@@ -84,7 +84,7 @@ const staleWhileParsing = createStaleWhileParsingResponse()
 
 export const StaleWhileJobDescriptionParsing = meta.story({
   args: {
-    profileContext: staleWhileParsing.profileContext,
+    profile: staleWhileParsing.profile,
     role: staleWhileParsing.roles[0]!,
     synchronizationError: false,
   },
@@ -94,7 +94,7 @@ const longMatchingAnalysis = createLongMatchingAnalysisResponse()
 
 export const LongMatchingAnalysis = meta.story({
   args: {
-    profileContext: longMatchingAnalysis.profileContext,
+    profile: longMatchingAnalysis.profile,
     role: longMatchingAnalysis.roles[0]!,
     synchronizationError: false,
   },
@@ -108,7 +108,7 @@ function AnalysisFlowHarness({ initialScenario }: { initialScenario: RolesMockSc
   return (
     <MatchingAnalysisCard
       onGenerate={() => setResponse(completed)}
-      profileContext={response.profileContext}
+      profile={response.profile}
       role={role}
       synchronizationError={false}
     />

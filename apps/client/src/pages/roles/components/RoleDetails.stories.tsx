@@ -17,9 +17,9 @@ function DetailsHarness({ initialTab = "overview" }: { initialTab?: TargetRoleTa
   return (
     <RoleDetails
       activeTab={activeTab}
-      currentRoleId={response.currentRoleId}
+      activeRoleId={response.activeRoleId}
       onTabChange={setActiveTab}
-      profileContext={response.profileContext}
+      profile={response.profile}
       role={response.roles[0]!}
     />
   )
@@ -28,13 +28,13 @@ function DetailsHarness({ initialTab = "overview" }: { initialTab?: TargetRoleTa
 function ArchivedDetailsHarness() {
   const [activeTab, setActiveTab] = useState<TargetRoleTab>("overview")
   const response = createRoleStoryResponse("archivedRoles")
-  const archivedRole = response.roles.find((role) => role.status === "archived")!
+  const archivedRole = response.roles.find((role) => role.isArchived)!
   return (
     <RoleDetails
       activeTab={activeTab}
-      currentRoleId={response.currentRoleId}
+      activeRoleId={response.activeRoleId}
       onTabChange={setActiveTab}
-      profileContext={response.profileContext}
+      profile={response.profile}
       role={archivedRole}
     />
   )

@@ -3,7 +3,7 @@ import { useState } from "react"
 import preview from "#storybook/preview"
 import { expect, fn, screen, waitFor, within } from "storybook/test"
 
-import type { RecognizeTargetRoleInput } from "@/models/roles"
+import type { RecognizeRoleInput } from "@/models/target-role-workflow"
 
 import { TargetRoleCreationDialog } from "./TargetRoleCreationDialog"
 
@@ -12,7 +12,7 @@ const meta = preview.meta({
   title: "Roles/TargetRoleCreationDialog",
 })
 
-function recognize(input: RecognizeTargetRoleInput) {
+function recognize(input: RecognizeRoleInput) {
   void input
   return Promise.resolve()
 }
@@ -38,9 +38,10 @@ export const Manual = meta.story({
   play: async ({ userEvent }) => {
     const dialog = await screen.findByRole("dialog")
     await userEvent.click(within(dialog).getByRole("button", { name: /手动填写|enter manually/i }))
-    await expect(
-      screen.findByRole("dialog", { name: /手动填写目标岗位|enter target role manually/i }),
-    ).resolves.toBeVisible()
+    const manualDialog = await screen.findByRole("dialog", {
+      name: /手动填写目标岗位|enter target role manually/i,
+    })
+    await waitFor(() => expect(manualDialog).toBeVisible())
   },
 })
 

@@ -53,15 +53,12 @@ import {
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
-import type {
-  CreateTargetRoleInput,
-  RecognizeTargetRoleInput,
-  TargetRoleImportSourceType,
-} from "@/models/roles"
+import type { CreateTargetRoleRequest } from "@/api/generated/models"
+import type { RecognizeRoleInput } from "@/models/target-role-workflow"
 
 import { RoleEditorForm } from "./RoleEditorDialog"
 
-type CreationMethod = "manual" | TargetRoleImportSourceType
+type CreationMethod = "manual" | RecognizeRoleInput["sourceType"]
 type RecognitionInputError = "imageRequired" | "textRequired" | "urlInvalid" | null
 
 const creationMethods = [
@@ -80,9 +77,9 @@ export function TargetRoleCreationDialog({
   open,
 }: {
   onDirtyChange: (isDirty: boolean) => void
-  onManualCreate: (input: CreateTargetRoleInput) => Promise<void>
+  onManualCreate: (input: CreateTargetRoleRequest) => Promise<void>
   onOpenChange: (open: boolean) => void
-  onRecognize: (input: RecognizeTargetRoleInput) => Promise<void>
+  onRecognize: (input: RecognizeRoleInput) => Promise<void>
   onSaved: () => void
   open: boolean
 }) {
@@ -450,7 +447,7 @@ function createRecognitionInput(
   text: string,
   images: File[],
   url: string,
-): RecognizeTargetRoleInput | null {
+): RecognizeRoleInput | null {
   if (method === "text") return text.trim() ? { sourceType: "text", text: text.trim() } : null
   if (method === "image") return images.length > 0 ? { sourceType: "image", images } : null
   if (method !== "url") return null

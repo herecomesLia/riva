@@ -1,149 +1,91 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useRef, useState } from "react"
 
-import type {
-  GetJobDescriptionParsingStatusInput,
-  RolesPageResponse,
-  TargetRole,
-} from "@/models/roles"
-import { getJobDescriptionParsingStatus } from "@/services/roles"
+import type { RolesData, RoleView } from "@/models/target-role-workflow"
+import { pollJd } from "@/services/roles"
 
 export const ROLES_QUERY_KEY = ["roles"] as const
 export const JOB_DESCRIPTION_POLL_INTERVAL_MS = 1000
 
 type PollingController = {
-  input: GetJobDescriptionParsingStatusInput
+  roleId: string
   timer: ReturnType<typeof setTimeout> | null
 }
 
-function createOperationKey(input: GetJobDescriptionParsingStatusInput) {
-  return `${input.roleId}:${input.version}:${input.jobDescriptionVersion}`
-}
-
-function getParsingInput(role: TargetRole): GetJobDescriptionParsingStatusInput | null {
-  if (role.jobDescription.status !== "parsing") return null
-  return {
-    roleId: role.id,
-    version: role.version,
-    jobDescriptionVersion: role.jobDescription.version,
-  }
-}
-
-function responseMatchesOperation(role: TargetRole, input: GetJobDescriptionParsingStatusInput) {
-  return (
-    role.id === input.roleId &&
-    role.jobDescription.status !== "missing" &&
-    role.jobDescription.version === input.jobDescriptionVersion
-  )
-}
-
-export function useJobDescriptionSynchronization(data: RolesPageResponse | undefined) {
+export function useJobDescriptionSynchronization(data: RolesData | undefined) {
   const queryClient = useQueryClient()
   const [synchronizationErrorRoleIds, setSynchronizationErrorRoleIds] = useState<string[]>([])
   const mountedRef = useRef(true)
-  const activeControllersRef = useRef(new Map<string, PollingController>())
-  const failedOperationKeysRef = useRef(new Set<string>())
+  const controllersRef = useRef(new Map<string, PollingController>())
+  const failedRoleIdsRef = useRef(new Set<string>())
 
-  const isCurrentOperation = useCallback(
-    (input: GetJobDescriptionParsingStatusInput) => {
-      const current = queryClient.getQueryData<RolesPageResponse>(ROLES_QUERY_KEY)
-      const role = current?.roles.find((candidate) => candidate.id === input.roleId)
-      return (
-        role?.version === input.version &&
-        role.jobDescription.status === "parsing" &&
-        role.jobDescription.version === input.jobDescriptionVersion
-      )
+  const getParsingRole = useCallback(
+    (roleId: string) => {
+      const current = queryClient.getQueryData<RolesData>(ROLES_QUERY_KEY)
+      const role = current?.roles.find((item) => item.id === roleId)
+      return role?.jdState.status === "parsing" ? role : null
     },
     [queryClient],
   )
 
-  const clearFailedOperations = useCallback((roleId: string) => {
-    for (const operationKey of failedOperationKeysRef.current) {
-      if (operationKey.startsWith(`${roleId}:`)) {
-        failedOperationKeysRef.current.delete(operationKey)
-      }
-    }
+  const clearSynchronizationError = useCallback((roleId: string) => {
+    failedRoleIdsRef.current.delete(roleId)
+    if (!mountedRef.current) return
+    setSynchronizationErrorRoleIds((current) =>
+      current.includes(roleId) ? current.filter((item) => item !== roleId) : current,
+    )
   }, [])
 
-  const clearSynchronizationError = useCallback(
-    (roleId: string) => {
-      clearFailedOperations(roleId)
-      if (!mountedRef.current) return
-      setSynchronizationErrorRoleIds((current) =>
-        current.includes(roleId) ? current.filter((candidate) => candidate !== roleId) : current,
-      )
-    },
-    [clearFailedOperations],
-  )
-
-  const stopController = useCallback((roleId: string, controller: PollingController) => {
+  const stop = useCallback((controller: PollingController) => {
     if (controller.timer !== null) clearTimeout(controller.timer)
-    if (activeControllersRef.current.get(roleId) === controller) {
-      activeControllersRef.current.delete(roleId)
+    if (controllersRef.current.get(controller.roleId) === controller) {
+      controllersRef.current.delete(controller.roleId)
     }
   }, [])
 
-  const mergeRoleSnapshot = useCallback(
-    (
-      role: TargetRole,
-      input: GetJobDescriptionParsingStatusInput,
-      controller: PollingController,
-    ) => {
-      let merged = false
-      queryClient.setQueryData<RolesPageResponse>(ROLES_QUERY_KEY, (current) => {
-        if (!mountedRef.current || activeControllersRef.current.get(input.roleId) !== controller) {
+  const mergeRole = useCallback(
+    (role: RoleView, controller: PollingController) => {
+      queryClient.setQueryData<RolesData>(ROLES_QUERY_KEY, (current) => {
+        if (!current || !mountedRef.current || controllersRef.current.get(role.id) !== controller) {
           return current
         }
-        const currentRole = current?.roles.find((candidate) => candidate.id === input.roleId)
-        if (
-          !current ||
-          currentRole?.version !== input.version ||
-          currentRole.jobDescription.status !== "parsing" ||
-          currentRole.jobDescription.version !== input.jobDescriptionVersion ||
-          !responseMatchesOperation(role, input)
-        ) {
-          return current
-        }
-        merged = true
+        const currentRole = current.roles.find((item) => item.id === role.id)
+        if (currentRole?.jdState.status !== "parsing") return current
         return {
           ...current,
-          roles: current.roles.map((candidate) =>
-            candidate.id === input.roleId ? role : candidate,
-          ),
+          roles: current.roles.map((item) => (item.id === role.id ? role : item)),
         }
       })
-      return merged
     },
     [queryClient],
   )
 
   const pollRef = useRef<(controller: PollingController) => Promise<void>>(async () => {})
-
   const poll = useCallback(
     async (controller: PollingController) => {
-      const input = controller.input
+      const role = getParsingRole(controller.roleId)
       if (
         !mountedRef.current ||
-        activeControllersRef.current.get(input.roleId) !== controller ||
-        !isCurrentOperation(input)
+        controllersRef.current.get(controller.roleId) !== controller ||
+        !role
       ) {
-        stopController(input.roleId, controller)
+        stop(controller)
         return
       }
 
-      let role: TargetRole
+      let nextRole: RoleView
       try {
-        role = await getJobDescriptionParsingStatus(input)
+        nextRole = await pollJd(role)
       } catch {
         if (
           mountedRef.current &&
-          activeControllersRef.current.get(input.roleId) === controller &&
-          isCurrentOperation(input)
+          controllersRef.current.get(controller.roleId) === controller &&
+          getParsingRole(controller.roleId)
         ) {
-          failedOperationKeysRef.current.add(createOperationKey(input))
-          stopController(input.roleId, controller)
+          failedRoleIdsRef.current.add(controller.roleId)
+          stop(controller)
           setSynchronizationErrorRoleIds((current) =>
-            current.includes(input.roleId) ? current : [...current, input.roleId],
+            current.includes(controller.roleId) ? current : [...current, controller.roleId],
           )
         }
         return
@@ -151,93 +93,65 @@ export function useJobDescriptionSynchronization(data: RolesPageResponse | undef
 
       if (
         !mountedRef.current ||
-        activeControllersRef.current.get(input.roleId) !== controller ||
-        !isCurrentOperation(input)
+        controllersRef.current.get(controller.roleId) !== controller ||
+        !getParsingRole(controller.roleId)
       ) {
-        stopController(input.roleId, controller)
+        stop(controller)
         return
       }
 
-      const nextInput = getParsingInput(role)
-      if (nextInput) controller.input = nextInput
-      if (!mergeRoleSnapshot(role, input, controller)) {
-        stopController(input.roleId, controller)
+      mergeRole(nextRole, controller)
+      clearSynchronizationError(controller.roleId)
+      if (nextRole.jdState.status !== "parsing") {
+        stop(controller)
         return
       }
-
-      clearSynchronizationError(input.roleId)
-      if (!nextInput) {
-        stopController(input.roleId, controller)
-        return
-      }
-
       controller.timer = setTimeout(
         () => void pollRef.current(controller),
         JOB_DESCRIPTION_POLL_INTERVAL_MS,
       )
     },
-    [clearSynchronizationError, isCurrentOperation, mergeRoleSnapshot, stopController],
+    [clearSynchronizationError, getParsingRole, mergeRole, stop],
   )
   pollRef.current = poll
 
-  const startPolling = useCallback(
-    (input: GetJobDescriptionParsingStatusInput) => {
-      if (!mountedRef.current || failedOperationKeysRef.current.has(createOperationKey(input))) {
-        return
-      }
-      const existing = activeControllersRef.current.get(input.roleId)
-      if (existing && createOperationKey(existing.input) === createOperationKey(input)) return
-      if (existing) stopController(input.roleId, existing)
+  const start = useCallback((roleId: string) => {
+    if (!mountedRef.current || failedRoleIdsRef.current.has(roleId)) return
+    if (controllersRef.current.has(roleId)) return
+    const controller: PollingController = { roleId, timer: null }
+    controllersRef.current.set(roleId, controller)
+    void pollRef.current(controller)
+  }, [])
 
-      const controller: PollingController = { input, timer: null }
-      activeControllersRef.current.set(input.roleId, controller)
-      void pollRef.current(controller)
-    },
-    [stopController],
-  )
   const restartSynchronization = useCallback(
-    (input: GetJobDescriptionParsingStatusInput) => {
-      const current = queryClient.getQueryData<RolesPageResponse>(ROLES_QUERY_KEY)
-      if (!current || !isCurrentOperation(input)) return null
-      clearFailedOperations(input.roleId)
-      startPolling(input)
-      return current
+    (roleId: string) => {
+      if (!getParsingRole(roleId)) return false
+      clearSynchronizationError(roleId)
+      start(roleId)
+      return true
     },
-    [clearFailedOperations, isCurrentOperation, queryClient, startPolling],
+    [clearSynchronizationError, getParsingRole, start],
   )
 
   useEffect(() => {
-    const activeControllers = activeControllersRef.current
+    const controllers = controllersRef.current
     mountedRef.current = true
     return () => {
       mountedRef.current = false
-      for (const controller of activeControllers.values()) {
-        if (controller.timer !== null) clearTimeout(controller.timer)
-      }
-      activeControllers.clear()
+      for (const controller of controllers.values()) stop(controller)
     }
-  }, [])
+  }, [stop])
 
   useEffect(() => {
     if (!data) return
-
-    for (const [roleId, controller] of activeControllersRef.current) {
-      const role = data.roles.find((candidate) => candidate.id === roleId)
-      const input = role ? getParsingInput(role) : null
-      if (!input || createOperationKey(input) !== createOperationKey(controller.input)) {
-        stopController(roleId, controller)
-      }
+    for (const controller of controllersRef.current.values()) {
+      const role = data.roles.find((item) => item.id === controller.roleId)
+      if (role?.jdState.status !== "parsing") stop(controller)
     }
-
     for (const role of data.roles) {
-      const input = getParsingInput(role)
-      if (input) startPolling(input)
+      if (role.jdState.status === "parsing") start(role.id)
     }
-  }, [data, startPolling, stopController])
+  }, [data, start, stop])
 
-  return {
-    clearSynchronizationError,
-    restartSynchronization,
-    synchronizationErrorRoleIds,
-  }
+  return { clearSynchronizationError, restartSynchronization, synchronizationErrorRoleIds }
 }

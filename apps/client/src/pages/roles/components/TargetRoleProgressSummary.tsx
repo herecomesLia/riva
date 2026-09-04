@@ -2,17 +2,18 @@ import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import type { TargetRole } from "@/models/roles"
+import type { RoleView } from "@/models/target-role-workflow"
 
 export function TargetRoleProgressSummary({
   isCurrent,
   role,
 }: {
   isCurrent: boolean
-  role: TargetRole
+  role: RoleView
 }) {
   const { i18n, t } = useTranslation()
-  const matchingStatus = role.matchingAnalysis?.status ?? "none"
+  const matchingStatus = role.matchState.status
+  const roleStatus = role.isArchived ? "archived" : "active"
   const updatedAt = new Intl.DateTimeFormat(i18n.language, {
     dateStyle: "medium",
     timeStyle: "short",
@@ -32,13 +33,13 @@ export function TargetRoleProgressSummary({
             label={t("roles.summary.roleStatus")}
             value={
               isCurrent
-                ? `${t("roles.badges.current")} · ${t(`roles.status.${role.status}`)}`
-                : t(`roles.status.${role.status}`)
+                ? `${t("roles.badges.current")} · ${t(`roles.status.${roleStatus}`)}`
+                : t(`roles.status.${roleStatus}`)
             }
           />
           <SummaryRow
             label={t("roles.summary.jobDescription")}
-            value={t(`roles.jobDescriptionStatus.${role.jobDescription.status}.label`)}
+            value={t(`roles.jobDescriptionStatus.${role.jdState.status}.label`)}
           />
           <SummaryRow
             label={t("roles.summary.matchingAnalysis")}

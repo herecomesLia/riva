@@ -10,13 +10,13 @@ function createActions(overrides: Partial<RoleDetailsActions> = {}): RoleDetails
     archive: fn(),
     delete: fn(),
     edit: fn(),
-    editJobDescription: fn(),
-    generateMatchingAnalysis: fn(),
-    retryJobDescriptionSynchronization: fn(),
-    retryMatchingAnalysisSynchronization: fn(),
+    editJd: fn(),
+    generateMatch: fn(),
+    retryJdSynchronization: fn(),
+    retryMatchSynchronization: fn(),
     restore: fn(),
     setCurrent: fn(),
-    editJobDescriptionAnalysisModule: fn(),
+    editJdField: fn(),
     ...overrides,
   }
 }
@@ -28,11 +28,9 @@ const meta = preview.meta({
 
 const readyRole = createRoleStoryResponse("matchingAnalysisCurrent").roles[0]!
 const activeRole = createRoleStoryResponse("multipleRoles").roles.find(
-  (role) => role.id !== createRoleStoryResponse("multipleRoles").currentRoleId,
+  (role) => role.id !== createRoleStoryResponse("multipleRoles").activeRoleId,
 )!
-const archivedRole = createRoleStoryResponse("archivedRoles").roles.find(
-  (role) => role.status === "archived",
-)!
+const archivedRole = createRoleStoryResponse("archivedRoles").roles.find((role) => role.isArchived)!
 
 export const CompleteRole = meta.story({
   args: { actions: createActions(), isCurrent: true, role: readyRole },
