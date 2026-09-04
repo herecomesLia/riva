@@ -2,7 +2,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from riva.db import Database
-from riva.tasks.schema import reset_task_schema, setup_task_schema
+from riva.tasks import reset_task_schema, setup_task_schema
 
 
 async def _table_exists(

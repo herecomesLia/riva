@@ -5,8 +5,7 @@ from sqlalchemy import select, text
 
 from riva.db import Database
 from riva.models import User
-from riva.tasks.dispatch import cancel_job, defer_job
-from riva.tasks.schema import reset_task_schema
+from riva.tasks import cancel_job, defer_job, reset_task_schema
 
 task_app = procrastinate.App(connector=procrastinate.PsycopgConnector())
 

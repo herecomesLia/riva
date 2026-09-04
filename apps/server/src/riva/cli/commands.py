@@ -10,7 +10,7 @@ from rich import print_json
 from riva.core.app import create_app
 from riva.core.config import Settings
 from riva.core.logging import LogFormat, LogLevel, configure_logging
-from riva.tasks.worker import run_worker
+from riva.tasks import run_worker
 
 
 def start(
