@@ -1,4 +1,4 @@
-from riva.core.config import SameSitePolicy, Settings
+from riva.core.config import LLMSettings, SameSitePolicy, Settings, TaskSettings
 from riva.core.logging import LogFormat, LogLevel
 
 # Settings requires a URL even when a unit test never opens a database connection.
@@ -14,6 +14,8 @@ def make_test_settings(**overrides: object) -> Settings:
         "log_level": LogLevel.INFO,
         "log_format": LogFormat.CONSOLE,
         "database_url": PLACEHOLDER_DATABASE_URL,
+        "llm": LLMSettings(),
+        "tasks": TaskSettings(),
         "cors_allowed_origins": [TEST_ORIGIN],
         "cors_allow_credentials": True,
         "session_digest_key": TEST_SESSION_DIGEST_KEY,
