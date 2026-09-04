@@ -42,7 +42,7 @@ async def require_current_user(
     user_service: UserServiceDep,
 ) -> User:
     settings = request.app.state.settings
-    token = request.cookies.get(settings.session_cookie_name)
+    token = request.cookies.get(settings.session.cookie_name)
     if token is None:
         raise AuthRequiredError()
 

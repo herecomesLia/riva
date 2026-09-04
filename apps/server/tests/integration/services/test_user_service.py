@@ -26,7 +26,7 @@ PASSWORD = "ValidPass123!"
 
 def _token_digest(token: str, settings: Settings) -> str:
     return hmac.new(
-        settings.session_digest_key.encode(),
+        settings.session.digest_key.encode(),
         token.encode(),
         hashlib.sha256,
     ).hexdigest()
@@ -188,7 +188,7 @@ class TestCurrentSession:
         settings: Settings,
         clock: Clock,
     ) -> None:
-        settings.session_idle_timeout_seconds = 60
+        settings.session.idle_timeout_seconds = 60
         registered = await user_service.register(USERNAME, PASSWORD)
         clock.advance(seconds=60)
 
@@ -236,7 +236,7 @@ class TestCurrentSession:
         auth_session = await _auth_session(db_session, registered.token, settings)
         assert auth_session.last_seen_at == clock.now
         assert auth_session.expires_at == clock.now + timedelta(
-            seconds=settings.session_idle_timeout_seconds
+            seconds=settings.session.idle_timeout_seconds
         )
 
 

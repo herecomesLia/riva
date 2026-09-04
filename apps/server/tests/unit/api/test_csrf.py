@@ -5,7 +5,7 @@ from fastapi import Request
 
 from riva.api.csrf import csrf_protect
 from riva.api.errors import CsrfFailedError
-from riva.core.config import Settings
+from riva.core.config import CORSSettings, Settings
 from tests.support.settings import make_test_settings
 
 
@@ -56,7 +56,9 @@ async def test_csrf_allows_same_origin() -> None:
 
 
 async def test_csrf_allows_configured_cors_origin() -> None:
-    settings = make_test_settings(cors_allowed_origins=["https://client.test"])
+    settings = make_test_settings(
+        cors=CORSSettings(allowed_origins=["https://client.test"])
+    )
     request = _request(
         "POST",
         settings=settings,
@@ -67,7 +69,9 @@ async def test_csrf_allows_configured_cors_origin() -> None:
 
 
 async def test_csrf_uses_referer_as_fallback() -> None:
-    settings = make_test_settings(cors_allowed_origins=["https://client.test"])
+    settings = make_test_settings(
+        cors=CORSSettings(allowed_origins=["https://client.test"])
+    )
     request = _request(
         "POST",
         settings=settings,
@@ -91,7 +95,9 @@ async def test_csrf_rejects_invalid_source(headers: dict[str, str]) -> None:
 
 
 async def test_csrf_does_not_fallback_when_origin_is_present() -> None:
-    settings = make_test_settings(cors_allowed_origins=["https://client.test"])
+    settings = make_test_settings(
+        cors=CORSSettings(allowed_origins=["https://client.test"])
+    )
     request = _request(
         "POST",
         settings=settings,

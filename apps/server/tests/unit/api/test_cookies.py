@@ -3,7 +3,7 @@ from http.cookies import Morsel, SimpleCookie
 from fastapi import Response
 
 from riva.api.cookies import delete_session_cookie, set_session_cookie
-from riva.core.config import SameSitePolicy
+from riva.core.config import SameSitePolicy, SessionSettings
 from tests.support.settings import make_test_settings
 
 
@@ -19,7 +19,7 @@ def test_set_session_cookie_uses_secure_defaults() -> None:
 
     set_session_cookie(response, settings, "session-token")
 
-    cookie = _cookie(response, settings.session_cookie_name)
+    cookie = _cookie(response, settings.session.cookie_name)
     assert cookie.value == "session-token"
     assert cookie["max-age"] == "604800"
     assert cookie["httponly"] is True
@@ -30,11 +30,14 @@ def test_set_session_cookie_uses_secure_defaults() -> None:
 
 def test_set_session_cookie_uses_custom_settings() -> None:
     settings = make_test_settings(
-        session_cookie_name="custom_session",
-        session_cookie_secure=False,
-        session_cookie_samesite=SameSitePolicy.STRICT,
-        session_cookie_path="/api",
-        session_idle_timeout_seconds=60,
+        session=SessionSettings(
+            digest_key="test-digest-key",
+            cookie_name="custom_session",
+            cookie_secure=False,
+            cookie_samesite=SameSitePolicy.STRICT,
+            cookie_path="/api",
+            idle_timeout_seconds=60,
+        )
     )
     response = Response()
 
@@ -51,9 +54,12 @@ def test_set_session_cookie_uses_custom_settings() -> None:
 
 def test_delete_session_cookie_uses_matching_settings() -> None:
     settings = make_test_settings(
-        session_cookie_name="custom_session",
-        session_cookie_samesite=SameSitePolicy.STRICT,
-        session_cookie_path="/api",
+        session=SessionSettings(
+            digest_key="test-digest-key",
+            cookie_name="custom_session",
+            cookie_samesite=SameSitePolicy.STRICT,
+            cookie_path="/api",
+        )
     )
     response = Response()
 

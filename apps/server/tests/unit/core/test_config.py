@@ -3,7 +3,14 @@ import os
 import pytest
 from pydantic import ValidationError
 
-from riva.core.config import LLMSettings, SameSitePolicy, Settings, TaskSettings
+from riva.core.config import (
+    CORSSettings,
+    LLMSettings,
+    SameSitePolicy,
+    SessionSettings,
+    Settings,
+    TaskSettings,
+)
 
 DATABASE_URL = "postgresql+psycopg://test:test@invalid/test"
 SESSION_DIGEST_KEY = "valid-session-digest-key"
@@ -17,12 +24,16 @@ def clear_riva_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(f"RIVA_LLM_{field_name.upper()}", raising=False)
     for field_name in TaskSettings.model_fields:
         monkeypatch.delenv(f"RIVA_TASKS_{field_name.upper()}", raising=False)
+    for field_name in CORSSettings.model_fields:
+        monkeypatch.delenv(f"RIVA_CORS_{field_name.upper()}", raising=False)
+    for field_name in SessionSettings.model_fields:
+        monkeypatch.delenv(f"RIVA_SESSION_{field_name.upper()}", raising=False)
 
 
 def _settings(**overrides: object) -> Settings:
     values: dict[str, object] = {
         "database_url": DATABASE_URL,
-        "session_digest_key": SESSION_DIGEST_KEY,
+        "session": SessionSettings(digest_key=SESSION_DIGEST_KEY),
     }
     values.update(overrides)
     return Settings(**values)
@@ -31,19 +42,19 @@ def _settings(**overrides: object) -> Settings:
 def test_settings_uses_production_defaults() -> None:
     settings = Settings(
         database_url=DATABASE_URL,
-        session_digest_key=SESSION_DIGEST_KEY,
+        session={"digest_key": SESSION_DIGEST_KEY},
     )
 
     assert settings.host == "127.0.0.1"
     assert settings.port == 7482
-    assert settings.cors_allowed_origins == []
-    assert settings.cors_allow_credentials is True
-    assert settings.session_cookie_name == "riva_session"
-    assert settings.session_cookie_secure is True
-    assert settings.session_cookie_samesite == SameSitePolicy.LAX
-    assert settings.session_cookie_path == "/"
-    assert settings.session_idle_timeout_seconds == 604800
-    assert settings.session_refresh_interval_seconds == 300
+    assert settings.cors.allowed_origins == []
+    assert settings.cors.allow_credentials is True
+    assert settings.session.cookie_name == "riva_session"
+    assert settings.session.cookie_secure is True
+    assert settings.session.cookie_samesite == SameSitePolicy.LAX
+    assert settings.session.cookie_path == "/"
+    assert settings.session.idle_timeout_seconds == 604800
+    assert settings.session.refresh_interval_seconds == 300
 
 
 @pytest.mark.parametrize(
@@ -56,40 +67,37 @@ def test_settings_uses_production_defaults() -> None:
         (["https://a.test", "https://b.test"], ["https://a.test", "https://b.test"]),
     ],
 )
-def test_settings_parses_cors_allowed_origins(
+def test_cors_settings_parses_allowed_origins(
     value: object,
     expected: list[str],
 ) -> None:
-    settings = _settings(cors_allowed_origins=value)
+    settings = CORSSettings(allowed_origins=value)
 
-    assert settings.cors_allowed_origins == expected
+    assert settings.allowed_origins == expected
 
 
-def test_settings_rejects_wildcard_origin_with_credentials() -> None:
+def test_cors_settings_rejects_wildcard_origin_with_credentials() -> None:
     with pytest.raises(ValidationError, match=r"cannot contain '\*'"):
-        _settings(cors_allowed_origins=["*"], cors_allow_credentials=True)
+        CORSSettings(allowed_origins=["*"], allow_credentials=True)
 
 
-def test_settings_allows_wildcard_origin_without_credentials() -> None:
-    settings = _settings(
-        cors_allowed_origins=["*"],
-        cors_allow_credentials=False,
-    )
+def test_cors_settings_allows_wildcard_origin_without_credentials() -> None:
+    settings = CORSSettings(allowed_origins=["*"], allow_credentials=False)
 
-    assert settings.cors_allowed_origins == ["*"]
+    assert settings.allowed_origins == ["*"]
 
 
-@pytest.mark.parametrize("session_digest_key", ["", "   "])
-def test_settings_rejects_blank_session_digest_key(session_digest_key: str) -> None:
+@pytest.mark.parametrize("digest_key", ["", "   "])
+def test_session_settings_rejects_blank_digest_key(digest_key: str) -> None:
     with pytest.raises(ValidationError, match="must not be empty"):
-        _settings(session_digest_key=session_digest_key)
+        SessionSettings(digest_key=digest_key)
 
 
-def test_settings_accepts_non_blank_session_digest_key() -> None:
-    assert _settings(session_digest_key="valid-key").session_digest_key == "valid-key"
+def test_session_settings_accepts_non_blank_digest_key() -> None:
+    assert SessionSettings(digest_key="valid-key").digest_key == "valid-key"
 
 
-def test_settings_treats_empty_llm_base_url_as_not_configured(
+def test_llm_settings_treats_empty_base_url_as_not_configured(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("RIVA_LLM_BASE_URL", "")
@@ -110,11 +118,11 @@ def test_settings_treats_empty_llm_base_url_as_not_configured(
         {"base_url": "https://llm.test/v1", "api_key": "   "},
     ],
 )
-def test_settings_requires_model_and_api_key_when_llm_is_configured(
+def test_llm_settings_requires_model_and_api_key_when_configured(
     llm: dict[str, object],
 ) -> None:
     with pytest.raises(ValidationError):
-        _settings(llm=llm)
+        LLMSettings(**llm)
 
 
 def test_settings_loads_llm_environment(
@@ -134,6 +142,22 @@ def test_settings_loads_llm_environment(
     assert settings.llm.health_ttl_seconds == 12
 
 
+def test_settings_loads_nested_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RIVA_CORS_ALLOWED_ORIGINS", "https://a.test, https://b.test")
+    monkeypatch.setenv("RIVA_CORS_ALLOW_CREDENTIALS", "false")
+    monkeypatch.setenv("RIVA_SESSION_DIGEST_KEY", SESSION_DIGEST_KEY)
+    monkeypatch.setenv("RIVA_SESSION_COOKIE_NAME", "custom_session")
+
+    settings = Settings(database_url=DATABASE_URL)
+
+    assert settings.cors.allowed_origins == ["https://a.test", "https://b.test"]
+    assert settings.cors.allow_credentials is False
+    assert settings.session.digest_key == SESSION_DIGEST_KEY
+    assert settings.session.cookie_name == "custom_session"
+
+
 def test_settings_loads_task_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -146,94 +170,100 @@ def test_settings_loads_task_environment(
     assert settings.tasks.shutdown_timeout_seconds == 12.5
 
 
+def _session(**overrides: object) -> SessionSettings:
+    values: dict[str, object] = {"digest_key": SESSION_DIGEST_KEY}
+    values.update(overrides)
+    return SessionSettings(**values)
+
+
 @pytest.mark.parametrize(
     ("overrides", "is_valid"),
     [
         (
             {
-                "session_cookie_name": "__Host-riva",
-                "session_cookie_secure": True,
-                "session_cookie_path": "/",
+                "cookie_name": "__Host-riva",
+                "cookie_secure": True,
+                "cookie_path": "/",
             },
             True,
         ),
         (
             {
-                "session_cookie_name": "__Host-riva",
-                "session_cookie_secure": False,
+                "cookie_name": "__Host-riva",
+                "cookie_secure": False,
             },
             False,
         ),
         (
             {
-                "session_cookie_name": "__Host-riva",
-                "session_cookie_path": "/api",
+                "cookie_name": "__Host-riva",
+                "cookie_path": "/api",
             },
             False,
         ),
         (
             {
-                "session_cookie_name": "riva_session",
-                "session_cookie_secure": False,
+                "cookie_name": "riva_session",
+                "cookie_secure": False,
             },
             True,
         ),
     ],
 )
-def test_settings_enforces_host_cookie_requirements(
+def test_session_settings_enforces_host_cookie_requirements(
     overrides: dict[str, object],
     is_valid: bool,
 ) -> None:
     if is_valid:
-        _settings(**overrides)
+        _session(**overrides)
         return
 
     with pytest.raises(ValidationError, match="__Host- cookies require"):
-        _settings(**overrides)
+        _session(**overrides)
 
 
 @pytest.mark.parametrize(
     ("secure", "is_valid"),
     [(True, True), (False, False)],
 )
-def test_settings_requires_secure_cookie_for_samesite_none(
+def test_session_settings_requires_secure_cookie_for_samesite_none(
     secure: bool,
     is_valid: bool,
 ) -> None:
     if is_valid:
-        _settings(
-            session_cookie_samesite=SameSitePolicy.NONE,
-            session_cookie_secure=secure,
+        _session(
+            cookie_samesite=SameSitePolicy.NONE,
+            cookie_secure=secure,
         )
         return
 
     with pytest.raises(ValidationError, match="SameSite=None cookies require"):
-        _settings(
-            session_cookie_samesite=SameSitePolicy.NONE,
-            session_cookie_secure=secure,
+        _session(
+            cookie_samesite=SameSitePolicy.NONE,
+            cookie_secure=secure,
         )
 
 
 @pytest.mark.parametrize(
     ("field_name", "value", "is_valid"),
     [
-        ("session_idle_timeout_seconds", 0, False),
-        ("session_idle_timeout_seconds", 1, True),
-        ("session_refresh_interval_seconds", -1, False),
-        ("session_refresh_interval_seconds", 0, True),
+        ("idle_timeout_seconds", 0, False),
+        ("idle_timeout_seconds", 1, True),
+        ("refresh_interval_seconds", -1, False),
+        ("refresh_interval_seconds", 0, True),
     ],
 )
-def test_settings_validates_session_timeout_boundaries(
+def test_session_settings_validates_timeout_boundaries(
     field_name: str,
     value: int,
     is_valid: bool,
 ) -> None:
     if is_valid:
-        assert getattr(_settings(**{field_name: value}), field_name) == value
+        assert getattr(_session(**{field_name: value}), field_name) == value
         return
 
     with pytest.raises(ValidationError):
-        _settings(**{field_name: value})
+        _session(**{field_name: value})
 
 
 def test_write_environ_writes_all_settings(
@@ -245,15 +275,19 @@ def test_write_environ_writes_all_settings(
         log_level="debug",
         log_format="json",
         database_url="postgresql+psycopg://riva:riva@db/riva",
-        cors_allowed_origins=["https://a.test", "https://b.test"],
-        cors_allow_credentials=False,
-        session_digest_key="digest-key",
-        session_cookie_name="custom_session",
-        session_cookie_secure=False,
-        session_cookie_samesite=SameSitePolicy.STRICT,
-        session_cookie_path="/api",
-        session_idle_timeout_seconds=60,
-        session_refresh_interval_seconds=0,
+        cors={
+            "allowed_origins": ["https://a.test", "https://b.test"],
+            "allow_credentials": False,
+        },
+        session={
+            "digest_key": "digest-key",
+            "cookie_name": "custom_session",
+            "cookie_secure": False,
+            "cookie_samesite": SameSitePolicy.STRICT,
+            "cookie_path": "/api",
+            "idle_timeout_seconds": 60,
+            "refresh_interval_seconds": 0,
+        },
         llm={
             "model": "test-model",
             "api_key": "test-key",

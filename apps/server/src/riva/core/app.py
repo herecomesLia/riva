@@ -116,8 +116,8 @@ def register_middlewares(app: FastAPI) -> None:
 def wrap_cors(app: ASGIApp, settings: Settings) -> ASGIApp:
     return CORSMiddleware(
         app,
-        allow_origins=settings.cors_allowed_origins,
-        allow_credentials=settings.cors_allow_credentials,
+        allow_origins=settings.cors.allowed_origins,
+        allow_credentials=settings.cors.allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )

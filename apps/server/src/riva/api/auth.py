@@ -64,7 +64,7 @@ async def login(
     result = await user_service.login(
         payload.username,
         payload.password,
-        current_token=request.cookies.get(settings.session_cookie_name),
+        current_token=request.cookies.get(settings.session.cookie_name),
     )
     set_session_cookie(response, settings, result.token)
     user_id = str(result.user.id)
@@ -85,7 +85,7 @@ async def logout(
 ) -> None:
     settings = request.app.state.settings
     user_id = await user_service.logout(
-        request.cookies.get(settings.session_cookie_name)
+        request.cookies.get(settings.session.cookie_name)
     )
     delete_session_cookie(response, settings)
     if user_id is not None:

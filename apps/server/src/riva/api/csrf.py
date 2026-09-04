@@ -32,7 +32,7 @@ def _is_allowed_source(source: str, request: Request, settings: Settings) -> boo
         return False
 
     return source_origin == _request_origin(request) or source_origin in {
-        _origin_from_url(origin) for origin in settings.cors_allowed_origins
+        _origin_from_url(origin) for origin in settings.cors.allowed_origins
     }
 
 

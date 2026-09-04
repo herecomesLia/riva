@@ -109,7 +109,7 @@ class UserService:
 
         refreshed = False
         refresh_after = timedelta(
-            seconds=self.settings.session_refresh_interval_seconds
+            seconds=self.settings.session.refresh_interval_seconds
         )
         if auth_session.last_seen_at + refresh_after <= now:
             auth_session.last_seen_at = now
@@ -147,14 +147,14 @@ class UserService:
         token = _generate_session_token()
         return token, AuthSession(
             user=user,
-            token_digest=_digest_session_token(token, self.settings.session_digest_key),
+            token_digest=_digest_session_token(token, self.settings.session.digest_key),
             created_at=now,
             last_seen_at=now,
             expires_at=self._expires_at(now),
         )
 
     async def _session_by_token(self, token: str) -> AuthSession | None:
-        token_digest = _digest_session_token(token, self.settings.session_digest_key)
+        token_digest = _digest_session_token(token, self.settings.session.digest_key)
         result = await self.session.execute(
             select(AuthSession)
             .options(selectinload(AuthSession.user))
@@ -175,7 +175,7 @@ class UserService:
         return auth_session.user_id
 
     def _expires_at(self, now: datetime) -> datetime:
-        return now + timedelta(seconds=self.settings.session_idle_timeout_seconds)
+        return now + timedelta(seconds=self.settings.session.idle_timeout_seconds)
 
 
 def _hash_password(password: str) -> str:

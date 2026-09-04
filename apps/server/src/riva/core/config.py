@@ -21,6 +21,67 @@ class SameSitePolicy(StrEnum):
     NONE = "none"
 
 
+class CORSSettings(BaseModel):
+    allowed_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    allow_credentials: bool = True
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @model_validator(mode="after")
+    def validate_credentials(self) -> Self:
+        if self.allow_credentials and "*" in self.allowed_origins:
+            raise ValueError(
+                "RIVA_CORS_ALLOWED_ORIGINS cannot contain '*' when "
+                "RIVA_CORS_ALLOW_CREDENTIALS is true."
+            )
+        return self
+
+    def write_environ(self) -> None:
+        os.environ["RIVA_CORS_ALLOWED_ORIGINS"] = ",".join(self.allowed_origins)
+        os.environ["RIVA_CORS_ALLOW_CREDENTIALS"] = str(self.allow_credentials).lower()
+
+
+class SessionSettings(BaseModel):
+    digest_key: str
+    cookie_name: str = "riva_session"
+    cookie_secure: bool = True
+    cookie_samesite: SameSitePolicy = SameSitePolicy.LAX
+    cookie_path: str = "/"
+    idle_timeout_seconds: int = Field(default=604800, gt=0)
+    refresh_interval_seconds: int = Field(default=300, ge=0)
+
+    @model_validator(mode="after")
+    def validate_policy(self) -> Self:
+        if not self.digest_key.strip():
+            raise ValueError("RIVA_SESSION_DIGEST_KEY must not be empty.")
+        if self.cookie_name.startswith("__Host-"):
+            if not self.cookie_secure:
+                raise ValueError("__Host- cookies require RIVA_SESSION_COOKIE_SECURE.")
+            if self.cookie_path != "/":
+                raise ValueError("__Host- cookies require RIVA_SESSION_COOKIE_PATH=/.")
+        if self.cookie_samesite == SameSitePolicy.NONE and not self.cookie_secure:
+            raise ValueError(
+                "SameSite=None cookies require RIVA_SESSION_COOKIE_SECURE."
+            )
+        return self
+
+    def write_environ(self) -> None:
+        os.environ["RIVA_SESSION_DIGEST_KEY"] = self.digest_key
+        os.environ["RIVA_SESSION_COOKIE_NAME"] = self.cookie_name
+        os.environ["RIVA_SESSION_COOKIE_SECURE"] = str(self.cookie_secure).lower()
+        os.environ["RIVA_SESSION_COOKIE_SAMESITE"] = self.cookie_samesite.value
+        os.environ["RIVA_SESSION_COOKIE_PATH"] = self.cookie_path
+        os.environ["RIVA_SESSION_IDLE_TIMEOUT_SECONDS"] = str(self.idle_timeout_seconds)
+        os.environ["RIVA_SESSION_REFRESH_INTERVAL_SECONDS"] = str(
+            self.refresh_interval_seconds
+        )
+
+
 class LLMSettings(BaseModel):
     model: str | None = None
     api_key: SecretStr | None = None
@@ -55,10 +116,31 @@ class LLMSettings(BaseModel):
     def configured(self) -> bool:
         return self.base_url is not None
 
+    def write_environ(self) -> None:
+        _write_optional_environ("RIVA_LLM_MODEL", self.model)
+        _write_optional_environ(
+            "RIVA_LLM_API_KEY",
+            self.api_key.get_secret_value() if self.api_key else None,
+        )
+        _write_optional_environ(
+            "RIVA_LLM_BASE_URL",
+            str(self.base_url) if self.base_url else None,
+        )
+        os.environ["RIVA_LLM_TIMEOUT_SECONDS"] = str(self.timeout_seconds)
+        os.environ["RIVA_LLM_MAX_RETRIES"] = str(self.max_retries)
+        os.environ["RIVA_LLM_HEALTH_TIMEOUT_SECONDS"] = str(self.health_timeout_seconds)
+        os.environ["RIVA_LLM_HEALTH_TTL_SECONDS"] = str(self.health_ttl_seconds)
+
 
 class TaskSettings(BaseModel):
     concurrency: int = Field(default=4, gt=0)
     shutdown_timeout_seconds: float = Field(default=30, ge=0)
+
+    def write_environ(self) -> None:
+        os.environ["RIVA_TASKS_CONCURRENCY"] = str(self.concurrency)
+        os.environ["RIVA_TASKS_SHUTDOWN_TIMEOUT_SECONDS"] = str(
+            self.shutdown_timeout_seconds
+        )
 
 
 class Settings(BaseSettings):
@@ -74,47 +156,10 @@ class Settings(BaseSettings):
     log_level: LogLevel = LogLevel.INFO
     log_format: LogFormat = LogFormat.CONSOLE
     database_url: str
+    cors: CORSSettings = Field(default_factory=CORSSettings)
+    session: SessionSettings
     llm: LLMSettings = Field(default_factory=LLMSettings)
     tasks: TaskSettings = Field(default_factory=TaskSettings)
-    cors_allowed_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
-    cors_allow_credentials: bool = True
-    session_digest_key: str
-    session_cookie_name: str = "riva_session"
-    session_cookie_secure: bool = True
-    session_cookie_samesite: SameSitePolicy = SameSitePolicy.LAX
-    session_cookie_path: str = "/"
-    session_idle_timeout_seconds: int = Field(default=604800, gt=0)
-    session_refresh_interval_seconds: int = Field(default=300, ge=0)
-
-    @field_validator("cors_allowed_origins", mode="before")
-    @classmethod
-    def parse_cors_allowed_origins(cls, value: object) -> object:
-        if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
-
-    @model_validator(mode="after")
-    def validate_cors_credentials(self) -> Self:
-        if self.cors_allow_credentials and "*" in self.cors_allowed_origins:
-            raise ValueError(
-                "RIVA_CORS_ALLOWED_ORIGINS cannot contain '*' when "
-                "RIVA_CORS_ALLOW_CREDENTIALS is true."
-            )
-        if not self.session_digest_key.strip():
-            raise ValueError("RIVA_SESSION_DIGEST_KEY must not be empty.")
-        if self.session_cookie_name.startswith("__Host-"):
-            if not self.session_cookie_secure:
-                raise ValueError("__Host- cookies require RIVA_SESSION_COOKIE_SECURE.")
-            if self.session_cookie_path != "/":
-                raise ValueError("__Host- cookies require RIVA_SESSION_COOKIE_PATH=/.")
-        if (
-            self.session_cookie_samesite == SameSitePolicy.NONE
-            and not self.session_cookie_secure
-        ):
-            raise ValueError(
-                "SameSite=None cookies require RIVA_SESSION_COOKIE_SECURE."
-            )
-        return self
 
     def write_environ(self) -> None:
         os.environ["RIVA_HOST"] = self.host
@@ -122,42 +167,10 @@ class Settings(BaseSettings):
         os.environ["RIVA_LOG_LEVEL"] = self.log_level.value
         os.environ["RIVA_LOG_FORMAT"] = self.log_format.value
         os.environ["RIVA_DATABASE_URL"] = self.database_url
-        _write_optional_environ("RIVA_LLM_MODEL", self.llm.model)
-        _write_optional_environ(
-            "RIVA_LLM_API_KEY",
-            self.llm.api_key.get_secret_value() if self.llm.api_key else None,
-        )
-        _write_optional_environ(
-            "RIVA_LLM_BASE_URL",
-            str(self.llm.base_url) if self.llm.base_url else None,
-        )
-        os.environ["RIVA_LLM_TIMEOUT_SECONDS"] = str(self.llm.timeout_seconds)
-        os.environ["RIVA_LLM_MAX_RETRIES"] = str(self.llm.max_retries)
-        os.environ["RIVA_LLM_HEALTH_TIMEOUT_SECONDS"] = str(
-            self.llm.health_timeout_seconds
-        )
-        os.environ["RIVA_LLM_HEALTH_TTL_SECONDS"] = str(self.llm.health_ttl_seconds)
-        os.environ["RIVA_TASKS_CONCURRENCY"] = str(self.tasks.concurrency)
-        os.environ["RIVA_TASKS_SHUTDOWN_TIMEOUT_SECONDS"] = str(
-            self.tasks.shutdown_timeout_seconds
-        )
-        os.environ["RIVA_CORS_ALLOWED_ORIGINS"] = ",".join(self.cors_allowed_origins)
-        os.environ["RIVA_CORS_ALLOW_CREDENTIALS"] = str(
-            self.cors_allow_credentials
-        ).lower()
-        os.environ["RIVA_SESSION_DIGEST_KEY"] = self.session_digest_key
-        os.environ["RIVA_SESSION_COOKIE_NAME"] = self.session_cookie_name
-        os.environ["RIVA_SESSION_COOKIE_SECURE"] = str(
-            self.session_cookie_secure
-        ).lower()
-        os.environ["RIVA_SESSION_COOKIE_SAMESITE"] = self.session_cookie_samesite.value
-        os.environ["RIVA_SESSION_COOKIE_PATH"] = self.session_cookie_path
-        os.environ["RIVA_SESSION_IDLE_TIMEOUT_SECONDS"] = str(
-            self.session_idle_timeout_seconds
-        )
-        os.environ["RIVA_SESSION_REFRESH_INTERVAL_SECONDS"] = str(
-            self.session_refresh_interval_seconds
-        )
+        self.cors.write_environ()
+        self.session.write_environ()
+        self.llm.write_environ()
+        self.tasks.write_environ()
 
 
 def _write_optional_environ(name: str, value: str | None) -> None:
