@@ -14,6 +14,9 @@ import type {
 import type { RecognizeTargetRoleInput } from "@/models/roles"
 import {
   imageRecognitionFixture,
+  jobDescriptionParsingFailureInput,
+  jobDescriptionParsingFailureReason,
+  parsedJobDescriptionFixture,
   targetRoleListFixture,
   textRecognitionFixture,
   urlRecognitionFixture,
@@ -45,6 +48,11 @@ const emptyJobDescription = {
   businessDomains: [],
 } satisfies JobDescriptionResponse
 
+type TaskRecord<T> =
+  | { status: "running"; result: T | string }
+  | { status: "success"; result: T }
+  | { status: "failed"; result: string }
+
 function normalizeRequirements(input: JobRequirementsRequest): JobRequirementsResponse {
   return {
     education: input.education ?? [],
@@ -71,6 +79,7 @@ function normalizeHardSkills(input: HardSkillsRequest): HardSkillsResponse {
 
 export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
   let state = structuredClone(initialState)
+  const jobDescriptionParsingTasks = new Map<string, TaskRecord<JobDescriptionResponse>>()
   let createdRoleSequence = 0
   let timestampSequence = 0
 
@@ -100,6 +109,16 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
       ),
     }
     return structuredClone(storedRole)
+  }
+
+  function startJobDescriptionParsing(roleId: string, text?: string) {
+    const result =
+      text === jobDescriptionParsingFailureInput
+        ? jobDescriptionParsingFailureReason
+        : structuredClone(parsedJobDescriptionFixture)
+    const task = { status: "running", result } satisfies TaskRecord<JobDescriptionResponse>
+    jobDescriptionParsingTasks.set(roleId, task)
+    return structuredClone(task)
   }
 
   async function create(input: CreateTargetRoleRequest): Promise<TargetRoleResponse> {
@@ -136,14 +155,58 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
     create,
 
     async recognize(input: RecognizeTargetRoleInput): Promise<TargetRoleResponse> {
+      let fixture: CreateTargetRoleRequest
       switch (input.sourceType) {
         case "text":
-          return create(textRecognitionFixture)
+          fixture = textRecognitionFixture
+          break
         case "image":
-          return create(imageRecognitionFixture)
+          fixture = imageRecognitionFixture
+          break
         case "url":
-          return create(urlRecognitionFixture)
+          fixture = urlRecognitionFixture
       }
+
+      const role = await create(fixture)
+      startJobDescriptionParsing(role.id, input.sourceType === "text" ? input.text : undefined)
+      return role
+    },
+
+    async submitJobDescription(
+      roleId: string,
+      text: string,
+    ): Promise<TaskRecord<JobDescriptionResponse>> {
+      requireRole(roleId)
+      return startJobDescriptionParsing(roleId, text)
+    },
+
+    async getJobDescriptionParsingStatus(
+      roleId: string,
+    ): Promise<TaskRecord<JobDescriptionResponse> | null> {
+      const role = requireRole(roleId)
+      const task = jobDescriptionParsingTasks.get(roleId)
+      if (!task || task.status !== "running") return structuredClone(task ?? null)
+
+      if (typeof task.result === "string") {
+        const failedTask = {
+          status: "failed",
+          result: task.result,
+        } satisfies TaskRecord<JobDescriptionResponse>
+        jobDescriptionParsingTasks.set(roleId, failedTask)
+        return structuredClone(failedTask)
+      }
+
+      replaceRole({
+        ...role,
+        jd: structuredClone(task.result),
+        updatedAt: nextTimestamp(),
+      })
+      const successfulTask = {
+        status: "success",
+        result: task.result,
+      } satisfies TaskRecord<JobDescriptionResponse>
+      jobDescriptionParsingTasks.set(roleId, successfulTask)
+      return structuredClone(successfulTask)
     },
 
     async update(roleId: string, input: UpdateTargetRoleRequest): Promise<TargetRoleResponse> {
@@ -166,6 +229,7 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
         targetRoles: state.targetRoles.filter(({ id }) => id !== roleId),
         activeTargetRoleId: state.activeTargetRoleId === roleId ? null : state.activeTargetRoleId,
       }
+      jobDescriptionParsingTasks.delete(roleId)
     },
 
     async setActive(input: SetActiveTargetRoleRequest): Promise<void> {

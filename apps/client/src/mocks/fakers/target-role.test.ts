@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest"
 import { createTargetRoleFaker } from "@/mocks/fakers/target-role"
 import {
   imageRecognitionFixture,
+  jobDescriptionParsingFailureInput,
+  jobDescriptionParsingFailureReason,
+  parsedJobDescriptionFixture,
   targetRoleFixture,
   targetRoleListFixture,
   textRecognitionFixture,
@@ -99,6 +102,43 @@ describe("targetRoleFaker", () => {
       expect(recognized).toMatchObject(fixture)
       expect(state.targetRoles).toContainEqual(recognized)
       expect(state.activeTargetRoleId).toBe(targetRoleListFixture.activeTargetRoleId)
+      await expect(faker.getJobDescriptionParsingStatus(recognized.id)).resolves.toEqual({
+        status: "success",
+        result: parsedJobDescriptionFixture,
+      })
     },
   )
+
+  it("advances a submitted JD task from running to an idempotent fixed success", async () => {
+    const faker = createTargetRoleFaker({ targetRoles: [], activeTargetRoleId: null })
+    const role = await faker.create({ title: "Staff Platform Engineer" })
+
+    await expect(faker.getJobDescriptionParsingStatus(role.id)).resolves.toBeNull()
+    const running = await faker.submitJobDescription(role.id, "JD text is not persisted.")
+    expect(running).toEqual({ status: "running", result: parsedJobDescriptionFixture })
+    expect((await faker.list()).targetRoles[0]?.jd).toEqual(role.jd)
+
+    const success = await faker.getJobDescriptionParsingStatus(role.id)
+    expect(success).toEqual({ status: "success", result: parsedJobDescriptionFixture })
+    expect((await faker.list()).targetRoles[0]?.jd).toEqual(parsedJobDescriptionFixture)
+    await expect(faker.getJobDescriptionParsingStatus(role.id)).resolves.toEqual(success)
+  })
+
+  it("advances the fixed failure input without replacing the saved structured JD", async () => {
+    const faker = createTargetRoleFaker(targetRoleListFixture)
+    const previousJobDescription = structuredClone(targetRoleFixture.jd)
+
+    await expect(
+      faker.submitJobDescription(targetRoleFixture.id, jobDescriptionParsingFailureInput),
+    ).resolves.toEqual({ status: "running", result: jobDescriptionParsingFailureReason })
+
+    const failed = await faker.getJobDescriptionParsingStatus(targetRoleFixture.id)
+    expect(failed).toEqual({ status: "failed", result: jobDescriptionParsingFailureReason })
+    expect(
+      (await faker.list()).targetRoles.find(({ id }) => id === targetRoleFixture.id)?.jd,
+    ).toEqual(previousJobDescription)
+    await expect(faker.getJobDescriptionParsingStatus(targetRoleFixture.id)).resolves.toEqual(
+      failed,
+    )
+  })
 })
