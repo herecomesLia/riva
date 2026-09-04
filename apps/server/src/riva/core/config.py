@@ -56,6 +56,11 @@ class LLMSettings(BaseModel):
         return self.base_url is not None
 
 
+class TaskSettings(BaseModel):
+    concurrency: int = Field(default=4, gt=0)
+    shutdown_timeout_seconds: float = Field(default=30, ge=0)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="RIVA_",
@@ -70,6 +75,7 @@ class Settings(BaseSettings):
     log_format: LogFormat = LogFormat.CONSOLE
     database_url: str
     llm: LLMSettings = Field(default_factory=LLMSettings)
+    tasks: TaskSettings = Field(default_factory=TaskSettings)
     cors_allowed_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
     cors_allow_credentials: bool = True
     session_digest_key: str
@@ -131,6 +137,10 @@ class Settings(BaseSettings):
             self.llm.health_timeout_seconds
         )
         os.environ["RIVA_LLM_HEALTH_TTL_SECONDS"] = str(self.llm.health_ttl_seconds)
+        os.environ["RIVA_TASKS_CONCURRENCY"] = str(self.tasks.concurrency)
+        os.environ["RIVA_TASKS_SHUTDOWN_TIMEOUT_SECONDS"] = str(
+            self.tasks.shutdown_timeout_seconds
+        )
         os.environ["RIVA_CORS_ALLOWED_ORIGINS"] = ",".join(self.cors_allowed_origins)
         os.environ["RIVA_CORS_ALLOW_CREDENTIALS"] = str(
             self.cors_allow_credentials

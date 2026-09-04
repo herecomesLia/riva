@@ -130,3 +130,72 @@ def test_start_reload_watches_source_root(
     _, options = uvicorn_calls[0]
     assert options["reload"] is True
     assert options["reload_dirs"] == ["/tmp/riva-src"]
+
+
+def test_worker_runs_with_environment_settings(
+    required_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RIVA_TASKS_CONCURRENCY", "6")
+    monkeypatch.setenv("RIVA_LOG_LEVEL", "warning")
+    monkeypatch.setenv("RIVA_LOG_FORMAT", "json")
+    worker_calls: list[tuple[str, int, int | None]] = []
+    logging_calls: list[tuple[LogLevel, LogFormat]] = []
+
+    async def capture_run_worker(settings: Any, *, concurrency: int | None) -> None:
+        worker_calls.append(
+            (settings.database_url, settings.tasks.concurrency, concurrency)
+        )
+
+    monkeypatch.setattr(commands, "run_worker", capture_run_worker)
+    monkeypatch.setattr(
+        commands,
+        "configure_logging",
+        lambda level, format_: logging_calls.append((level, format_)),
+    )
+
+    result = runner.invoke(app, ["worker"])
+
+    assert result.exit_code == 0, result.output
+    assert worker_calls == [
+        ("postgresql+psycopg://unused:unused@invalid/unused", 6, None)
+    ]
+    assert logging_calls == [(LogLevel.WARNING, LogFormat.JSON)]
+
+
+def test_worker_cli_options_override_environment(
+    required_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RIVA_TASKS_CONCURRENCY", "6")
+    monkeypatch.setenv("RIVA_LOG_LEVEL", "warning")
+    monkeypatch.setenv("RIVA_LOG_FORMAT", "console")
+    worker_calls: list[tuple[int, int | None]] = []
+    logging_calls: list[tuple[LogLevel, LogFormat]] = []
+
+    async def capture_run_worker(settings: Any, *, concurrency: int | None) -> None:
+        worker_calls.append((settings.tasks.concurrency, concurrency))
+
+    monkeypatch.setattr(commands, "run_worker", capture_run_worker)
+    monkeypatch.setattr(
+        commands,
+        "configure_logging",
+        lambda level, format_: logging_calls.append((level, format_)),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "worker",
+            "--concurrency",
+            "8",
+            "--log-level",
+            "debug",
+            "--log-format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert worker_calls == [(6, 8)]
+    assert logging_calls == [(LogLevel.DEBUG, LogFormat.JSON)]

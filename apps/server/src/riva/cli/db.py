@@ -7,6 +7,7 @@ from rich import print as rprint
 
 from riva.core.config import Settings
 from riva.db import Database
+from riva.tasks.schema import reset_task_schema, setup_task_schema
 
 app = typer.Typer(
     invoke_without_command=True,
@@ -41,7 +42,7 @@ def setup(
         ),
     ] = False,
 ) -> None:
-    """Create all tables declared in SQLAlchemy metadata."""
+    """Initialize the Riva database schemas."""
     if not yes:
         rprint(
             "[bold yellow]Warning:[/bold yellow] Production environments should use migrations instead of [bold cyan]riva db setup[/bold cyan]."
@@ -54,18 +55,19 @@ def setup(
     async def run() -> None:
         async with Database(database_url) as database:
             await database.create_tables()
+            await setup_task_schema(database_url)
 
     try:
         asyncio.run(run())
     except Exception as exc:
         typer.secho(
-            f"Failed to create database tables: {exc}",
+            f"Failed to initialize database: {exc}",
             fg=typer.colors.RED,
             err=True,
         )
         raise typer.Exit(code=1) from exc
 
-    typer.echo("Database tables created.")
+    typer.echo("Database schemas initialized.")
 
 
 @app.command()
@@ -87,7 +89,7 @@ def reset(
         ),
     ] = False,
 ) -> None:
-    """Drop and recreate all tables declared in SQLAlchemy metadata."""
+    """Reset the Riva database schemas."""
     if not yes:
         rprint(
             "[bold yellow]Warning:[/bold yellow] [bold cyan]riva db reset[/bold cyan] drops and recreates every table in the database."
@@ -100,18 +102,19 @@ def reset(
     async def run() -> None:
         async with Database(database_url) as database:
             await database.reset()
+            await reset_task_schema(database_url)
 
     try:
         asyncio.run(run())
     except Exception as exc:
         typer.secho(
-            f"Failed to reset database tables: {exc}",
+            f"Failed to reset database: {exc}",
             fg=typer.colors.RED,
             err=True,
         )
         raise typer.Exit(code=1) from exc
 
-    typer.echo("Database tables reset.")
+    typer.echo("Database schemas reset.")
 
 
 @app.command()

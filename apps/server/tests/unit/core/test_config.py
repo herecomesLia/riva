@@ -3,7 +3,7 @@ import os
 import pytest
 from pydantic import ValidationError
 
-from riva.core.config import LLMSettings, SameSitePolicy, Settings
+from riva.core.config import LLMSettings, SameSitePolicy, Settings, TaskSettings
 
 DATABASE_URL = "postgresql+psycopg://test:test@invalid/test"
 SESSION_DIGEST_KEY = "valid-session-digest-key"
@@ -15,6 +15,8 @@ def clear_riva_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(f"RIVA_{field_name.upper()}", raising=False)
     for field_name in LLMSettings.model_fields:
         monkeypatch.delenv(f"RIVA_LLM_{field_name.upper()}", raising=False)
+    for field_name in TaskSettings.model_fields:
+        monkeypatch.delenv(f"RIVA_TASKS_{field_name.upper()}", raising=False)
 
 
 def _settings(**overrides: object) -> Settings:
@@ -130,6 +132,18 @@ def test_settings_loads_llm_environment(
     assert settings.llm.api_key is not None
     assert settings.llm.api_key.get_secret_value() == "test-key"
     assert settings.llm.health_ttl_seconds == 12
+
+
+def test_settings_loads_task_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RIVA_TASKS_CONCURRENCY", "8")
+    monkeypatch.setenv("RIVA_TASKS_SHUTDOWN_TIMEOUT_SECONDS", "12.5")
+
+    settings = _settings()
+
+    assert settings.tasks.concurrency == 8
+    assert settings.tasks.shutdown_timeout_seconds == 12.5
 
 
 @pytest.mark.parametrize(
@@ -249,6 +263,10 @@ def test_write_environ_writes_all_settings(
             "health_timeout_seconds": 7,
             "health_ttl_seconds": 18,
         },
+        tasks={
+            "concurrency": 8,
+            "shutdown_timeout_seconds": 12.5,
+        },
     )
     expected = {
         "RIVA_HOST": "0.0.0.0",
@@ -263,6 +281,8 @@ def test_write_environ_writes_all_settings(
         "RIVA_LLM_MAX_RETRIES": "3",
         "RIVA_LLM_HEALTH_TIMEOUT_SECONDS": "7.0",
         "RIVA_LLM_HEALTH_TTL_SECONDS": "18.0",
+        "RIVA_TASKS_CONCURRENCY": "8",
+        "RIVA_TASKS_SHUTDOWN_TIMEOUT_SECONDS": "12.5",
         "RIVA_CORS_ALLOWED_ORIGINS": "https://a.test,https://b.test",
         "RIVA_CORS_ALLOW_CREDENTIALS": "false",
         "RIVA_SESSION_DIGEST_KEY": "digest-key",

@@ -19,6 +19,8 @@ class DatabaseCalls:
     exited: int = 0
     create_tables: int = 0
     reset: int = 0
+    setup_task_schema_urls: list[str] = field(default_factory=list)
+    reset_task_schema_urls: list[str] = field(default_factory=list)
     failure_operation: str | None = None
 
 
@@ -76,6 +78,15 @@ def database_calls(monkeypatch: pytest.MonkeyPatch) -> DatabaseCalls:
                 raise RuntimeError("database failure")
 
     monkeypatch.setattr(db_commands, "Database", DatabaseDouble)
+
+    async def capture_setup_task_schema(database_url: str) -> None:
+        calls.setup_task_schema_urls.append(database_url)
+
+    async def capture_reset_task_schema(database_url: str) -> None:
+        calls.reset_task_schema_urls.append(database_url)
+
+    monkeypatch.setattr(db_commands, "setup_task_schema", capture_setup_task_schema)
+    monkeypatch.setattr(db_commands, "reset_task_schema", capture_reset_task_schema)
     return calls
 
 
@@ -91,6 +102,8 @@ def test_database_command_cancellation_does_not_open_database(
     assert database_calls.entered == 0
     assert database_calls.create_tables == 0
     assert database_calls.reset == 0
+    assert database_calls.setup_task_schema_urls == []
+    assert database_calls.reset_task_schema_urls == []
 
 
 @pytest.mark.parametrize(
@@ -109,6 +122,13 @@ def test_database_command_yes_executes_requested_operation(
     assert database_calls.entered == 1
     assert database_calls.exited == 1
     assert getattr(database_calls, operation) == 1
+    expected_url = "postgresql+psycopg://unused:unused@invalid/unused"
+    if command == "setup":
+        assert database_calls.setup_task_schema_urls == [expected_url]
+        assert database_calls.reset_task_schema_urls == []
+    else:
+        assert database_calls.setup_task_schema_urls == []
+        assert database_calls.reset_task_schema_urls == [expected_url]
 
 
 @pytest.mark.parametrize(
