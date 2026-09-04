@@ -14,18 +14,18 @@ import type {
 import type { MatchingAnalysisResult, RecognizeTargetRoleInput } from "@/models/roles"
 import type { JdState, MatchState } from "@/models/target-role-workflow"
 import {
-  imageRecognitionFixture,
-  jobDescriptionParsingFailureInput,
-  jobDescriptionParsingFailureReason,
+  imageRoleFixture,
+  jdFailInput,
+  jdFailReason,
   matchResultFixture,
-  parsedJobDescriptionFixture,
-  targetRoleListFixture,
-  textRecognitionFixture,
-  urlRecognitionFixture,
+  parsedJdFixture,
+  roleListFixture,
+  textRoleFixture,
+  urlRoleFixture,
 } from "@/mocks/fixtures/target-role"
 import { createMockApiError } from "@/mocks/utils"
 
-const emptyJobDescription = {
+const emptyJd = {
   responsibilities: [],
   requirements: {
     education: [],
@@ -69,7 +69,7 @@ type MatchRecord =
       result: MatchingAnalysisResult
     }
 
-function hasStructuredJobDescription(jd: JobDescriptionResponse) {
+function hasJdContent(jd: JobDescriptionResponse) {
   return (
     jd.responsibilities.length > 0 ||
     Object.values(jd.requirements).some((items) => items.length > 0) ||
@@ -85,7 +85,7 @@ function toJdState(
   jd: JobDescriptionResponse,
 ): JdState {
   if (!task) {
-    return hasStructuredJobDescription(jd)
+    return hasJdContent(jd)
       ? { status: "ready", result: structuredClone(jd) }
       : { status: "missing" }
   }
@@ -127,21 +127,21 @@ function normalizeHardSkills(input: HardSkillsRequest): HardSkillsResponse {
   }
 }
 
-export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
+export function createRoleFaker(initialState: TargetRoleListResponse) {
   let state = structuredClone(initialState)
-  const jobDescriptionParsingTasks = new Map<string, TaskRecord<JobDescriptionResponse>>()
+  const jdTasks = new Map<string, TaskRecord<JobDescriptionResponse>>()
   const matches = new Map<string, MatchRecord>()
-  let createdRoleSequence = 0
-  let timestampSequence = 0
+  let roleSeq = 0
+  let timeSeq = 0
 
   function nextId() {
-    createdRoleSequence += 1
-    return `00000000-0000-4000-8000-${String(createdRoleSequence).padStart(12, "0")}`
+    roleSeq += 1
+    return `00000000-0000-4000-8000-${String(roleSeq).padStart(12, "0")}`
   }
 
-  function nextTimestamp() {
-    const timestamp = new Date(Date.UTC(2026, 7, 1, 8, timestampSequence)).toISOString()
-    timestampSequence += 1
+  function nextTime() {
+    const timestamp = new Date(Date.UTC(2026, 7, 1, 8, timeSeq)).toISOString()
+    timeSeq += 1
     return timestamp
   }
 
@@ -155,20 +155,15 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
     const storedRole = structuredClone(role)
     state = {
       ...state,
-      targetRoles: state.targetRoles.map((candidate) =>
-        candidate.id === storedRole.id ? storedRole : candidate,
-      ),
+      targetRoles: state.targetRoles.map((item) => (item.id === storedRole.id ? storedRole : item)),
     }
     return structuredClone(storedRole)
   }
 
-  function startJobDescriptionParsing(roleId: string, text?: string) {
-    const result =
-      text === jobDescriptionParsingFailureInput
-        ? jobDescriptionParsingFailureReason
-        : structuredClone(parsedJobDescriptionFixture)
+  function startJdTask(roleId: string, text?: string) {
+    const result = text === jdFailInput ? jdFailReason : structuredClone(parsedJdFixture)
     const task = { status: "running", result } satisfies TaskRecord<JobDescriptionResponse>
-    jobDescriptionParsingTasks.set(roleId, task)
+    jdTasks.set(roleId, task)
   }
 
   function staleMatch(roleId: string) {
@@ -178,7 +173,7 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
   }
 
   async function create(input: CreateTargetRoleRequest): Promise<TargetRoleResponse> {
-    const createdAt = nextTimestamp()
+    const createdAt = nextTime()
     const role: TargetRoleResponse = {
       id: nextId(),
       title: input.title,
@@ -186,7 +181,7 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
       recruitmentTrack: input.recruitmentTrack ?? null,
       location: input.location ?? null,
       isArchived: false,
-      jd: structuredClone(emptyJobDescription),
+      jd: structuredClone(emptyJd),
       createdAt,
       updatedAt: createdAt,
     }
@@ -214,30 +209,30 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
       let fixture: CreateTargetRoleRequest
       switch (input.sourceType) {
         case "text":
-          fixture = textRecognitionFixture
+          fixture = textRoleFixture
           break
         case "image":
-          fixture = imageRecognitionFixture
+          fixture = imageRoleFixture
           break
         case "url":
-          fixture = urlRecognitionFixture
+          fixture = urlRoleFixture
       }
 
       const role = await create(fixture)
-      startJobDescriptionParsing(role.id, input.sourceType === "text" ? input.text : undefined)
+      startJdTask(role.id, input.sourceType === "text" ? input.text : undefined)
       return role
     },
 
     async parseJd(roleId: string, text: string): Promise<JdState> {
       requireRole(roleId)
       staleMatch(roleId)
-      startJobDescriptionParsing(roleId, text)
+      startJdTask(roleId, text)
       return { status: "parsing" }
     },
 
     async getJd(roleId: string): Promise<JdState> {
       const role = requireRole(roleId)
-      const task = jobDescriptionParsingTasks.get(roleId)
+      const task = jdTasks.get(roleId)
       if (!task || task.status !== "running") return toJdState(task, role.jd)
 
       if (typeof task.result === "string") {
@@ -245,21 +240,21 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
           status: "failed",
           result: task.result,
         } satisfies TaskRecord<JobDescriptionResponse>
-        jobDescriptionParsingTasks.set(roleId, failedTask)
+        jdTasks.set(roleId, failedTask)
         return toJdState(failedTask, role.jd)
       }
 
       const updatedRole = replaceRole({
         ...role,
         jd: structuredClone(task.result),
-        updatedAt: nextTimestamp(),
+        updatedAt: nextTime(),
       })
-      const successfulTask = {
+      const doneTask = {
         status: "success",
         result: task.result,
       } satisfies TaskRecord<JobDescriptionResponse>
-      jobDescriptionParsingTasks.set(roleId, successfulTask)
-      return toJdState(successfulTask, updatedRole.jd)
+      jdTasks.set(roleId, doneTask)
+      return toJdState(doneTask, updatedRole.jd)
     },
 
     async match(roleId: string): Promise<MatchState> {
@@ -277,12 +272,12 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
       const match = matches.get(roleId)
       if (!match || match.status !== "running") return toMatchState(match)
 
-      const successfulMatch = {
+      const doneMatch = {
         status: "success",
         result: structuredClone(match.result),
       } satisfies TaskRecord<MatchingAnalysisResult>
-      matches.set(roleId, successfulMatch)
-      return toMatchState(successfulMatch)
+      matches.set(roleId, doneMatch)
+      return toMatchState(doneMatch)
     },
 
     async update(roleId: string, input: UpdateTargetRoleRequest): Promise<TargetRoleResponse> {
@@ -295,7 +290,7 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
           ? { recruitmentTrack: input.recruitmentTrack }
           : {}),
         ...(input.location !== undefined ? { location: input.location } : {}),
-        updatedAt: nextTimestamp(),
+        updatedAt: nextTime(),
       })
     },
 
@@ -305,7 +300,7 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
         targetRoles: state.targetRoles.filter(({ id }) => id !== roleId),
         activeTargetRoleId: state.activeTargetRoleId === roleId ? null : state.activeTargetRoleId,
       }
-      jobDescriptionParsingTasks.delete(roleId)
+      jdTasks.delete(roleId)
       matches.delete(roleId)
     },
 
@@ -326,13 +321,13 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
         state = { ...state, activeTargetRoleId: null }
       }
       if (role.isArchived) return structuredClone(role)
-      return replaceRole({ ...role, isArchived: true, updatedAt: nextTimestamp() })
+      return replaceRole({ ...role, isArchived: true, updatedAt: nextTime() })
     },
 
     async restore(roleId: string): Promise<TargetRoleResponse> {
       const role = requireRole(roleId)
       if (!role.isArchived) return structuredClone(role)
-      return replaceRole({ ...role, isArchived: false, updatedAt: nextTimestamp() })
+      return replaceRole({ ...role, isArchived: false, updatedAt: nextTime() })
     },
 
     async updateJd(
@@ -361,7 +356,7 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
             ? { businessDomains: input.businessDomains }
             : {}),
         },
-        updatedAt: nextTimestamp(),
+        updatedAt: nextTime(),
       })
       staleMatch(roleId)
       return updatedRole
@@ -369,4 +364,4 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
   }
 }
 
-export const targetRoleFaker = createTargetRoleFaker(targetRoleListFixture)
+export const targetRoleFaker = createRoleFaker(roleListFixture)

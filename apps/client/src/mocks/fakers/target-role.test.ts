@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest"
 
-import { createTargetRoleFaker } from "@/mocks/fakers/target-role"
+import { createRoleFaker } from "@/mocks/fakers/target-role"
 import {
-  imageRecognitionFixture,
-  jobDescriptionParsingFailureInput,
-  jobDescriptionParsingFailureReason,
+  imageRoleFixture,
+  jdFailInput,
+  jdFailReason,
   matchResultFixture,
-  parsedJobDescriptionFixture,
+  parsedJdFixture,
+  roleListFixture,
   targetRoleFixture,
-  targetRoleListFixture,
-  textRecognitionFixture,
-  urlRecognitionFixture,
+  textRoleFixture,
+  urlRoleFixture,
 } from "@/mocks/fixtures/target-role"
 
 describe("targetRoleFaker", () => {
   it("keeps CRUD and active-role lifecycle state consistent", async () => {
-    const faker = createTargetRoleFaker({ targetRoles: [], activeTargetRoleId: null })
+    const faker = createRoleFaker({ targetRoles: [], activeTargetRoleId: null })
 
     const created = await faker.create({ title: "Staff Platform Engineer" })
     let state = await faker.list()
@@ -36,7 +36,7 @@ describe("targetRoleFaker", () => {
   })
 
   it("rejects activation of an archived role without changing active state", async () => {
-    const faker = createTargetRoleFaker(targetRoleListFixture)
+    const faker = createRoleFaker(roleListFixture)
 
     await faker.archive(targetRoleFixture.id)
     await expect(faker.setActive({ targetRoleId: targetRoleFixture.id })).rejects.toMatchObject({
@@ -49,7 +49,7 @@ describe("targetRoleFaker", () => {
   })
 
   it("patches role fields while replacing provided nested JD sections", async () => {
-    const faker = createTargetRoleFaker(targetRoleListFixture)
+    const faker = createRoleFaker(roleListFixture)
 
     const updated = await faker.update(targetRoleFixture.id, { company: null })
     expect(updated).toMatchObject({
@@ -81,37 +81,33 @@ describe("targetRoleFaker", () => {
   })
 
   it.each([
-    ["text", { sourceType: "text" as const, text: "A job posting" }, textRecognitionFixture],
+    ["text", { sourceType: "text" as const, text: "A job posting" }, textRoleFixture],
     [
       "image",
       { sourceType: "image" as const, images: [new File(["posting"], "posting.png")] },
-      imageRecognitionFixture,
+      imageRoleFixture,
     ],
-    [
-      "url",
-      { sourceType: "url" as const, url: "https://example.com/jobs/1" },
-      urlRecognitionFixture,
-    ],
+    ["url", { sourceType: "url" as const, url: "https://example.com/jobs/1" }, urlRoleFixture],
   ])(
     "recognizes a %s source into a listed role without changing the active role",
     async (_sourceType, input, fixture) => {
-      const faker = createTargetRoleFaker(targetRoleListFixture)
+      const faker = createRoleFaker(roleListFixture)
 
       const recognized = await faker.recognize(input)
       const state = await faker.list()
 
       expect(recognized).toMatchObject(fixture)
       expect(state.targetRoles).toContainEqual(recognized)
-      expect(state.activeTargetRoleId).toBe(targetRoleListFixture.activeTargetRoleId)
+      expect(state.activeTargetRoleId).toBe(roleListFixture.activeTargetRoleId)
       await expect(faker.getJd(recognized.id)).resolves.toEqual({
         status: "ready",
-        result: parsedJobDescriptionFixture,
+        result: parsedJdFixture,
       })
     },
   )
 
   it("advances a submitted JD task from running to an idempotent fixed success", async () => {
-    const faker = createTargetRoleFaker({ targetRoles: [], activeTargetRoleId: null })
+    const faker = createRoleFaker({ targetRoles: [], activeTargetRoleId: null })
     const role = await faker.create({ title: "Staff Platform Engineer" })
 
     await expect(faker.getJd(role.id)).resolves.toEqual({ status: "missing" })
@@ -120,21 +116,21 @@ describe("targetRoleFaker", () => {
     expect((await faker.list()).targetRoles[0]?.jd).toEqual(role.jd)
 
     const ready = await faker.getJd(role.id)
-    expect(ready).toEqual({ status: "ready", result: parsedJobDescriptionFixture })
-    expect((await faker.list()).targetRoles[0]?.jd).toEqual(parsedJobDescriptionFixture)
+    expect(ready).toEqual({ status: "ready", result: parsedJdFixture })
+    expect((await faker.list()).targetRoles[0]?.jd).toEqual(parsedJdFixture)
     await expect(faker.getJd(role.id)).resolves.toEqual(ready)
   })
 
   it("advances the fixed failure input without replacing the saved structured JD", async () => {
-    const faker = createTargetRoleFaker(targetRoleListFixture)
+    const faker = createRoleFaker(roleListFixture)
     const previousJobDescription = structuredClone(targetRoleFixture.jd)
 
-    await expect(
-      faker.parseJd(targetRoleFixture.id, jobDescriptionParsingFailureInput),
-    ).resolves.toEqual({ status: "parsing" })
+    await expect(faker.parseJd(targetRoleFixture.id, jdFailInput)).resolves.toEqual({
+      status: "parsing",
+    })
 
     const failed = await faker.getJd(targetRoleFixture.id)
-    expect(failed).toEqual({ status: "failed", reason: jobDescriptionParsingFailureReason })
+    expect(failed).toEqual({ status: "failed", reason: jdFailReason })
     expect(
       (await faker.list()).targetRoles.find(({ id }) => id === targetRoleFixture.id)?.jd,
     ).toEqual(previousJobDescription)
@@ -142,7 +138,7 @@ describe("targetRoleFaker", () => {
   })
 
   it("advances a match from running to an idempotent fixed success", async () => {
-    const faker = createTargetRoleFaker(targetRoleListFixture)
+    const faker = createRoleFaker(roleListFixture)
 
     await expect(faker.getMatch(targetRoleFixture.id)).resolves.toEqual({ status: "none" })
     await expect(faker.match(targetRoleFixture.id)).resolves.toEqual({
@@ -155,7 +151,7 @@ describe("targetRoleFaker", () => {
   })
 
   it("keeps a successful match stale across JD changes until regeneration", async () => {
-    const faker = createTargetRoleFaker(targetRoleListFixture)
+    const faker = createRoleFaker(roleListFixture)
     await faker.match(targetRoleFixture.id)
     await faker.getMatch(targetRoleFixture.id)
 

@@ -14,39 +14,33 @@ import type {
   UpdateJobDescriptionRequest,
   UpdateTargetRoleRequest,
 } from "@/api/generated/models"
-import { targetRoleFaker as rawTargetRoleFaker } from "@/mocks/fakers/target-role"
+import { targetRoleFaker as baseFaker } from "@/mocks/fakers/target-role"
 import { asMswFaker } from "@/mocks/handlers/adapter"
 
-const targetRoleFaker = asMswFaker(rawTargetRoleFaker, {
+const roleFaker = asMswFaker(baseFaker, {
   "resource.not_found": 404,
   "resource.conflict": 409,
 })
 
 export const targetRoleHandlers = [
-  getListTargetRolesMockHandler(() => targetRoleFaker.list()),
+  getListTargetRolesMockHandler(() => roleFaker.list()),
   getCreateTargetRoleMockHandler(async ({ request }) => {
     const input = (await request.json()) as CreateTargetRoleRequest
-    return targetRoleFaker.create(input)
+    return roleFaker.create(input)
   }),
   getUpdateTargetRoleMockHandler(async ({ params, request }) => {
     const input = (await request.json()) as UpdateTargetRoleRequest
-    return targetRoleFaker.update(params.targetRoleId as string, input)
+    return roleFaker.update(params.targetRoleId as string, input)
   }),
-  getDeleteTargetRoleMockHandler(({ params }) =>
-    targetRoleFaker.delete(params.targetRoleId as string),
-  ),
+  getDeleteTargetRoleMockHandler(({ params }) => roleFaker.delete(params.targetRoleId as string)),
   getSetActiveTargetRoleMockHandler(async ({ request }) => {
     const input = (await request.json()) as SetActiveTargetRoleRequest
-    return targetRoleFaker.setActive(input)
+    return roleFaker.setActive(input)
   }),
-  getArchiveTargetRoleMockHandler(({ params }) =>
-    targetRoleFaker.archive(params.targetRoleId as string),
-  ),
-  getRestoreTargetRoleMockHandler(({ params }) =>
-    targetRoleFaker.restore(params.targetRoleId as string),
-  ),
+  getArchiveTargetRoleMockHandler(({ params }) => roleFaker.archive(params.targetRoleId as string)),
+  getRestoreTargetRoleMockHandler(({ params }) => roleFaker.restore(params.targetRoleId as string)),
   getUpdateTargetRoleJdMockHandler(async ({ params, request }) => {
     const input = (await request.json()) as UpdateJobDescriptionRequest
-    return targetRoleFaker.updateJd(params.targetRoleId as string, input)
+    return roleFaker.updateJd(params.targetRoleId as string, input)
   }),
 ]

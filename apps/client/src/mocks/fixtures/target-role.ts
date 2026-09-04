@@ -6,33 +6,32 @@ import type {
 } from "@/api/generated/models"
 import type { MatchingAnalysisResult } from "@/models/roles"
 
-export const jobDescriptionParsingFailureInput = "__RIVA_MOCK_JD_PARSING_FAILURE__"
+export const jdFailInput = "__RIVA_MOCK_JD_PARSING_FAILURE__"
 
-export const jobDescriptionParsingFailureReason =
-  "We could not extract structured requirements from this JD."
+export const jdFailReason = "We could not extract structured requirements from this JD."
 
-export const textRecognitionFixture = {
+export const textRoleFixture = {
   title: "Senior Frontend Engineer",
   company: "ByteDance",
   recruitmentTrack: "experienced",
   location: "Shanghai",
 } satisfies CreateTargetRoleRequest
 
-export const imageRecognitionFixture = {
+export const imageRoleFixture = {
   title: "Frontend Engineer",
   company: "Riva Technology",
   recruitmentTrack: "experienced",
   location: "Shanghai",
 } satisfies CreateTargetRoleRequest
 
-export const urlRecognitionFixture = {
+export const urlRoleFixture = {
   title: "Product Manager",
   company: "Meituan",
   recruitmentTrack: "experienced",
   location: "Beijing",
 } satisfies CreateTargetRoleRequest
 
-export const parsedJobDescriptionFixture = {
+export const parsedJdFixture = {
   responsibilities: [
     "Lead frontend architecture for merchant operations products.",
     "Partner with product and design teams to deliver accessible experiences.",
@@ -89,12 +88,12 @@ export const targetRoleFixture = {
   recruitmentTrack: "experienced",
   location: "Shanghai",
   isArchived: false,
-  jd: parsedJobDescriptionFixture,
+  jd: parsedJdFixture,
   createdAt: "2026-07-15T08:00:00Z",
   updatedAt: "2026-07-15T08:00:00Z",
 } satisfies TargetRoleResponse
 
-export const secondaryTargetRoleFixture = {
+export const secondaryRoleFixture = {
   id: "22222222-2222-4222-8222-222222222222",
   title: "Product Manager",
   company: "Meituan",
@@ -129,7 +128,7 @@ export const secondaryTargetRoleFixture = {
   updatedAt: "2026-07-01T08:00:00Z",
 } satisfies TargetRoleResponse
 
-export const targetRoleListFixture = {
-  targetRoles: [targetRoleFixture, secondaryTargetRoleFixture],
+export const roleListFixture = {
+  targetRoles: [targetRoleFixture, secondaryRoleFixture],
   activeTargetRoleId: targetRoleFixture.id,
 } satisfies TargetRoleListResponse
