@@ -1,6 +1,7 @@
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from riva.db import Database
 from riva.tasks.schema import reset_task_schema, setup_task_schema
 
 
@@ -42,10 +43,10 @@ async def _drop_task_schema(database_url: str) -> None:
 
 
 async def test_setup_creates_task_tables_only_in_task_schema(
-    test_database_url: str,
+    test_database_url: str, database: Database
 ) -> None:
     await _drop_task_schema(test_database_url)
-    await setup_task_schema(test_database_url)
+    await setup_task_schema(database)
 
     assert await _table_exists(
         test_database_url,
@@ -59,32 +60,33 @@ async def test_setup_creates_task_tables_only_in_task_schema(
     )
 
 
-async def test_setup_is_idempotent(test_database_url: str) -> None:
+async def test_setup_is_idempotent(test_database_url: str, database: Database) -> None:
     await _drop_task_schema(test_database_url)
-    await setup_task_schema(test_database_url)
-    await setup_task_schema(test_database_url)
+    await setup_task_schema(database)
+    await setup_task_schema(database)
 
 
-async def test_reset_rebuilds_task_schema(test_database_url: str) -> None:
-    await setup_task_schema(test_database_url)
+async def test_reset_rebuilds_task_schema(
+    test_database_url: str, database: Database
+) -> None:
     engine = create_async_engine(test_database_url)
     try:
+        await setup_task_schema(database)
         async with engine.begin() as connection:
             await connection.execute(
                 text("CREATE TABLE procrastinate.reset_probe (id integer)")
             )
+        await reset_task_schema(database)
+
+        assert not await _table_exists(
+            test_database_url,
+            schema="procrastinate",
+            table="reset_probe",
+        )
+        assert await _table_exists(
+            test_database_url,
+            schema="procrastinate",
+            table="procrastinate_jobs",
+        )
     finally:
         await engine.dispose()
-
-    await reset_task_schema(test_database_url)
-
-    assert not await _table_exists(
-        test_database_url,
-        schema="procrastinate",
-        table="reset_probe",
-    )
-    assert await _table_exists(
-        test_database_url,
-        schema="procrastinate",
-        table="procrastinate_jobs",
-    )

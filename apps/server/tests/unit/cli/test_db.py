@@ -58,6 +58,7 @@ def database_calls(monkeypatch: pytest.MonkeyPatch) -> DatabaseCalls:
 
     class DatabaseDouble:
         def __init__(self, database_url: str) -> None:
+            self.database_url = database_url
             calls.urls.append(database_url)
 
         async def __aenter__(self) -> Self:
@@ -79,11 +80,11 @@ def database_calls(monkeypatch: pytest.MonkeyPatch) -> DatabaseCalls:
 
     monkeypatch.setattr(db_commands, "Database", DatabaseDouble)
 
-    async def capture_setup_task_schema(database_url: str) -> None:
-        calls.setup_task_schema_urls.append(database_url)
+    async def capture_setup_task_schema(database: DatabaseDouble) -> None:
+        calls.setup_task_schema_urls.append(database.database_url)
 
-    async def capture_reset_task_schema(database_url: str) -> None:
-        calls.reset_task_schema_urls.append(database_url)
+    async def capture_reset_task_schema(database: DatabaseDouble) -> None:
+        calls.reset_task_schema_urls.append(database.database_url)
 
     monkeypatch.setattr(db_commands, "setup_task_schema", capture_setup_task_schema)
     monkeypatch.setattr(db_commands, "reset_task_schema", capture_reset_task_schema)

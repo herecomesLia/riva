@@ -1,38 +1,43 @@
-import psycopg
-from psycopg import sql
+from sqlalchemy import inspect
+from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.schema import CreateSchema, DropSchema
 
-from riva.tasks.app import TASK_SCHEMA, _to_psycopg_conninfo, create_task_app
+from riva.db import Database
+from riva.tasks.app import TASK_SCHEMA, create_task_app
 
-
-async def setup_task_schema(database_url: str) -> None:
-    await _execute_schema_ddl(database_url, create=True)
-    await _apply_task_schema_if_needed(database_url)
-
-
-async def reset_task_schema(database_url: str) -> None:
-    await _execute_schema_ddl(database_url, create=False)
-    await _apply_task_schema_if_needed(database_url)
+JOBS_TABLE = "procrastinate_jobs"
 
 
-async def _apply_task_schema_if_needed(database_url: str) -> None:
-    task_app = create_task_app(database_url)
-    async with task_app.open_async():
-        if not await task_app.check_connection_async():
-            await task_app.schema_manager.apply_schema_async()
+async def setup_task_schema(database: Database) -> None:
+    """Create the Procrastinate schema if it has not been initialized."""
+    async with database.engine.begin() as connection:
+        await connection.execute(CreateSchema(TASK_SCHEMA, if_not_exists=True))
+        if await _has_task_schema(connection):
+            return
+    await _apply_task_schema(database)
 
 
-async def _execute_schema_ddl(database_url: str, *, create: bool) -> None:
-    async with await psycopg.AsyncConnection.connect(
-        _to_psycopg_conninfo(database_url), autocommit=True
-    ) as connection:
-        if not create:
-            await connection.execute(
-                sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(
-                    sql.Identifier(TASK_SCHEMA)
-                )
-            )
-        await connection.execute(
-            sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(
-                sql.Identifier(TASK_SCHEMA)
-            )
+async def reset_task_schema(database: Database) -> None:
+    """Drop and recreate the Procrastinate schema from the installed version."""
+    async with database.engine.begin() as connection:
+        await connection.execute(DropSchema(TASK_SCHEMA, cascade=True, if_exists=True))
+        await connection.execute(CreateSchema(TASK_SCHEMA))
+    await _apply_task_schema(database)
+
+
+async def _has_task_schema(connection: AsyncConnection) -> bool:
+    def has_jobs_table(sync_connection) -> bool:
+        return inspect(sync_connection).has_table(
+            JOBS_TABLE,
+            schema=TASK_SCHEMA,
         )
+
+    return await connection.run_sync(has_jobs_table)
+
+
+async def _apply_task_schema(database: Database) -> None:
+    task_app = create_task_app(
+        database.engine.url.render_as_string(hide_password=False)
+    )
+    async with task_app.open_async():
+        await task_app.schema_manager.apply_schema_async()

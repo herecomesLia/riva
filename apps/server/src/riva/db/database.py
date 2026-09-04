@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.schema import CreateSchema, DropSchema
 
 from riva.db.base import Base
 from riva.db.errors import DatabaseUnavailableError
@@ -61,5 +62,7 @@ class Database:
             await connection.run_sync(Base.metadata.drop_all)
 
     async def reset(self) -> None:
-        await self.drop_tables()
+        async with self.engine.begin() as connection:
+            await connection.execute(DropSchema("public", cascade=True, if_exists=True))
+            await connection.execute(CreateSchema("public"))
         await self.create_tables()

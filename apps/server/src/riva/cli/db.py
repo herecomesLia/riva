@@ -55,7 +55,7 @@ def setup(
     async def run() -> None:
         async with Database(database_url) as database:
             await database.create_tables()
-            await setup_task_schema(database_url)
+            await setup_task_schema(database)
 
     try:
         asyncio.run(run())
@@ -102,7 +102,7 @@ def reset(
     async def run() -> None:
         async with Database(database_url) as database:
             await database.reset()
-            await reset_task_schema(database_url)
+            await reset_task_schema(database)
 
     try:
         asyncio.run(run())
