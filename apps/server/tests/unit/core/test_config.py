@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from riva.core.config import LLMSettings, SameSitePolicy, Settings
 
-DATABASE_URL = "postgresql+asyncpg://test:test@invalid/test"
+DATABASE_URL = "postgresql+psycopg://test:test@invalid/test"
 SESSION_DIGEST_KEY = "valid-session-digest-key"
 
 
@@ -230,7 +230,7 @@ def test_write_environ_writes_all_settings(
         port=8000,
         log_level="debug",
         log_format="json",
-        database_url="postgresql+asyncpg://riva:riva@db/riva",
+        database_url="postgresql+psycopg://riva:riva@db/riva",
         cors_allowed_origins=["https://a.test", "https://b.test"],
         cors_allow_credentials=False,
         session_digest_key="digest-key",
@@ -255,7 +255,7 @@ def test_write_environ_writes_all_settings(
         "RIVA_PORT": "8000",
         "RIVA_LOG_LEVEL": "debug",
         "RIVA_LOG_FORMAT": "json",
-        "RIVA_DATABASE_URL": "postgresql+asyncpg://riva:riva@db/riva",
+        "RIVA_DATABASE_URL": "postgresql+psycopg://riva:riva@db/riva",
         "RIVA_LLM_MODEL": "test-model",
         "RIVA_LLM_API_KEY": "test-key",
         "RIVA_LLM_BASE_URL": "https://llm.test/v1",

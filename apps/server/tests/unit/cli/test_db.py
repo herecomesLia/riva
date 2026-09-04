@@ -45,7 +45,7 @@ def required_environment(
 ) -> None:
     monkeypatch.setenv(
         "RIVA_DATABASE_URL",
-        "postgresql+asyncpg://unused:unused@invalid/unused",
+        "postgresql+psycopg://unused:unused@invalid/unused",
     )
     monkeypatch.setenv("RIVA_SESSION_DIGEST_KEY", "test-session-digest-key")
 

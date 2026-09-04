@@ -2,7 +2,7 @@ from riva.core.config import SameSitePolicy, Settings
 from riva.core.logging import LogFormat, LogLevel
 
 # Settings requires a URL even when a unit test never opens a database connection.
-PLACEHOLDER_DATABASE_URL = "postgresql+asyncpg://unused:unused@invalid/unused"
+PLACEHOLDER_DATABASE_URL = "postgresql+psycopg://unused:unused@invalid/unused"
 TEST_ORIGIN = "https://testserver"
 TEST_SESSION_DIGEST_KEY = "riva-test-session-digest-key"
 

@@ -19,7 +19,7 @@ POSTGRES_IMAGE = "postgres:18-alpine"
 
 @pytest.fixture(scope="session")
 def postgres_container() -> Iterator[PostgresContainer]:
-    with PostgresContainer(POSTGRES_IMAGE, driver="asyncpg") as postgres:
+    with PostgresContainer(POSTGRES_IMAGE, driver="psycopg") as postgres:
         yield postgres
 
 
