@@ -12,6 +12,7 @@ import type {
   UpdateTargetRoleRequest,
 } from "@/api/generated/models"
 import type { MatchingAnalysisResult, RecognizeTargetRoleInput } from "@/models/roles"
+import type { JdState, MatchState } from "@/models/target-role-workflow"
 import {
   imageRecognitionFixture,
   jobDescriptionParsingFailureInput,
@@ -55,7 +56,52 @@ type TaskRecord<T> =
   | { status: "failed"; result: string }
 
 type MatchRecord =
-  TaskRecord<MatchingAnalysisResult> | { status: "stale"; result: MatchingAnalysisResult }
+  | {
+      status: "running"
+      result: MatchingAnalysisResult
+    }
+  | {
+      status: "success"
+      result: MatchingAnalysisResult
+    }
+  | {
+      status: "stale"
+      result: MatchingAnalysisResult
+    }
+
+function hasStructuredJobDescription(jd: JobDescriptionResponse) {
+  return (
+    jd.responsibilities.length > 0 ||
+    Object.values(jd.requirements).some((items) => items.length > 0) ||
+    Object.values(jd.hardSkills).some((items) => items.length > 0) ||
+    jd.softSkills.length > 0 ||
+    jd.preferredQualifications.length > 0 ||
+    jd.businessDomains.length > 0
+  )
+}
+
+function toJdState(
+  task: TaskRecord<JobDescriptionResponse> | undefined,
+  jd: JobDescriptionResponse,
+): JdState {
+  if (!task) {
+    return hasStructuredJobDescription(jd)
+      ? { status: "ready", result: structuredClone(jd) }
+      : { status: "missing" }
+  }
+  if (task.status === "running") return { status: "parsing" }
+  if (task.status === "failed") return { status: "failed", reason: task.result }
+  return { status: "ready", result: structuredClone(task.result) }
+}
+
+function toMatchState(match: MatchRecord | undefined): MatchState {
+  if (!match) return { status: "none" }
+  if (match.status === "running") return { status: "generating" }
+  return {
+    status: match.status === "success" ? "current" : "stale",
+    result: structuredClone(match.result),
+  }
+}
 
 function normalizeRequirements(input: JobRequirementsRequest): JobRequirementsResponse {
   return {
@@ -123,7 +169,6 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
         : structuredClone(parsedJobDescriptionFixture)
     const task = { status: "running", result } satisfies TaskRecord<JobDescriptionResponse>
     jobDescriptionParsingTasks.set(roleId, task)
-    return structuredClone(task)
   }
 
   function staleMatch(roleId: string) {
@@ -183,21 +228,17 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
       return role
     },
 
-    async submitJobDescription(
-      roleId: string,
-      text: string,
-    ): Promise<TaskRecord<JobDescriptionResponse>> {
+    async parseJd(roleId: string, text: string): Promise<JdState> {
       requireRole(roleId)
       staleMatch(roleId)
-      return startJobDescriptionParsing(roleId, text)
+      startJobDescriptionParsing(roleId, text)
+      return { status: "parsing" }
     },
 
-    async getJobDescriptionParsingStatus(
-      roleId: string,
-    ): Promise<TaskRecord<JobDescriptionResponse> | null> {
+    async getJd(roleId: string): Promise<JdState> {
       const role = requireRole(roleId)
       const task = jobDescriptionParsingTasks.get(roleId)
-      if (!task || task.status !== "running") return structuredClone(task ?? null)
+      if (!task || task.status !== "running") return toJdState(task, role.jd)
 
       if (typeof task.result === "string") {
         const failedTask = {
@@ -205,10 +246,10 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
           result: task.result,
         } satisfies TaskRecord<JobDescriptionResponse>
         jobDescriptionParsingTasks.set(roleId, failedTask)
-        return structuredClone(failedTask)
+        return toJdState(failedTask, role.jd)
       }
 
-      replaceRole({
+      const updatedRole = replaceRole({
         ...role,
         jd: structuredClone(task.result),
         updatedAt: nextTimestamp(),
@@ -218,30 +259,30 @@ export function createTargetRoleFaker(initialState: TargetRoleListResponse) {
         result: task.result,
       } satisfies TaskRecord<JobDescriptionResponse>
       jobDescriptionParsingTasks.set(roleId, successfulTask)
-      return structuredClone(successfulTask)
+      return toJdState(successfulTask, updatedRole.jd)
     },
 
-    async match(roleId: string): Promise<TaskRecord<MatchingAnalysisResult>> {
+    async match(roleId: string): Promise<MatchState> {
       requireRole(roleId)
       const task = {
         status: "running",
         result: structuredClone(matchResultFixture),
       } satisfies TaskRecord<MatchingAnalysisResult>
       matches.set(roleId, task)
-      return structuredClone(task)
+      return { status: "generating" }
     },
 
-    async getMatch(roleId: string): Promise<MatchRecord | null> {
+    async getMatch(roleId: string): Promise<MatchState> {
       requireRole(roleId)
       const match = matches.get(roleId)
-      if (!match || match.status !== "running") return structuredClone(match ?? null)
+      if (!match || match.status !== "running") return toMatchState(match)
 
       const successfulMatch = {
         status: "success",
-        result: structuredClone(matchResultFixture),
+        result: structuredClone(match.result),
       } satisfies TaskRecord<MatchingAnalysisResult>
       matches.set(roleId, successfulMatch)
-      return structuredClone(successfulMatch)
+      return toMatchState(successfulMatch)
     },
 
     async update(roleId: string, input: UpdateTargetRoleRequest): Promise<TargetRoleResponse> {
