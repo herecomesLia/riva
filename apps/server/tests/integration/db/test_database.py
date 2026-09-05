@@ -13,8 +13,9 @@ def _user(username: str) -> User:
 
 
 async def test_reset_removes_persisted_data_and_recreates_schema(
-    database: Database,
+    resettable_database: Database,
 ) -> None:
+    database = resettable_database
     async with database.sessionmaker() as session:
         session.add(_user("BeforeReset"))
         await session.commit()
