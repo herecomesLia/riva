@@ -65,7 +65,7 @@ def test_update_allows_skill_consistency_check_to_service_when_one_side_is_missi
 
 @pytest.mark.parametrize(
     ("payload", "valid"),
-    [({}, False), ({"skills": None}, False), ({"skills": []}, True)],
+    [({"skills": None}, False), ({"skills": []}, True)],
 )
 def test_update_patch_semantics(
     payload: dict[str, object],

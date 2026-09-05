@@ -51,19 +51,6 @@ async def test_patch_current_user_persists_display_name(
     assert persisted_response.json() == update_response.json()
 
 
-async def test_patch_current_user_allows_empty_payload(client: AsyncClient) -> None:
-    registered = await register_user(client)
-
-    response = await client.patch(
-        "/api/users/me",
-        headers=ORIGIN_HEADERS,
-        json={},
-    )
-
-    assert response.status_code == 200
-    assert response.json() == registered.json()
-
-
 async def test_patch_current_user_rejects_null_display_name(
     client: AsyncClient,
 ) -> None:

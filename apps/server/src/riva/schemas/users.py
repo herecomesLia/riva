@@ -4,7 +4,7 @@ from uuid import UUID
 from pydantic import Field, StringConstraints, field_validator
 from pydantic.json_schema import SkipJsonSchema
 
-from riva.schemas.base import RequestModel, ResponseModel
+from riva.schemas.base import NonEmptyPartialUpdateRequest, ResponseModel
 
 DisplayName = Annotated[
     str,
@@ -24,7 +24,7 @@ class UserResponse(ResponseModel):
     avatar_url: str | None
 
 
-class UpdateCurrentUserRequest(RequestModel):
+class UpdateCurrentUserRequest(NonEmptyPartialUpdateRequest):
     display_name: DisplayName | SkipJsonSchema[None] = Field(
         default_factory=lambda: None,
     )

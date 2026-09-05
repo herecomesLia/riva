@@ -17,12 +17,9 @@ def test_target_role_patch_distinguishes_omitted_null_and_value() -> None:
     assert payload.recruitment_track is None
 
 
-@pytest.mark.parametrize("payload", [{}, {"title": None}])
-def test_target_role_patch_rejects_empty_or_null_title(
-    payload: dict[str, object],
-) -> None:
+def test_target_role_patch_rejects_null_title() -> None:
     with pytest.raises(ValidationError):
-        UpdateTargetRoleRequest.model_validate(payload)
+        UpdateTargetRoleRequest.model_validate({"title": None})
 
 
 def test_jd_patch_distinguishes_omitted_and_empty_collection() -> None:
@@ -33,7 +30,6 @@ def test_jd_patch_distinguishes_omitted_and_empty_collection() -> None:
     assert payload.responsibilities is None
 
 
-@pytest.mark.parametrize("payload", [{}, {"responsibilities": None}])
-def test_jd_patch_rejects_empty_or_null_section(payload: dict[str, object]) -> None:
+def test_jd_patch_rejects_null_section() -> None:
     with pytest.raises(ValidationError):
-        UpdateJobDescriptionRequest.model_validate(payload)
+        UpdateJobDescriptionRequest.model_validate({"responsibilities": None})

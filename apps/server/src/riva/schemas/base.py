@@ -1,4 +1,6 @@
-from pydantic import BaseModel, ConfigDict
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, model_validator
 from pydantic.alias_generators import to_camel
 
 
@@ -13,6 +15,14 @@ class APIModel(BaseModel):
 
 class RequestModel(APIModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class NonEmptyPartialUpdateRequest(RequestModel):
+    @model_validator(mode="after")
+    def require_changes(self) -> Self:
+        if not self.model_fields_set:
+            raise ValueError("at least one field must be provided")
+        return self
 
 
 class ResponseModel(APIModel):

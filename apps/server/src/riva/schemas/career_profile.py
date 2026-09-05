@@ -11,7 +11,11 @@ from riva.models.career_profile import (
     WorkExperienceEntry,
 )
 from riva.models.types import NonBlankStr
-from riva.schemas.base import RequestModel, ResponseModel
+from riva.schemas.base import (
+    NonEmptyPartialUpdateRequest,
+    RequestModel,
+    ResponseModel,
+)
 
 
 class EducationEntryRequest(EducationEntry, RequestModel):
@@ -46,7 +50,7 @@ class CreateCareerProfileRequest(CareerProfileContent, RequestModel):
     projects: list[ProjectEntryRequest] = Field(default_factory=list)
 
 
-class UpdateCareerProfileRequest(RequestModel):
+class UpdateCareerProfileRequest(NonEmptyPartialUpdateRequest):
     education: list[EducationEntryRequest] | SkipJsonSchema[None] = Field(
         default_factory=lambda: None,
     )
@@ -89,12 +93,6 @@ class UpdateCareerProfileRequest(RequestModel):
             raise ValueError(
                 "work experience skills must exist in the career profile skills list"
             )
-        return self
-
-    @model_validator(mode="after")
-    def require_changes(self) -> Self:
-        if not self.model_fields_set:
-            raise ValueError("at least one career profile section must be provided")
         return self
 
 

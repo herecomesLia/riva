@@ -13,19 +13,6 @@ def test_current_user_update_accepts_display_name() -> None:
     assert update.display_name == "Test User"
 
 
-def test_current_user_update_allows_empty_payload() -> None:
-    update = UpdateCurrentUserRequest.model_validate({})
-
-    assert (
-        update.model_dump(
-            mode="json",
-            by_alias=False,
-            exclude_unset=True,
-        )
-        == {}
-    )
-
-
 def test_current_user_update_rejects_null_display_name() -> None:
     with pytest.raises(ValidationError):
         UpdateCurrentUserRequest.model_validate({"displayName": None})

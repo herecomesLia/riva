@@ -3,11 +3,19 @@ from dataclasses import dataclass
 import pytest
 from pydantic import ValidationError
 
-from riva.schemas.base import RequestModel, ResponseModel
+from riva.schemas.base import (
+    NonEmptyPartialUpdateRequest,
+    RequestModel,
+    ResponseModel,
+)
 
 
 class ExampleRequest(RequestModel):
     request_id: str
+
+
+class ExamplePartialUpdateRequest(NonEmptyPartialUpdateRequest):
+    value: str | None = None
 
 
 class ExampleResponse(ResponseModel):
@@ -40,6 +48,11 @@ def test_request_model_forbids_extra_fields() -> None:
                 "unexpected": "value",
             }
         )
+
+
+def test_non_empty_partial_update_rejects_empty_payload() -> None:
+    with pytest.raises(ValidationError):
+        ExamplePartialUpdateRequest.model_validate({})
 
 
 def test_response_model_validates_from_object_attributes() -> None:

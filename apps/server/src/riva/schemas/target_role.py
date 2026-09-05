@@ -1,8 +1,7 @@
 from datetime import datetime
-from typing import Self
 from uuid import UUID
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from riva.models.target_role import (
@@ -12,7 +11,11 @@ from riva.models.target_role import (
     RecruitmentTrack,
 )
 from riva.models.types import NonBlankStr
-from riva.schemas.base import RequestModel, ResponseModel
+from riva.schemas.base import (
+    NonEmptyPartialUpdateRequest,
+    RequestModel,
+    ResponseModel,
+)
 
 
 class JobRequirementsRequest(JobRequirements, RequestModel):
@@ -60,7 +63,7 @@ class CreateTargetRoleRequest(RequestModel):
     location: NonBlankStr | None = None
 
 
-class UpdateTargetRoleRequest(RequestModel):
+class UpdateTargetRoleRequest(NonEmptyPartialUpdateRequest):
     title: NonBlankStr | SkipJsonSchema[None] = Field(default_factory=lambda: None)
     company: NonBlankStr | None = None
     recruitment_track: RecruitmentTrack | None = None
@@ -73,18 +76,12 @@ class UpdateTargetRoleRequest(RequestModel):
             raise ValueError("title cannot be null")
         return value
 
-    @model_validator(mode="after")
-    def require_changes(self) -> Self:
-        if not self.model_fields_set:
-            raise ValueError("at least one target role field must be provided")
-        return self
-
 
 class SetActiveTargetRoleRequest(RequestModel):
     target_role_id: UUID
 
 
-class UpdateJobDescriptionRequest(RequestModel):
+class UpdateJobDescriptionRequest(NonEmptyPartialUpdateRequest):
     responsibilities: list[NonBlankStr] | SkipJsonSchema[None] = Field(
         default_factory=lambda: None
     )
@@ -118,9 +115,3 @@ class UpdateJobDescriptionRequest(RequestModel):
         if value is None:
             raise ValueError("job description sections cannot be null")
         return value
-
-    @model_validator(mode="after")
-    def require_changes(self) -> Self:
-        if not self.model_fields_set:
-            raise ValueError("at least one job description section must be provided")
-        return self
