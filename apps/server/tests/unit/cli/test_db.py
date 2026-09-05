@@ -1,7 +1,6 @@
 import os
 from collections.abc import Iterator
-from dataclasses import dataclass, field
-from typing import Self
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 from typer.testing import CliRunner
@@ -10,18 +9,7 @@ from riva.cli import db as db_commands
 from riva.cli.main import app
 
 runner = CliRunner()
-
-
-@dataclass
-class DatabaseCalls:
-    urls: list[str] = field(default_factory=list)
-    entered: int = 0
-    exited: int = 0
-    create_tables: int = 0
-    reset: int = 0
-    setup_task_schema_urls: list[str] = field(default_factory=list)
-    reset_task_schema_urls: list[str] = field(default_factory=list)
-    failure_operation: str | None = None
+DATABASE_URL = "postgresql+psycopg://unused:unused@invalid/unused"
 
 
 @pytest.fixture(autouse=True)
@@ -45,66 +33,45 @@ def required_environment(
     restore_riva_environment: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv(
-        "RIVA_DATABASE_URL",
-        "postgresql+psycopg://unused:unused@invalid/unused",
-    )
+    monkeypatch.setenv("RIVA_DATABASE_URL", DATABASE_URL)
     monkeypatch.setenv("RIVA_SESSION_DIGEST_KEY", "test-session-digest-key")
 
 
 @pytest.fixture
-def database_calls(monkeypatch: pytest.MonkeyPatch) -> DatabaseCalls:
-    calls = DatabaseCalls()
+def database_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[Mock, MagicMock, AsyncMock, AsyncMock]:
+    database = MagicMock()
+    database.database_url = DATABASE_URL
+    database.__aenter__ = AsyncMock(return_value=database)
+    database.__aexit__ = AsyncMock(return_value=None)
+    database.create_tables = AsyncMock()
+    database.reset = AsyncMock()
 
-    class DatabaseDouble:
-        def __init__(self, database_url: str) -> None:
-            self.database_url = database_url
-            calls.urls.append(database_url)
-
-        async def __aenter__(self) -> Self:
-            calls.entered += 1
-            return self
-
-        async def __aexit__(self, *args: object) -> None:
-            calls.exited += 1
-
-        async def create_tables(self) -> None:
-            calls.create_tables += 1
-            if calls.failure_operation == "create_tables":
-                raise RuntimeError("database failure")
-
-        async def reset(self) -> None:
-            calls.reset += 1
-            if calls.failure_operation == "reset":
-                raise RuntimeError("database failure")
-
-    monkeypatch.setattr(db_commands, "Database", DatabaseDouble)
-
-    async def capture_setup_task_schema(database: DatabaseDouble) -> None:
-        calls.setup_task_schema_urls.append(database.database_url)
-
-    async def capture_reset_task_schema(database: DatabaseDouble) -> None:
-        calls.reset_task_schema_urls.append(database.database_url)
-
-    monkeypatch.setattr(db_commands, "setup_task_schema", capture_setup_task_schema)
-    monkeypatch.setattr(db_commands, "reset_task_schema", capture_reset_task_schema)
-    return calls
+    database_factory = Mock(return_value=database)
+    setup_task_schema = AsyncMock()
+    reset_task_schema = AsyncMock()
+    monkeypatch.setattr(db_commands, "Database", database_factory)
+    monkeypatch.setattr(db_commands, "setup_task_schema", setup_task_schema)
+    monkeypatch.setattr(db_commands, "reset_task_schema", reset_task_schema)
+    return database_factory, database, setup_task_schema, reset_task_schema
 
 
 @pytest.mark.parametrize("command", ["setup", "reset"])
 def test_database_command_cancellation_does_not_open_database(
     command: str,
-    database_calls: DatabaseCalls,
+    database_calls: tuple[Mock, MagicMock, AsyncMock, AsyncMock],
 ) -> None:
+    database_factory, database, setup_task_schema, reset_task_schema = database_calls
     result = runner.invoke(app, ["db", command], input="n\n")
 
     assert result.exit_code == 1
-    assert database_calls.urls == []
-    assert database_calls.entered == 0
-    assert database_calls.create_tables == 0
-    assert database_calls.reset == 0
-    assert database_calls.setup_task_schema_urls == []
-    assert database_calls.reset_task_schema_urls == []
+    database_factory.assert_not_called()
+    database.__aenter__.assert_not_awaited()
+    database.create_tables.assert_not_awaited()
+    database.reset.assert_not_awaited()
+    setup_task_schema.assert_not_awaited()
+    reset_task_schema.assert_not_awaited()
 
 
 @pytest.mark.parametrize(
@@ -114,22 +81,22 @@ def test_database_command_cancellation_does_not_open_database(
 def test_database_command_yes_executes_requested_operation(
     command: str,
     operation: str,
-    database_calls: DatabaseCalls,
+    database_calls: tuple[Mock, MagicMock, AsyncMock, AsyncMock],
 ) -> None:
+    database_factory, database, setup_task_schema, reset_task_schema = database_calls
     result = runner.invoke(app, ["db", command, "--yes"])
 
     assert result.exit_code == 0, result.output
-    assert len(database_calls.urls) == 1
-    assert database_calls.entered == 1
-    assert database_calls.exited == 1
-    assert getattr(database_calls, operation) == 1
-    expected_url = "postgresql+psycopg://unused:unused@invalid/unused"
+    database_factory.assert_called_once_with(DATABASE_URL)
+    database.__aenter__.assert_awaited_once_with()
+    database.__aexit__.assert_awaited_once()
+    getattr(database, operation).assert_awaited_once_with()
     if command == "setup":
-        assert database_calls.setup_task_schema_urls == [expected_url]
-        assert database_calls.reset_task_schema_urls == []
+        setup_task_schema.assert_awaited_once_with(database)
+        reset_task_schema.assert_not_awaited()
     else:
-        assert database_calls.setup_task_schema_urls == []
-        assert database_calls.reset_task_schema_urls == [expected_url]
+        setup_task_schema.assert_not_awaited()
+        reset_task_schema.assert_awaited_once_with(database)
 
 
 @pytest.mark.parametrize(
@@ -139,13 +106,14 @@ def test_database_command_yes_executes_requested_operation(
 def test_database_command_failure_returns_nonzero_exit(
     command: str,
     operation: str,
-    database_calls: DatabaseCalls,
+    database_calls: tuple[Mock, MagicMock, AsyncMock, AsyncMock],
 ) -> None:
-    database_calls.failure_operation = operation
+    _, database, _, _ = database_calls
+    getattr(database, operation).side_effect = RuntimeError("database failure")
 
     result = runner.invoke(app, ["db", command, "--yes"])
 
     assert result.exit_code == 1
-    assert getattr(database_calls, operation) == 1
-    assert database_calls.exited == 1
+    getattr(database, operation).assert_awaited_once_with()
+    database.__aexit__.assert_awaited_once()
     assert "Failed" in result.output

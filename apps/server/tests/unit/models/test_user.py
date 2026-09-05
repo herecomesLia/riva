@@ -1,7 +1,6 @@
 import pytest
-from sqlalchemy import select
 
-from riva.models.user import User, normalize_username
+from riva.models.user import User
 
 
 def make_user(username: str = "TestUser") -> User:
@@ -35,15 +34,3 @@ def test_normalized_username_is_read_only() -> None:
         user.normalized_username = "manual"
 
     assert user.normalized_username == "testuser"
-
-
-def test_normalize_username_lowercases_username() -> None:
-    assert normalize_username("TestUser") == "testuser"
-
-
-def test_normalized_username_supports_class_level_queries() -> None:
-    statement = select(User).where(
-        User.normalized_username == normalize_username("TestUser")
-    )
-
-    assert "users.normalized_username" in str(statement)

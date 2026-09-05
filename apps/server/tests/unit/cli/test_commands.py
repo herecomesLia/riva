@@ -1,7 +1,7 @@
 import os
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 import uvicorn
@@ -44,35 +44,27 @@ def required_environment(
 
 def _capture_boundaries(
     monkeypatch: pytest.MonkeyPatch,
-) -> tuple[list[tuple[str, dict[str, Any]]], list[tuple[LogLevel, LogFormat]]]:
-    uvicorn_calls: list[tuple[str, dict[str, Any]]] = []
-    logging_calls: list[tuple[LogLevel, LogFormat]] = []
+) -> tuple[Mock, Mock]:
+    uvicorn_run = Mock()
+    configure_logging = Mock()
 
-    def capture_uvicorn_run(application: str, **options: Any) -> None:
-        uvicorn_calls.append((application, options))
-
-    def capture_configure_logging(
-        log_level: LogLevel,
-        log_format: LogFormat,
-    ) -> None:
-        logging_calls.append((log_level, log_format))
-
-    monkeypatch.setattr(uvicorn, "run", capture_uvicorn_run)
-    monkeypatch.setattr(commands, "configure_logging", capture_configure_logging)
-    return uvicorn_calls, logging_calls
+    monkeypatch.setattr(uvicorn, "run", uvicorn_run)
+    monkeypatch.setattr(commands, "configure_logging", configure_logging)
+    return uvicorn_run, configure_logging
 
 
 def test_start_runs_uvicorn_with_settings_defaults(
     required_environment: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    uvicorn_calls, logging_calls = _capture_boundaries(monkeypatch)
+    uvicorn_run, configure_logging = _capture_boundaries(monkeypatch)
 
     result = runner.invoke(app, ["start"])
 
     assert result.exit_code == 0, result.output
-    assert len(uvicorn_calls) == 1
-    application, options = uvicorn_calls[0]
+    uvicorn_run.assert_called_once()
+    application = uvicorn_run.call_args.args[0]
+    options = uvicorn_run.call_args.kwargs
     assert application == "riva.main:app"
     assert options["host"] == "127.0.0.1"
     assert options["port"] == 7482
@@ -81,7 +73,7 @@ def test_start_runs_uvicorn_with_settings_defaults(
     assert options["log_config"] is None
     assert options["access_log"] is False
     assert "reload_dirs" not in options
-    assert logging_calls == [(LogLevel.INFO, LogFormat.CONSOLE)]
+    configure_logging.assert_called_once_with(LogLevel.INFO, LogFormat.CONSOLE)
 
 
 def test_start_cli_options_override_environment(
@@ -92,7 +84,7 @@ def test_start_cli_options_override_environment(
     monkeypatch.setenv("RIVA_PORT", "8000")
     monkeypatch.setenv("RIVA_LOG_LEVEL", "warning")
     monkeypatch.setenv("RIVA_LOG_FORMAT", "console")
-    uvicorn_calls, logging_calls = _capture_boundaries(monkeypatch)
+    uvicorn_run, configure_logging = _capture_boundaries(monkeypatch)
 
     result = runner.invoke(
         app,
@@ -110,24 +102,24 @@ def test_start_cli_options_override_environment(
     )
 
     assert result.exit_code == 0, result.output
-    _, options = uvicorn_calls[0]
+    options = uvicorn_run.call_args.kwargs
     assert options["host"] == "cli-host"
     assert options["port"] == 9000
     assert options["log_level"] == "debug"
-    assert logging_calls == [(LogLevel.DEBUG, LogFormat.JSON)]
+    configure_logging.assert_called_once_with(LogLevel.DEBUG, LogFormat.JSON)
 
 
 def test_start_reload_watches_source_root(
     required_environment: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    uvicorn_calls, _ = _capture_boundaries(monkeypatch)
+    uvicorn_run, _ = _capture_boundaries(monkeypatch)
     monkeypatch.setattr(commands, "_source_root_dir", lambda: Path("/tmp/riva-src"))
 
     result = runner.invoke(app, ["start", "--reload"])
 
     assert result.exit_code == 0, result.output
-    _, options = uvicorn_calls[0]
+    options = uvicorn_run.call_args.kwargs
     assert options["reload"] is True
     assert options["reload_dirs"] == ["/tmp/riva-src"]
 
@@ -139,28 +131,20 @@ def test_worker_runs_with_environment_settings(
     monkeypatch.setenv("RIVA_TASKS_CONCURRENCY", "6")
     monkeypatch.setenv("RIVA_LOG_LEVEL", "warning")
     monkeypatch.setenv("RIVA_LOG_FORMAT", "json")
-    worker_calls: list[tuple[str, int, int | None]] = []
-    logging_calls: list[tuple[LogLevel, LogFormat]] = []
-
-    async def capture_run_worker(settings: Any, *, concurrency: int | None) -> None:
-        worker_calls.append(
-            (settings.database_url, settings.tasks.concurrency, concurrency)
-        )
-
-    monkeypatch.setattr(commands, "run_worker", capture_run_worker)
-    monkeypatch.setattr(
-        commands,
-        "configure_logging",
-        lambda level, format_: logging_calls.append((level, format_)),
-    )
+    run_worker = AsyncMock()
+    configure_logging = Mock()
+    monkeypatch.setattr(commands, "run_worker", run_worker)
+    monkeypatch.setattr(commands, "configure_logging", configure_logging)
 
     result = runner.invoke(app, ["worker"])
 
     assert result.exit_code == 0, result.output
-    assert worker_calls == [
-        ("postgresql+psycopg://unused:unused@invalid/unused", 6, None)
-    ]
-    assert logging_calls == [(LogLevel.WARNING, LogFormat.JSON)]
+    run_worker.assert_awaited_once()
+    settings = run_worker.await_args.args[0]
+    assert settings.database_url == "postgresql+psycopg://unused:unused@invalid/unused"
+    assert settings.tasks.concurrency == 6
+    assert run_worker.await_args.kwargs == {"concurrency": None}
+    configure_logging.assert_called_once_with(LogLevel.WARNING, LogFormat.JSON)
 
 
 def test_worker_cli_options_override_environment(
@@ -170,18 +154,10 @@ def test_worker_cli_options_override_environment(
     monkeypatch.setenv("RIVA_TASKS_CONCURRENCY", "6")
     monkeypatch.setenv("RIVA_LOG_LEVEL", "warning")
     monkeypatch.setenv("RIVA_LOG_FORMAT", "console")
-    worker_calls: list[tuple[int, int | None]] = []
-    logging_calls: list[tuple[LogLevel, LogFormat]] = []
-
-    async def capture_run_worker(settings: Any, *, concurrency: int | None) -> None:
-        worker_calls.append((settings.tasks.concurrency, concurrency))
-
-    monkeypatch.setattr(commands, "run_worker", capture_run_worker)
-    monkeypatch.setattr(
-        commands,
-        "configure_logging",
-        lambda level, format_: logging_calls.append((level, format_)),
-    )
+    run_worker = AsyncMock()
+    configure_logging = Mock()
+    monkeypatch.setattr(commands, "run_worker", run_worker)
+    monkeypatch.setattr(commands, "configure_logging", configure_logging)
 
     result = runner.invoke(
         app,
@@ -197,5 +173,8 @@ def test_worker_cli_options_override_environment(
     )
 
     assert result.exit_code == 0, result.output
-    assert worker_calls == [(6, 8)]
-    assert logging_calls == [(LogLevel.DEBUG, LogFormat.JSON)]
+    run_worker.assert_awaited_once()
+    settings = run_worker.await_args.args[0]
+    assert settings.tasks.concurrency == 6
+    assert run_worker.await_args.kwargs == {"concurrency": 8}
+    configure_logging.assert_called_once_with(LogLevel.DEBUG, LogFormat.JSON)
