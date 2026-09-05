@@ -1,11 +1,11 @@
 import preview from "#storybook/preview"
 import { expect, userEvent } from "storybook/test"
 
-import { createInterviewReviewResponseMock } from "@/mocks/data/interview"
+import { createInterviewReviewStoryFixture } from "@/pages/interview/stories/interview-story-fixtures"
 
 import { InterviewQuestionDetails } from "./InterviewQuestionDetails"
 
-const response = createInterviewReviewResponseMock()
+const response = createInterviewReviewStoryFixture()
 if (response.status !== "complete") throw new Error("Complete review fixture required.")
 
 const meta = preview.meta({
@@ -19,10 +19,10 @@ export const AnsweredWithFollowUp = meta.story({
     const detail = response.questionDetails[1]!
     await userEvent.click(
       canvas.getByRole("button", {
-        name: new RegExp(detail.record.question.prompt.slice(0, 16)),
+        name: new RegExp(detail.prompt.slice(0, 16)),
       }),
     )
-    await expect(canvas.getByText(detail.followUps[0]!.record.question.prompt)).toBeVisible()
+    await expect(canvas.getByText(detail.followUps[0]!.prompt)).toBeVisible()
   },
 })
 
@@ -31,12 +31,7 @@ export const Unanswered = meta.story({
     details: [
       {
         ...response.questionDetails[0]!,
-        record: {
-          status: "unanswered",
-          question: response.questionDetails[0]!.record.question,
-          answer: null,
-          followUps: [],
-        },
+        answer: null,
         performance: null,
         followUps: [],
       },

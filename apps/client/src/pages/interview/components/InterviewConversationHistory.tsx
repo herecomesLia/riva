@@ -3,10 +3,10 @@ import { useTranslation } from "react-i18next"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import type { InterviewConversationRecordViewData } from "@/models/interview"
+import type { InterviewConversationItem } from "@/models/interview-workflow"
 
 type InterviewConversationHistoryProps = {
-  records: readonly InterviewConversationRecordViewData[]
+  records: readonly InterviewConversationItem[]
 }
 
 export function InterviewConversationHistory({ records }: InterviewConversationHistoryProps) {
@@ -24,7 +24,10 @@ export function InterviewConversationHistory({ records }: InterviewConversationH
       <CardContent>
         <ol className="flex flex-col gap-5">
           {records.map((record, index) => (
-            <li className="flex min-w-0 flex-col gap-3" key={record.id}>
+            <li
+              className="flex min-w-0 flex-col gap-3"
+              key={`${record.kind}-${record.questionOrder}-${index}`}
+            >
               {index > 0 ? <Separator /> : null}
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={record.kind === "followUp" ? "outline" : "secondary"}>

@@ -35,20 +35,17 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
-import type {
-  GetInterviewReviewResponse,
-  InterviewTrainingSuggestionResponse,
-} from "@/models/interview"
+import type { InterviewReview, InterviewTrainingSuggestion } from "@/models/interview-workflow"
 
 import { InterviewDimensionScores } from "./components/InterviewDimensionScores"
 import { InterviewQuestionDetails } from "./components/InterviewQuestionDetails"
 import { InterviewReviewListCard } from "./components/InterviewReviewListCard"
 
-type PartialReviewData = Extract<GetInterviewReviewResponse, { status: "partial" }>
-type CompleteReviewData = Extract<GetInterviewReviewResponse, { status: "complete" }>
-type FailedReviewData = Extract<GetInterviewReviewResponse, { status: "failed" }>
-type GeneratingReviewData = Extract<GetInterviewReviewResponse, { status: "generating" }>
-type UnavailableReviewData = Extract<GetInterviewReviewResponse, { status: "unavailable" }>
+type PartialReviewData = Extract<InterviewReview, { status: "partial" }>
+type CompleteReviewData = Extract<InterviewReview, { status: "complete" }>
+type FailedReviewData = Extract<InterviewReview, { status: "failed" }>
+type GeneratingReviewData = Extract<InterviewReview, { status: "generating" }>
+type UnavailableReviewData = Extract<InterviewReview, { status: "unavailable" }>
 type AvailableReviewData = PartialReviewData | CompleteReviewData
 
 export type InterviewReviewViewProps =
@@ -66,7 +63,7 @@ export type InterviewReviewViewProps =
       status: "complete"
       data: CompleteReviewData
       onBack: () => void
-      onNextTraining: (suggestion: InterviewTrainingSuggestionResponse) => void
+      onNextTraining: (suggestion: InterviewTrainingSuggestion) => void
     }
   | {
       status: "unavailable"
@@ -136,14 +133,16 @@ export function InterviewReviewView(props: InterviewReviewViewProps) {
   )
 }
 
-function ReviewGenerationFailed({ data, onBack }: { data: FailedReviewData; onBack: () => void }) {
+function ReviewGenerationFailed({ onBack }: { data: FailedReviewData; onBack: () => void }) {
   const { t } = useTranslation()
 
   return (
     <Card role="alert">
       <CardHeader>
-        <CardTitle>{t(`interview.review.failed.${data.reason}.title`)}</CardTitle>
-        <CardDescription>{t(`interview.review.failed.${data.reason}.description`)}</CardDescription>
+        <CardTitle>{t("interview.review.failed.generationFailed.title")}</CardTitle>
+        <CardDescription>
+          {t("interview.review.failed.generationFailed.description")}
+        </CardDescription>
       </CardHeader>
       <CardFooter>
         <Button onClick={onBack} variant="outline">
@@ -199,7 +198,7 @@ function ReviewContent({
 }: {
   data: AvailableReviewData
   onBack: () => void
-  onNextTraining?: (suggestion: InterviewTrainingSuggestionResponse) => void
+  onNextTraining?: (suggestion: InterviewTrainingSuggestion) => void
 }) {
   const { t } = useTranslation()
   const isComplete = data.status === "complete"
@@ -297,9 +296,9 @@ function NextTrainingCard({
   onBack,
   onNextTraining,
 }: {
-  nextTraining: InterviewTrainingSuggestionResponse
+  nextTraining: InterviewTrainingSuggestion
   onBack: () => void
-  onNextTraining: (suggestion: InterviewTrainingSuggestionResponse) => void
+  onNextTraining: (suggestion: InterviewTrainingSuggestion) => void
 }) {
   const { t } = useTranslation()
 
@@ -343,7 +342,7 @@ function ReviewUnavailable({ data, onBack }: { data: UnavailableReviewData; onBa
       <div className="flex flex-col gap-6">
         <Alert>
           <CircleOffIcon aria-hidden="true" />
-          <AlertTitle>{t(`interview.review.unavailable.${data.reason}.title`)}</AlertTitle>
+          <AlertTitle>{t("interview.review.unavailable.insufficientAnswers.title")}</AlertTitle>
           <AlertDescription>
             {t("interview.review.unavailableWithLearningDescription")}
           </AlertDescription>
@@ -369,9 +368,9 @@ function ReviewUnavailable({ data, onBack }: { data: UnavailableReviewData; onBa
             <EmptyMedia variant="icon">
               <CircleOffIcon aria-hidden="true" />
             </EmptyMedia>
-            <EmptyTitle>{t(`interview.review.unavailable.${data.reason}.title`)}</EmptyTitle>
+            <EmptyTitle>{t("interview.review.unavailable.insufficientAnswers.title")}</EmptyTitle>
             <EmptyDescription>
-              {t(`interview.review.unavailable.${data.reason}.description`)}
+              {t("interview.review.unavailable.insufficientAnswers.description")}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

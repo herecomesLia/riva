@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import {
-  createInterviewAgentPlanMock,
-  defaultInterviewConfigurationMock,
-  interviewSetupResponseMock,
-} from "@/mocks/data/interview"
+import { interviewFixture } from "@/mocks/fixtures/interview"
 
 import {
   createInterviewSessionStoryFixture,
@@ -21,16 +17,15 @@ describe("interview Story fixtures", () => {
     const secondSetup = createInterviewSetupStoryFixture()
 
     expect(secondSetup.targetRoles[0]?.title).toBe("Senior Frontend Engineer")
-    expect(interviewSetupResponseMock.targetRoles[0]?.title).toBe("Senior Frontend Engineer")
 
     const firstSession = createInterviewSessionStoryFixture()
-    firstSession.completedQuestions[0]!.answer.content = "被 Story 修改的回答"
+    firstSession.history[0]!.answer = "被 Story 修改的回答"
     const secondSession = createInterviewSessionStoryFixture()
 
-    expect(secondSession.completedQuestions[0]?.answer.content).not.toBe("被 Story 修改的回答")
+    expect(secondSession.history[0]?.answer).not.toBe("被 Story 修改的回答")
   })
 
-  it("derives product-ready and missing-JD Stories from shared Roles scenarios", () => {
+  it("provides product-ready and missing-JD display scenarios", () => {
     const allReady = createInterviewSetupStoryFixture("multipleRolesReady")
     expect(allReady.targetRoles.map(({ id }) => id)).toEqual([
       "role_frontend_bytedance",
@@ -58,7 +53,9 @@ describe("interview Story fixtures", () => {
     const secondReview = createSparseInterviewReviewStoryFixture()
     if (secondReview.status !== "complete") throw new Error("Expected complete review.")
 
-    expect(secondReview.review.mainStrengths[0]).toBe("模块边界清楚")
+    expect(secondReview.review.mainStrengths[0]).toBe(
+      interviewFixture.review.review.mainStrengths[0],
+    )
     const secondReference = secondReview.questionDetails[0]?.referenceAnswer
     if (secondReference?.status !== "ready") throw new Error("Expected ready reference answer.")
     expect(secondReference.content.exampleAnswer).not.toBe("被 Story 修改的参考答案")
@@ -68,30 +65,13 @@ describe("interview Story fixtures", () => {
     const firstReview = createGeneratingReferenceReviewStoryFixture()
     firstReview.questionDetails[0]!.referenceAnswer = {
       status: "unavailable",
-      reason: "generationFailed",
     }
     const secondReview = createGeneratingReferenceReviewStoryFixture()
     expect(secondReview.questionDetails[0]!.referenceAnswer.status).toBe("generating")
 
     const firstExchanges = createLongCandidateExchangesStoryFixture()
-    firstExchanges[0]!.question.content = "被 Story 修改的问题"
+    firstExchanges[0]!.question = "被 Story 修改的问题"
     const secondExchanges = createLongCandidateExchangesStoryFixture()
-    expect(secondExchanges[0]!.question.content).not.toBe("被 Story 修改的问题")
-  })
-
-  it("keeps the public Interview Mock outlet deeply isolated after the directory split", () => {
-    const first = createInterviewAgentPlanMock({
-      ...defaultInterviewConfigurationMock,
-      scenario: "multipleFollowUps",
-    })
-    first.questions[0]!.question.prompt = "被调用方修改的问题"
-    first.questions[1]!.followUps[0]!.prompt = "被调用方修改的追问"
-
-    const second = createInterviewAgentPlanMock({
-      ...defaultInterviewConfigurationMock,
-      scenario: "multipleFollowUps",
-    })
-    expect(second.questions[0]!.question.prompt).not.toBe("被调用方修改的问题")
-    expect(second.questions[1]!.followUps[0]!.prompt).not.toBe("被调用方修改的追问")
+    expect(secondExchanges[0]!.question).not.toBe("被 Story 修改的问题")
   })
 })

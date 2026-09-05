@@ -8,14 +8,12 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import type { InterviewReferenceAnswerResponse } from "@/models/interview"
+import type { InterviewReferenceAnswer as ReferenceAnswerState } from "@/models/interview-workflow"
 
 export function InterviewReferenceAnswer({
-  id,
   referenceAnswer,
 }: {
-  id: string
-  referenceAnswer: InterviewReferenceAnswerResponse
+  referenceAnswer: ReferenceAnswerState
 }) {
   const { t } = useTranslation()
   if (referenceAnswer.status !== "ready") {
@@ -33,7 +31,7 @@ export function InterviewReferenceAnswer({
 
   return (
     <Accordion className="rounded-lg border border-primary/20 bg-primary/5 px-4">
-      <AccordionItem value={`reference-${id}`}>
+      <AccordionItem value="reference">
         <AccordionTrigger className="no-underline hover:no-underline">
           <span className="flex items-center gap-2 text-primary">
             <BookOpenTextIcon aria-hidden="true" />

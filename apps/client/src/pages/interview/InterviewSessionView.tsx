@@ -41,11 +41,12 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import type {
-  InterviewCandidateQuestionExchangeResponse,
-  InterviewConversationRecordViewData,
+  CandidateQuestionExchange,
+  InterviewConversationItem,
   InterviewDifficulty,
   InterviewRound,
-} from "@/models/interview"
+  InterviewPrompt,
+} from "@/models/interview-workflow"
 
 import { CandidateQuestionsStage } from "./components/CandidateQuestionsStage"
 import { InterviewAnswerComposer } from "./components/InterviewAnswerComposer"
@@ -58,14 +59,7 @@ export type InterviewSessionSummary = {
   difficulty: InterviewDifficulty
   completedMainQuestions: number
   totalMainQuestions: number | null
-  planRevision: number
-}
-
-export type InterviewPromptViewData = {
-  id: string
-  kind: "question" | "followUp"
-  content: string
-  questionOrder: number
+  planAdjusted: boolean
 }
 
 type ActiveSessionActions = {
@@ -98,8 +92,8 @@ export type InterviewSessionViewProps =
   | ({
       status: "question"
       summary: InterviewSessionSummary
-      prompt: InterviewPromptViewData
-      history: readonly InterviewConversationRecordViewData[]
+      prompt: InterviewPrompt
+      history: readonly InterviewConversationItem[]
       isSubmitting: boolean
       onSubmit: (content: string) => Promise<void>
     } & ActiveSessionActions)
@@ -107,8 +101,8 @@ export type InterviewSessionViewProps =
       status: "candidateQuestions"
       summary: InterviewSessionSummary
       prompt: string
-      history: readonly InterviewConversationRecordViewData[]
-      exchanges: readonly InterviewCandidateQuestionExchangeResponse[]
+      history: readonly InterviewConversationItem[]
+      exchanges: readonly CandidateQuestionExchange[]
       isSubmittingQuestion: boolean
       isFinishing: boolean
       isInteractionLocked: boolean
@@ -294,7 +288,7 @@ function SessionProgress({ summary }: { summary: InterviewSessionSummary }) {
               total: summary.totalMainQuestions,
             })}
       </span>
-      {summary.planRevision > 1 ? (
+      {summary.planAdjusted ? (
         <Badge variant="outline">{t("interview.session.planAdjusted")}</Badge>
       ) : null}
     </div>
@@ -383,7 +377,7 @@ function QuestionContent(props: Extract<InterviewSessionViewProps, { status: "qu
       <InterviewAnswerComposer
         isDisabled={props.isInteractionLocked}
         isPending={props.isSubmitting}
-        key={props.prompt.id}
+        key={`${props.prompt.kind}:${props.prompt.questionOrder}:${props.prompt.content}`}
         onSubmit={props.onSubmit}
       />
     </main>

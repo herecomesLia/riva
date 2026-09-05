@@ -3,13 +3,8 @@ import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
-import {
-  createInterviewSetupResponseMock,
-  interviewSetupResponseMock,
-} from "@/mocks/data/interview"
-import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
-import { createRolesMockResponse } from "@/mocks/data/roles"
-import type { InterviewConfiguration, InterviewSetupResponse } from "@/models/interview"
+import { createInterviewSetupStoryFixture } from "./stories/interview-story-fixtures"
+import type { InterviewConfiguration, InterviewSetup } from "@/models/interview-workflow"
 import { renderWithProviders } from "@/test/render"
 
 import { InterviewView } from "./InterviewView"
@@ -17,7 +12,7 @@ import { InterviewView } from "./InterviewView"
 function renderReadyView(
   onStart: (input: InterviewConfiguration) => Promise<void> = vi.fn(async () => undefined),
   isStarting = false,
-  setup: InterviewSetupResponse = interviewSetupResponseMock,
+  setup: InterviewSetup = createInterviewSetupStoryFixture(),
 ) {
   return {
     onStart,
@@ -62,17 +57,17 @@ describe("InterviewView", () => {
     expect(setupCard?.parentElement).not.toHaveClass("max-w-4xl")
 
     expect(await screen.findByText("Senior Frontend Engineer · ByteDance")).toBeInTheDocument()
-    for (const round of interviewSetupResponseMock.targetRoles[0].supportedRounds) {
+    for (const round of createInterviewSetupStoryFixture().targetRoles[0].supportedRounds) {
       expect(
         screen.getByRole("button", { name: i18n.t(`interview.rounds.${round}`) }),
       ).toBeVisible()
     }
-    for (const difficulty of interviewSetupResponseMock.availableDifficulties) {
+    for (const difficulty of createInterviewSetupStoryFixture().availableDifficulties) {
       expect(
         screen.getByRole("button", { name: i18n.t(`interview.difficulty.${difficulty}`) }),
       ).toBeVisible()
     }
-    for (const durationMinutes of interviewSetupResponseMock.availableDurationMinutes) {
+    for (const durationMinutes of createInterviewSetupStoryFixture().availableDurationMinutes) {
       expect(
         screen.getByRole("button", {
           name: i18n.t("interview.setup.durationMinutes", { minutes: durationMinutes }),
@@ -83,14 +78,7 @@ describe("InterviewView", () => {
 
   it("updates available rounds when the selected service role changes", async () => {
     const user = userEvent.setup()
-    renderReadyView(
-      undefined,
-      false,
-      createInterviewSetupResponseMock(
-        createRolesMockResponse("multipleRolesReady"),
-        careerProfileFixture,
-      ),
-    )
+    renderReadyView(undefined, false, createInterviewSetupStoryFixture("multipleRolesReady"))
 
     await user.click(await screen.findByTestId("interview-target-role-trigger"))
     await user.click(await screen.findByRole("option", { name: "Product Manager · Meituan" }))
@@ -144,7 +132,7 @@ describe("InterviewView", () => {
     await user.click(startButton)
 
     expect(onStart).toHaveBeenCalledTimes(1)
-    expect(onStart).toHaveBeenCalledWith(interviewSetupResponseMock.defaultConfiguration)
+    expect(onStart).toHaveBeenCalledWith(createInterviewSetupStoryFixture().defaultConfiguration)
   })
 
   it("submits the duration preference without converting it into a question count", async () => {
@@ -159,7 +147,7 @@ describe("InterviewView", () => {
     await user.click(screen.getByRole("button", { name: i18n.t("interview.actions.start") }))
 
     expect(onStart).toHaveBeenCalledWith({
-      ...interviewSetupResponseMock.defaultConfiguration,
+      ...createInterviewSetupStoryFixture().defaultConfiguration,
       durationMinutes: 45,
     })
   })

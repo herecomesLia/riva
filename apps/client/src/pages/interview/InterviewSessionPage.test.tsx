@@ -2,25 +2,21 @@ import { act, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { trainingRecordQueryKeys } from "@/app/training-record-query"
-import { dashboardQueryKeys } from "@/app/dashboard-query"
 import { i18n } from "@/i18n/i18n"
+import { interviewFixture } from "@/mocks/fixtures/interview"
 import {
-  createCandidateQuestionExchange,
-  createInterviewAgentPlanMock,
-  createInterviewCompletedSessionMock,
-  createInterviewCompletedSessionResponseMock,
-  createInterviewMockResponse,
-  defaultInterviewConfigurationMock,
-} from "@/mocks/data/interview"
+  createInterviewPageStoryFixture,
+  createInterviewSetupStoryFixture,
+  createCandidateExchangeStoryFixture,
+} from "./stories/interview-story-fixtures"
 import type {
-  ActiveInterviewSessionResponse,
-  InterviewCandidateQuestionsSessionResponse,
-  InterviewCompletionResponse,
-  InterviewFollowUpSessionResponse,
-  InterviewPageResponse,
-  InterviewQuestionSessionResponse,
-} from "@/models/interview"
+  InterviewSession,
+  InterviewData,
+  CompletedSession,
+  QuestionSession,
+  FollowUpSession,
+  CandidateQuestionsSession,
+} from "@/models/interview-workflow"
 import {
   beginInterviewQuestions,
   endInterview,
@@ -44,10 +40,6 @@ vi.mock("@/services/interview", async (importOriginal) => ({
 }))
 
 const sessionId = "mock-interview-session-page"
-const singleFollowUpPlan = createInterviewAgentPlanMock({
-  ...defaultInterviewConfigurationMock,
-  scenario: "singleFollowUp",
-})
 
 function createDeferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -57,120 +49,79 @@ function createDeferred<T>() {
   return { promise, resolve }
 }
 
-function responseWithSession(session: InterviewPageResponse["session"]): InterviewPageResponse {
+function responseWithSession(session: InterviewData["session"]): InterviewData {
   return {
-    setup: createInterviewMockResponse().setup,
+    setup: createInterviewSetupStoryFixture(),
     session,
   }
 }
 
-function completedResponse(
-  activeSession: ActiveInterviewSessionResponse,
-): InterviewCompletionResponse {
-  const completed = createInterviewCompletedSessionMock({
-    completionReason:
-      activeSession.status === "candidateQuestions" ? "formalQuestionsCompleted" : "userEndedEarly",
-    completedMainQuestions: activeSession.progress.completedMainQuestions,
-  })
+function completedResponse(active: Exclude<InterviewSession, CompletedSession>): CompletedSession {
   return {
-    session: {
-      ...createInterviewCompletedSessionResponseMock(completed),
-      sessionId: activeSession.sessionId,
-      version: activeSession.version + 1,
-      reviewStatus: completed.review.status === "unavailable" ? "unavailable" : "generating",
-    },
+    status: "completed",
+    sessionId: active.sessionId,
+    history: "history" in active ? active.history : [],
   }
 }
 
-function openingResponse(): InterviewPageResponse {
+const configuration = { ...interviewFixture.configuration, targetRoleId: "role_frontend_bytedance" }
+
+function openingResponse(): InterviewData {
   return responseWithSession({
     status: "opening",
     sessionId,
-    version: 1,
-    configuration: {
-      targetRoleId: "role_frontend_bytedance",
-      round: "technical",
-      difficulty: "pressure",
-      durationMinutes: 30,
-    },
-    startedAt: "2026-07-24T02:00:00.000Z",
-    progress: {
-      completedMainQuestions: 0,
-      totalMainQuestions: 3,
-      planRevision: 1,
-    },
-    completedQuestions: [],
-    openingMessage: "欢迎参加本次模拟面试。",
+    configuration,
+    progress: { ...interviewFixture.progress },
+    openingMessage: interviewFixture.openingMessage,
   })
 }
 
-function questionSession(order: number, version: number): InterviewQuestionSessionResponse {
-  const question = singleFollowUpPlan.questions[order - 1]!.question
+function questionSession(order: number): QuestionSession {
   return {
     status: "question",
     sessionId,
-    version,
-    configuration: {
-      targetRoleId: "role_frontend_bytedance",
-      round: "technical",
-      difficulty: "pressure",
-      durationMinutes: 30,
-    },
-    startedAt: "2026-07-24T02:00:00.000Z",
+    configuration,
     progress: {
+      ...interviewFixture.progress,
       completedMainQuestions: order - 1,
-      totalMainQuestions: 3,
-      planRevision: 1,
+      totalMainQuestions: 2,
     },
-    completedQuestions: [],
-    currentQuestion: { status: "awaitingAnswer", question, answer: null },
+    history: [],
+    prompt: {
+      ...interviewFixture.question,
+      questionOrder: order,
+      content: order === 1 ? interviewFixture.question.content : "请进一步说明方案取舍。",
+    },
   }
 }
 
-function followUpSession(followUpIndex: number, version: number): InterviewFollowUpSessionResponse {
-  const planned = createInterviewAgentPlanMock({
-    ...defaultInterviewConfigurationMock,
-    scenario: "multipleFollowUps",
-  }).questions[1]!
-  const currentFollowUp = planned.followUps[followUpIndex]!
+function followUpSession(index: number): FollowUpSession {
   return {
     status: "followUp",
     sessionId,
-    version,
-    configuration: {
-      targetRoleId: "role_frontend_bytedance",
-      round: "technical",
-      difficulty: "pressure",
-      durationMinutes: 30,
-    },
-    startedAt: "2026-07-24T02:00:00.000Z",
-    progress: {
-      completedMainQuestions: 1,
-      totalMainQuestions: 3,
-      planRevision: 1,
-    },
-    completedQuestions: [],
-    currentQuestion: {
-      question: planned.question,
-      answer: {
-        id: "main-answer",
-        content: "我通过真实用户监控定位长任务，并分阶段完成治理。",
-        submittedAt: "2026-07-24T02:03:00.000Z",
+    configuration,
+    progress: { ...interviewFixture.progress },
+    history: [
+      {
+        kind: "question",
+        questionOrder: 1,
+        prompt: interviewFixture.question.content,
+        answer: "我通过真实用户监控定位长任务，并分阶段完成治理。",
       },
-      answeredFollowUps: planned.followUps.slice(0, followUpIndex).map((question, index) => ({
-        status: "answered",
-        question,
-        answer: {
-          id: `follow-up-answer-${index}`,
-          content: "我会通过灰度对照验证业务收益。",
-          submittedAt: "2026-07-24T02:04:00.000Z",
-        },
-      })),
-    },
-    currentFollowUp: {
-      status: "awaitingAnswer",
-      question: currentFollowUp,
-      answer: null,
+      ...(index === 0
+        ? []
+        : [
+            {
+              kind: "followUp" as const,
+              questionOrder: 1,
+              prompt: interviewFixture.followUp.content,
+              answer: "我会通过灰度对照验证业务收益。",
+            },
+          ]),
+    ],
+    prompt: {
+      ...interviewFixture.followUp,
+      content: index === 0 ? interviewFixture.followUp.content : "你如何调整不符合预期的方案？",
     },
   }
 }
@@ -182,20 +133,15 @@ function renderSession() {
 }
 
 function candidateSession(
-  version: number,
-  exchanges: InterviewCandidateQuestionsSessionResponse["exchanges"] = [],
-): InterviewCandidateQuestionsSessionResponse {
-  const completedArtifact = createInterviewCompletedSessionMock()
-
+  exchanges: CandidateQuestionsSession["exchanges"] = [],
+): CandidateQuestionsSession {
   return {
     status: "candidateQuestions",
     sessionId,
-    version,
-    configuration: completedArtifact.configuration,
-    startedAt: completedArtifact.startedAt,
-    progress: completedArtifact.progress,
-    completedQuestions: completedArtifact.completedQuestions,
-    prompt: "正式提问已经结束。现在请你以候选人身份向面试官提问。",
+    configuration,
+    progress: { ...interviewFixture.progress, completedMainQuestions: 1 },
+    history: [],
+    prompt: interviewFixture.candidate.prompt,
     exchanges,
   }
 }
@@ -224,7 +170,7 @@ describe("InterviewSessionContainer", () => {
     const user = userEvent.setup()
     vi.mocked(getInterviewPage)
       .mockRejectedValueOnce(new Error("session load failed"))
-      .mockResolvedValueOnce(responseWithSession(questionSession(1, 2)))
+      .mockResolvedValueOnce(responseWithSession(questionSession(1)))
     renderSession()
 
     expect(await screen.findByText(i18n.t("interview.session.errors.loadTitle"))).toBeVisible()
@@ -234,15 +180,15 @@ describe("InterviewSessionContainer", () => {
       }),
     )
 
-    expect(await screen.findByText(singleFollowUpPlan.questions[0]!.question.prompt)).toBeVisible()
+    expect(await screen.findByText(interviewFixture.question.content)).toBeVisible()
     expect(getInterviewPage).toHaveBeenCalledTimes(2)
   })
 
   it("starts the question flow through the service and updates the cached snapshot", async () => {
     const user = userEvent.setup()
-    const firstQuestion = responseWithSession(questionSession(1, 2))
+    const firstQuestion = responseWithSession(questionSession(1))
     vi.mocked(getInterviewPage).mockResolvedValue(openingResponse())
-    vi.mocked(beginInterviewQuestions).mockResolvedValue(firstQuestion)
+    vi.mocked(beginInterviewQuestions).mockResolvedValue(firstQuestion.session)
     const result = renderSession()
 
     await user.click(
@@ -251,20 +197,17 @@ describe("InterviewSessionContainer", () => {
       }),
     )
 
-    expect(vi.mocked(beginInterviewQuestions).mock.calls[0]?.[0]).toEqual({
-      sessionId,
-      version: 1,
-    })
-    expect(await screen.findByText(singleFollowUpPlan.questions[0]!.question.prompt)).toBeVisible()
+    expect(beginInterviewQuestions).toHaveBeenCalledOnce()
+    expect(await screen.findByText(interviewFixture.question.content)).toBeVisible()
     expect(result.queryClient.getQueryData(["interview"])).toEqual(firstQuestion)
   })
 
   it("submits an answer only once while its mutation is pending", async () => {
     const user = userEvent.setup()
     const answer = "我会先说明背景和目标，再突出个人决策、推动动作和量化结果。"
-    const first = questionSession(1, 2)
-    const second = responseWithSession(questionSession(2, 3))
-    const submitRequest = createDeferred<InterviewPageResponse>()
+    const first = questionSession(1)
+    const second = responseWithSession(questionSession(2))
+    const submitRequest = createDeferred<InterviewData["session"]>()
     vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(first))
     vi.mocked(submitInterviewAnswer).mockReturnValue(submitRequest.promise)
     renderSession()
@@ -282,20 +225,18 @@ describe("InterviewSessionContainer", () => {
     await user.click(pendingButton)
     expect(submitInterviewAnswer).toHaveBeenCalledOnce()
 
-    await act(async () => submitRequest.resolve(second))
-    expect(
-      await screen.findByText(questionSession(2, 3).currentQuestion.question.prompt),
-    ).toBeVisible()
+    await act(async () => submitRequest.resolve(second.session))
+    expect(await screen.findByText(questionSession(2).prompt.content)).toBeVisible()
     expect(submitInterviewAnswer).toHaveBeenCalledOnce()
   })
 
   it("consumes the next session state returned by answer submission", async () => {
     const user = userEvent.setup()
     const answer = "我有五年前端开发经验，主要负责复杂业务的架构和性能治理。"
-    const first = questionSession(1, 2)
-    const second = questionSession(2, 3)
+    const first = questionSession(1)
+    const second = questionSession(2)
     vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(first))
-    vi.mocked(submitInterviewAnswer).mockResolvedValue(responseWithSession(second))
+    vi.mocked(submitInterviewAnswer).mockResolvedValue(second)
     renderSession()
 
     await user.type(await screen.findByRole("textbox"), answer)
@@ -303,18 +244,16 @@ describe("InterviewSessionContainer", () => {
       screen.getByRole("button", { name: i18n.t("interview.session.answer.submit") }),
     )
 
-    await waitFor(() =>
-      expect(screen.getByText(second.currentQuestion.question.prompt)).toBeVisible(),
-    )
+    await waitFor(() => expect(screen.getByText(second.prompt.content)).toBeVisible())
     expect(submitInterviewAnswer).toHaveBeenCalledOnce()
   })
 
   it("consumes a second consecutive follow-up returned by the service", async () => {
     const user = userEvent.setup()
-    const firstFollowUp = followUpSession(0, 4)
-    const secondFollowUp = followUpSession(1, 5)
+    const firstFollowUp = followUpSession(0)
+    const secondFollowUp = followUpSession(1)
     vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(firstFollowUp))
-    vi.mocked(submitInterviewAnswer).mockResolvedValue(responseWithSession(secondFollowUp))
+    vi.mocked(submitInterviewAnswer).mockResolvedValue(secondFollowUp)
     renderSession()
 
     await user.type(await screen.findByRole("textbox"), "我会使用灰度分组做同期对照。")
@@ -322,27 +261,18 @@ describe("InterviewSessionContainer", () => {
       screen.getByRole("button", { name: i18n.t("interview.session.answer.submit") }),
     )
 
-    expect(await screen.findByText(secondFollowUp.currentFollowUp.question.prompt)).toBeVisible()
-    expect(
-      screen.getByText(secondFollowUp.currentQuestion.answeredFollowUps[0]!.answer.content),
-    ).toBeVisible()
-    expect(vi.mocked(submitInterviewAnswer).mock.calls[0]?.[0]).toEqual(
-      expect.objectContaining({
-        target: "followUp",
-        followUpQuestionId: firstFollowUp.currentFollowUp.question.id,
-      }),
-    )
+    expect(await screen.findByText(secondFollowUp.prompt.content)).toBeVisible()
+    expect(screen.getByText(secondFollowUp.history[1]!.answer)).toBeVisible()
+    expect(vi.mocked(submitInterviewAnswer).mock.calls[0]?.[0]).toBe("我会使用灰度分组做同期对照。")
   })
 
   it("ends an unanswered main question once, caches its summary, and opens its review", async () => {
     const user = userEvent.setup()
-    const active = questionSession(1, 2)
+    const active = questionSession(1)
     const completed = completedResponse(active)
     vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(active))
     vi.mocked(endInterview).mockResolvedValue(completed)
     const result = renderSession()
-    result.queryClient.setQueryData(trainingRecordQueryKeys.overview(), { stale: true })
-    result.queryClient.setQueryData(dashboardQueryKeys.all, { stale: true })
 
     await user.click(
       await screen.findByRole("button", { name: i18n.t("interview.session.actions.end") }),
@@ -355,23 +285,16 @@ describe("InterviewSessionContainer", () => {
     )
 
     expect(endInterview).toHaveBeenCalledOnce()
-    expect(vi.mocked(endInterview).mock.calls[0]?.[0]).toEqual({ sessionId, version: 2 })
     await waitFor(() =>
       expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
     )
     expect(result.router?.state.location.pathname).not.toBe("/interview")
-    expect(result.queryClient.getQueryData(["interview"])).toEqual(
-      responseWithSession(completed.session),
-    )
-    expect(
-      result.queryClient.getQueryState(trainingRecordQueryKeys.overview())?.isInvalidated,
-    ).toBe(false)
-    expect(result.queryClient.getQueryState(dashboardQueryKeys.all)?.isInvalidated).toBe(false)
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(responseWithSession(completed))
   })
 
-  it("ends from the current follow-up version and opens the same review route", async () => {
+  it("ends from the current follow-up and opens the same review route", async () => {
     const user = userEvent.setup()
-    const active = followUpSession(1, 5)
+    const active = followUpSession(1)
     const completed = completedResponse(active)
     vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(active))
     vi.mocked(endInterview).mockResolvedValue(completed)
@@ -386,20 +309,18 @@ describe("InterviewSessionContainer", () => {
       }),
     )
 
-    expect(vi.mocked(endInterview).mock.calls[0]?.[0]).toEqual({ sessionId, version: 5 })
+    expect(endInterview).toHaveBeenCalledOnce()
     await waitFor(() =>
       expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
     )
-    expect(result.queryClient.getQueryData(["interview"])).toEqual(
-      responseWithSession(completed.session),
-    )
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(responseWithSession(completed))
   })
 
   it("locks repeated early-end confirmation while the request is pending", async () => {
     const user = userEvent.setup()
-    const active = questionSession(1, 2)
+    const active = questionSession(1)
     const completed = completedResponse(active)
-    const request = createDeferred<InterviewCompletionResponse>()
+    const request = createDeferred<CompletedSession>()
     vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(active))
     vi.mocked(endInterview).mockReturnValue(request.promise)
     const result = renderSession()
@@ -425,7 +346,7 @@ describe("InterviewSessionContainer", () => {
 
   it("keeps the active session and route when ending fails", async () => {
     const user = userEvent.setup()
-    const activeResponse = responseWithSession(questionSession(1, 2))
+    const activeResponse = responseWithSession(questionSession(1))
     vi.mocked(getInterviewPage).mockResolvedValue(activeResponse)
     vi.mocked(endInterview).mockRejectedValue(new Error("end failed"))
     const result = renderSession()
@@ -443,7 +364,7 @@ describe("InterviewSessionContainer", () => {
     expect(result.router?.state.location.pathname).toBe(`/interview/session/${sessionId}`)
     expect(result.queryClient.getQueryData(["interview"])).toEqual(activeResponse)
     expect(
-      result.queryClient.getQueryData<InterviewPageResponse>(["interview"])?.session,
+      result.queryClient.getQueryData<InterviewData>(["interview"])?.session,
     ).not.toMatchObject({
       status: "completed",
     })
@@ -455,7 +376,7 @@ describe("InterviewSessionContainer", () => {
     const active = activeResponse.session
     if (active?.status !== "opening") throw new Error("Expected opening session.")
     const completed = completedResponse(active)
-    const request = createDeferred<InterviewCompletionResponse>()
+    const request = createDeferred<CompletedSession>()
     vi.mocked(getInterviewPage).mockResolvedValue(activeResponse)
     vi.mocked(endInterview).mockReturnValue(request.promise)
     const result = renderSession()
@@ -477,28 +398,25 @@ describe("InterviewSessionContainer", () => {
     expect(confirm).toBeDisabled()
     await user.click(confirm)
     expect(endInterview).toHaveBeenCalledOnce()
-    expect(vi.mocked(endInterview).mock.calls[0]?.[0]).toEqual({ sessionId, version: 1 })
 
     await act(async () => request.resolve(completed))
     await waitFor(() =>
       expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
     )
     expect(endInterview).toHaveBeenCalledOnce()
-    expect(result.queryClient.getQueryData(["interview"])).toEqual(
-      responseWithSession(completed.session),
-    )
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(responseWithSession(completed))
   })
 
   it("submits candidate questions, shows feedback, and finishes only once", async () => {
     const user = userEvent.setup()
     const question = "这个岗位入职六个月后的成功标准是什么？"
-    const candidate = candidateSession(6)
-    const exchange = createCandidateQuestionExchange(question, 1)
-    const withExchange = candidateSession(7, [exchange])
+    const candidate = candidateSession()
+    const exchange = createCandidateExchangeStoryFixture(question)
+    const withExchange = candidateSession([exchange])
     const completed = completedResponse(withExchange)
-    const finishRequest = createDeferred<InterviewCompletionResponse>()
+    const finishRequest = createDeferred<CompletedSession>()
     vi.mocked(getInterviewPage).mockResolvedValue(responseWithSession(candidate))
-    vi.mocked(submitCandidateQuestion).mockResolvedValue(responseWithSession(withExchange))
+    vi.mocked(submitCandidateQuestion).mockResolvedValue(withExchange)
     vi.mocked(finishInterview).mockReturnValue(finishRequest.promise)
     const result = renderSession()
 
@@ -540,14 +458,12 @@ describe("InterviewSessionContainer", () => {
     await waitFor(() =>
       expect(result.router?.state.location.pathname).toBe(`/interview/review/${sessionId}`),
     )
-    expect(result.queryClient.getQueryData(["interview"])).toEqual(
-      responseWithSession(completed.session),
-    )
+    expect(result.queryClient.getQueryData(["interview"])).toEqual(responseWithSession(completed))
     expect(finishInterview).toHaveBeenCalledOnce()
   })
 
   it("offers a return path when the route does not match an active session", async () => {
-    vi.mocked(getInterviewPage).mockResolvedValue(createInterviewMockResponse())
+    vi.mocked(getInterviewPage).mockResolvedValue(createInterviewPageStoryFixture())
     renderSession()
 
     expect(

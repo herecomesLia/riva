@@ -1,11 +1,11 @@
 import preview from "#storybook/preview"
 import { expect } from "storybook/test"
 
-import { createInterviewReviewResponseMock } from "@/mocks/data/interview"
+import { createInterviewReviewStoryFixture } from "@/pages/interview/stories/interview-story-fixtures"
 
 import { InterviewDimensionScores } from "./InterviewDimensionScores"
 
-const response = createInterviewReviewResponseMock()
+const response = createInterviewReviewStoryFixture()
 if (response.status !== "complete") throw new Error("Complete review fixture required.")
 
 const meta = preview.meta({

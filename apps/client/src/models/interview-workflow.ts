@@ -193,3 +193,8 @@ export type InterviewReview =
   | { status: "unavailable"; questionDetails: InterviewQuestionDetail[] }
   | PartialInterviewReview
   | CompleteInterviewReview
+
+export type InterviewData = {
+  setup: InterviewSetup
+  session: InterviewSession | null
+}

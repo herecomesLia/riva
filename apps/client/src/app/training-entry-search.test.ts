@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { createInterviewMockResponse } from "@/mocks/data/interview"
+import type { InterviewSetup } from "@/models/interview-workflow"
 import { practiceFixture } from "@/mocks/fixtures/practice"
 import type { ActiveSelection, PracticeSetupContext } from "@/models/practice-workflow"
 import {
@@ -58,12 +58,24 @@ describe("training entry search application", () => {
   })
 
   it("reports every adjusted interview field with stable reasons", () => {
-    const response = createInterviewMockResponse()
-    const role = response.setup.targetRoles[0]
-    const setup = structuredClone(response.setup)
-    setup.targetRoles[0]!.supportedRounds = ["technical"]
-    setup.availableDifficulties = ["basic"]
-    setup.availableDurationMinutes = [15]
+    const role = {
+      id: "role_active",
+      title: "Frontend Engineer",
+      company: null,
+      supportedRounds: ["technical"] as const,
+    }
+    const setup: InterviewSetup = {
+      availability: { status: "available" },
+      targetRoles: [{ ...role, supportedRounds: ["technical"] }],
+      availableDifficulties: ["basic"],
+      availableDurationMinutes: [15],
+      defaultConfiguration: {
+        targetRoleId: role.id,
+        round: "technical",
+        difficulty: "basic",
+        durationMinutes: 15,
+      },
+    }
 
     expect(
       resolveInterviewTrainingEntry(

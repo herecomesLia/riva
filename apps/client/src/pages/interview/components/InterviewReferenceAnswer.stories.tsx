@@ -1,24 +1,23 @@
 import preview from "#storybook/preview"
 import { expect, userEvent } from "storybook/test"
 
-import { createInterviewReviewResponseMock } from "@/mocks/data/interview"
-import type { InterviewReferenceAnswerResponse } from "@/models/interview"
+import { createInterviewReviewStoryFixture } from "@/pages/interview/stories/interview-story-fixtures"
+import type { InterviewReferenceAnswer as ReferenceAnswerState } from "@/models/interview-workflow"
 
 import { InterviewReferenceAnswer } from "./InterviewReferenceAnswer"
 
-const review = createInterviewReviewResponseMock()
+const review = createInterviewReviewStoryFixture()
 if (review.status !== "complete") throw new Error("Complete review fixture required.")
 const readyReference = review.questionDetails[0]!.referenceAnswer
 if (readyReference.status !== "ready") throw new Error("Ready reference fixture required.")
 
 const generatingReference = {
   status: "generating",
-} satisfies InterviewReferenceAnswerResponse
+} satisfies ReferenceAnswerState
 
 const unavailableReference = {
   status: "unavailable",
-  reason: "generationFailed",
-} satisfies InterviewReferenceAnswerResponse
+} satisfies ReferenceAnswerState
 
 const meta = preview.meta({
   component: InterviewReferenceAnswer,
@@ -27,7 +26,6 @@ const meta = preview.meta({
 
 export const Ready = meta.story({
   args: {
-    id: "ready-reference",
     referenceAnswer: readyReference,
   },
   play: async ({ canvas }) => {
@@ -38,7 +36,6 @@ export const Ready = meta.story({
 
 export const Generating = meta.story({
   args: {
-    id: "generating-reference",
     referenceAnswer: generatingReference,
   },
   play: async ({ canvas }) => {
@@ -50,7 +47,6 @@ export const Generating = meta.story({
 
 export const Unavailable = meta.story({
   args: {
-    id: "unavailable-reference",
     referenceAnswer: unavailableReference,
   },
 })

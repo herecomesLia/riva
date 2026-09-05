@@ -7,40 +7,33 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
-import type { InterviewFollowUpLearningDetailResponse } from "@/models/interview"
+import type { InterviewFollowUpDetail } from "@/models/interview-workflow"
 
 import { InterviewAnswerAndPerformance } from "./InterviewAnswerAndPerformance"
 import { InterviewReferenceAnswer } from "./InterviewReferenceAnswer"
 
-export function InterviewFollowUpDetails({
-  followUps,
-}: {
-  followUps: InterviewFollowUpLearningDetailResponse[]
-}) {
+export function InterviewFollowUpDetails({ followUps }: { followUps: InterviewFollowUpDetail[] }) {
   const { t } = useTranslation()
   return (
     <section className="flex flex-col gap-2">
       <h4 className="font-medium">{t("interview.review.followUpQuestions")}</h4>
       <Accordion className="rounded-lg border px-4">
-        {followUps.map((followUp) => (
-          <AccordionItem key={followUp.record.question.id} value={followUp.record.question.id}>
+        {followUps.map((followUp, index) => (
+          <AccordionItem key={String(index)} value={String(index)}>
             <AccordionTrigger className="gap-3 no-underline hover:no-underline">
-              <span className="min-w-0 flex-1 text-left">{followUp.record.question.prompt}</span>
-              <Badge variant={followUp.record.status === "answered" ? "secondary" : "outline"}>
-                {followUp.record.status === "answered"
+              <span className="min-w-0 flex-1 text-left">{followUp.prompt}</span>
+              <Badge variant={followUp.answer !== null ? "secondary" : "outline"}>
+                {followUp.answer !== null
                   ? t("interview.review.answered")
                   : t("interview.review.unanswered")}
               </Badge>
             </AccordionTrigger>
             <AccordionContent className="flex flex-col gap-4">
               <InterviewAnswerAndPerformance
-                answer={followUp.record.answer?.content ?? null}
+                answer={followUp.answer}
                 performance={followUp.performance}
               />
-              <InterviewReferenceAnswer
-                id={followUp.record.question.id}
-                referenceAnswer={followUp.referenceAnswer}
-              />
+              <InterviewReferenceAnswer referenceAnswer={followUp.referenceAnswer} />
             </AccordionContent>
           </AccordionItem>
         ))}

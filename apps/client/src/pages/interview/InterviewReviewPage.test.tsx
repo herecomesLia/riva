@@ -2,13 +2,12 @@ import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { dashboardQueryKeys } from "@/app/dashboard-query"
-import { trainingRecordQueryKeys } from "@/app/training-record-query"
 import { i18n } from "@/i18n/i18n"
 import {
-  createInterviewCompletedSessionMock,
-  createInterviewReviewResponseMock,
-} from "@/mocks/data/interview"
+  createInterviewReviewStoryFixture,
+  createPartialInterviewReviewStoryFixture,
+  createUnavailableInterviewReviewStoryFixture,
+} from "./stories/interview-story-fixtures"
 import { getInterviewReview } from "@/services/interview"
 import { renderWithProviders } from "@/test/render"
 
@@ -27,32 +26,13 @@ vi.mock("@/services/interview", async (importOriginal) => ({
 const sessionId = "mock-interview-session-completed"
 
 function completedReview() {
-  const response = createInterviewReviewResponseMock()
+  const response = createInterviewReviewStoryFixture()
   if (response.status !== "complete") throw new Error("Expected complete review.")
   return response
 }
 
-function unavailableReview() {
-  const response = createInterviewReviewResponseMock(
-    createInterviewCompletedSessionMock({
-      completionReason: "userEndedEarly",
-      completedMainQuestions: 0,
-    }),
-  )
-  if (response.status !== "unavailable") throw new Error("Expected unavailable review.")
-  return response
-}
-
-function partialReview() {
-  const response = createInterviewReviewResponseMock(
-    createInterviewCompletedSessionMock({
-      completionReason: "userEndedEarly",
-      completedMainQuestions: 1,
-    }),
-  )
-  if (response.status !== "partial") throw new Error("Expected partial review.")
-  return response
-}
+const unavailableReview = createUnavailableInterviewReviewStoryFixture
+const partialReview = createPartialInterviewReviewStoryFixture
 
 function renderReview() {
   return renderWithProviders(<InterviewReviewContainer sessionId={sessionId} />, {
@@ -79,39 +59,9 @@ describe("InterviewReviewContainer", () => {
     expect(screen.getByText(i18n.t("interview.review.sections.questions"))).toBeVisible()
   })
 
-  it("polls a generating review and invalidates dependent data only at the terminal state", async () => {
-    const terminal = completedReview()
-    vi.mocked(getInterviewReview)
-      .mockResolvedValueOnce({
-        status: "generating",
-        sessionId,
-        completionReason: terminal.completionReason,
-      })
-      .mockResolvedValueOnce(terminal)
-    const result = renderReview()
-    result.queryClient.setQueryData(trainingRecordQueryKeys.overview(), { stale: true })
-    result.queryClient.setQueryData(dashboardQueryKeys.all, { stale: true })
-
-    expect(await screen.findByTestId("interview-review-loading")).toBeVisible()
-    expect(
-      result.queryClient.getQueryState(trainingRecordQueryKeys.overview())?.isInvalidated,
-    ).toBe(false)
-    expect(result.queryClient.getQueryState(dashboardQueryKeys.all)?.isInvalidated).toBe(false)
-
-    await waitFor(() => expect(getInterviewReview).toHaveBeenCalledTimes(2), { timeout: 2_500 })
-    expect(await screen.findByText(String(terminal.review.overallScore))).toBeVisible()
-    expect(
-      result.queryClient.getQueryState(trainingRecordQueryKeys.overview())?.isInvalidated,
-    ).toBe(true)
-    expect(result.queryClient.getQueryState(dashboardQueryKeys.all)?.isInvalidated).toBe(true)
-  })
-
   it("renders an explicit terminal generation failure without offering a GET retry", async () => {
     vi.mocked(getInterviewReview).mockResolvedValue({
       status: "failed",
-      sessionId,
-      completionReason: "userEndedEarly",
-      reason: "generationFailed",
     })
     renderReview()
 
@@ -129,7 +79,7 @@ describe("InterviewReviewContainer", () => {
     const detail = response.questionDetails[1]!
     const followUp = detail.followUps[0]!
     const reference = detail.referenceAnswer
-    if (detail.record.status !== "answered" || reference.status !== "ready") {
+    if (detail.answer === null || reference.status !== "ready") {
       throw new Error("Expected answered question with reference.")
     }
     vi.mocked(getInterviewReview).mockResolvedValue(response)
@@ -138,11 +88,11 @@ describe("InterviewReviewContainer", () => {
     expect(await screen.findByText(String(response.review.overallScore))).toBeVisible()
     await user.click(
       screen.getByRole("button", {
-        name: new RegExp(detail.record.question.prompt.slice(0, 16)),
+        name: new RegExp(detail.prompt.slice(0, 16)),
       }),
     )
-    expect(screen.getByText(followUp.record.question.prompt)).toBeVisible()
-    expect(screen.getByText(detail.record.answer.content)).toBeVisible()
+    expect(screen.getByText(followUp.prompt)).toBeVisible()
+    expect(screen.getByText(detail.answer!)).toBeVisible()
     await user.click(
       screen.getByRole("button", { name: i18n.t("interview.review.reference.view") }),
     )
@@ -188,7 +138,7 @@ describe("InterviewReviewContainer", () => {
     renderReview()
 
     const question = await screen.findByRole("button", {
-      name: new RegExp(detail.record.question.prompt.slice(0, 16)),
+      name: new RegExp(detail.prompt.slice(0, 16)),
     })
     await user.click(question)
     expect(screen.getAllByText(i18n.t("interview.review.unanswered")).length).toBeGreaterThan(0)
@@ -210,7 +160,7 @@ describe("InterviewReviewContainer", () => {
     renderReview()
 
     const question = await screen.findByRole("button", {
-      name: new RegExp(unanswered.record.question.prompt.slice(0, 16)),
+      name: new RegExp(unanswered.prompt.slice(0, 16)),
     })
     expect(within(question).getByText(i18n.t("interview.review.unanswered"))).toBeVisible()
     expect(within(question).queryByText(/^\d+ 分$/)).not.toBeInTheDocument()
@@ -239,12 +189,12 @@ describe("InterviewReviewContainer", () => {
 
     await user.click(
       await screen.findByRole("button", {
-        name: new RegExp(detail.record.question.prompt.slice(0, 16)),
+        name: new RegExp(detail.prompt.slice(0, 16)),
       }),
     )
     await user.click(
       screen.getByRole("button", {
-        name: new RegExp(followUp.record.question.prompt.slice(0, 16)),
+        name: new RegExp(followUp.prompt.slice(0, 16)),
       }),
     )
     const referenceButtons = screen.getAllByRole("button", {
@@ -257,8 +207,8 @@ describe("InterviewReviewContainer", () => {
 
   it("shows a limited-data notice and only the completed question for a partial review", async () => {
     const response = partialReview()
-    const prompt = response.questionDetails[0]!.record.question.prompt
-    const nextPrompt = completedReview().questionDetails[1]!.record.question.prompt
+    const prompt = response.questionDetails[0]!.prompt
+    const nextPrompt = completedReview().questionDetails[1]!.prompt
     vi.mocked(getInterviewReview).mockResolvedValue(response)
     renderReview()
 

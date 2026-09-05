@@ -2,7 +2,7 @@ import type {
   InterviewDifficulty,
   InterviewDurationMinutes,
   InterviewRound,
-} from "@/models/interview"
+} from "@/models/interview-workflow"
 import type { Difficulty, QuestionSource, QuestionType } from "@/models/practice-workflow"
 import type {
   InterviewTrainingEntryParameters,

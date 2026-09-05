@@ -8,17 +8,13 @@ import {
 } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import type { InterviewQuestionLearningDetailResponse } from "@/models/interview"
+import type { InterviewQuestionDetail } from "@/models/interview-workflow"
 
 import { InterviewAnswerAndPerformance } from "./InterviewAnswerAndPerformance"
 import { InterviewFollowUpDetails } from "./InterviewFollowUpDetails"
 import { InterviewReferenceAnswer } from "./InterviewReferenceAnswer"
 
-export function InterviewQuestionDetails({
-  details,
-}: {
-  details: InterviewQuestionLearningDetailResponse[]
-}) {
+export function InterviewQuestionDetails({ details }: { details: InterviewQuestionDetail[] }) {
   const { t } = useTranslation()
 
   return (
@@ -29,14 +25,17 @@ export function InterviewQuestionDetails({
       </CardHeader>
       <CardContent>
         <Accordion>
-          {details.map((detail) => (
-            <AccordionItem key={detail.record.question.id} value={detail.record.question.id}>
+          {details.map((detail, index) => (
+            <AccordionItem
+              key={`${detail.questionOrder}-${index}`}
+              value={`${detail.questionOrder}-${index}`}
+            >
               <AccordionTrigger className="gap-3 no-underline hover:no-underline">
                 <span className="flex min-w-0 flex-1 flex-col gap-1 pr-3">
                   <span className="text-xs font-normal text-muted-foreground">
-                    {t("interview.review.mainQuestion", { order: detail.record.question.order })}
+                    {t("interview.review.mainQuestion", { order: detail.questionOrder })}
                   </span>
-                  <span className="line-clamp-2 text-sm">{detail.record.question.prompt}</span>
+                  <span className="line-clamp-2 text-sm">{detail.prompt}</span>
                 </span>
                 {detail.performance ? (
                   <Badge className="shrink-0" variant="secondary">
@@ -50,13 +49,10 @@ export function InterviewQuestionDetails({
               </AccordionTrigger>
               <AccordionContent className="flex flex-col gap-5">
                 <InterviewAnswerAndPerformance
-                  answer={detail.record.answer?.content ?? null}
+                  answer={detail.answer}
                   performance={detail.performance}
                 />
-                <InterviewReferenceAnswer
-                  id={detail.record.question.id}
-                  referenceAnswer={detail.referenceAnswer}
-                />
+                <InterviewReferenceAnswer referenceAnswer={detail.referenceAnswer} />
                 {detail.followUps.length > 0 ? (
                   <InterviewFollowUpDetails followUps={detail.followUps} />
                 ) : null}

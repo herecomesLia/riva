@@ -1,7 +1,7 @@
 import preview from "#storybook/preview"
 import { expect, fn, userEvent } from "storybook/test"
 
-import { createInterviewReviewResponseMock } from "@/mocks/data/interview"
+import { createInterviewReviewStoryFixture } from "@/pages/interview/stories/interview-story-fixtures"
 
 import {
   createGeneratingReferenceReviewStoryFixture,
@@ -15,7 +15,7 @@ import {
 } from "./stories/interview-story-fixtures"
 import { InterviewReviewView } from "./InterviewReviewView"
 
-const completeReview = createInterviewReviewResponseMock()
+const completeReview = createInterviewReviewStoryFixture()
 const partialReview = createPartialInterviewReviewStoryFixture()
 const unavailableReview = createUnavailableInterviewReviewStoryFixture()
 const unavailableWithLearning = createUnavailableReviewWithLearningStoryFixture()
@@ -45,8 +45,6 @@ export const Generating = meta.story({
     status: "generating",
     data: {
       status: "generating",
-      sessionId: "mock-interview-session-generating",
-      completionReason: "formalQuestionsCompleted",
     },
   },
 })
@@ -56,9 +54,6 @@ export const GenerationFailed = meta.story({
     status: "failed",
     data: {
       status: "failed",
-      sessionId: "mock-interview-session-failed",
-      completionReason: "userEndedEarly",
-      reason: "generationFailed",
     },
     onBack: fn(),
   },
@@ -83,10 +78,10 @@ export const Complete = meta.story({
     await expect(canvas.getByText("风险意识")).toBeVisible()
     await userEvent.click(
       canvas.getByRole("button", {
-        name: new RegExp(detail.record.question.prompt.slice(0, 16)),
+        name: new RegExp(detail.prompt.slice(0, 16)),
       }),
     )
-    await expect(canvas.getByText(followUp.record.question.prompt)).toBeVisible()
+    await expect(canvas.getByText(followUp.prompt)).toBeVisible()
     await userEvent.click(canvas.getByRole("button", { name: /查看 RIVA 示例回答/ }))
     await expect(canvas.getByText(reference.content.exampleAnswer)).toBeVisible()
   },
@@ -111,8 +106,8 @@ export const Partial = meta.story({
     onBack: fn(),
   },
   play: async ({ canvas }) => {
-    const prompt = partialReview.questionDetails[0]!.record.question.prompt
-    const nextPrompt = completeReview.questionDetails[1]!.record.question.prompt
+    const prompt = partialReview.questionDetails[0]!.prompt
+    const nextPrompt = completeReview.questionDetails[1]!.prompt
     await expect(canvas.getByRole("alert")).toBeVisible()
     await expect(
       canvas.getAllByRole("button", { name: new RegExp(prompt.slice(0, 16)) }),
@@ -143,7 +138,7 @@ export const PartialWithUnansweredQuestion = meta.story({
     if (reference.status !== "ready") throw new Error("Ready reference required.")
     await userEvent.click(
       canvas.getByRole("button", {
-        name: new RegExp(detail.record.question.prompt.slice(0, 16)),
+        name: new RegExp(detail.prompt.slice(0, 16)),
       }),
     )
     await expect(canvas.getAllByText(/未作答/).length).toBeGreaterThan(0)
@@ -168,12 +163,12 @@ export const AnsweredMainWithUnansweredFollowUp = meta.story({
     const followUp = detail.followUps[0]!
     await userEvent.click(
       canvas.getByRole("button", {
-        name: new RegExp(detail.record.question.prompt.slice(0, 16)),
+        name: new RegExp(detail.prompt.slice(0, 16)),
       }),
     )
     await userEvent.click(
       canvas.getByRole("button", {
-        name: new RegExp(followUp.record.question.prompt.slice(0, 16)),
+        name: new RegExp(followUp.prompt.slice(0, 16)),
       }),
     )
     await expect(canvas.getAllByText(/未作答/).length).toBeGreaterThan(0)
@@ -196,17 +191,17 @@ export const MultipleFollowUps = meta.story({
     const detail = response.questionDetails[1]!
     await userEvent.click(
       canvas.getByRole("button", {
-        name: new RegExp(detail.record.question.prompt.slice(0, 16)),
+        name: new RegExp(detail.prompt.slice(0, 16)),
       }),
     )
     await expect(
       canvas.getByRole("button", {
-        name: new RegExp(detail.followUps[0]!.record.question.prompt.slice(0, 16)),
+        name: new RegExp(detail.followUps[0]!.prompt.slice(0, 16)),
       }),
     ).toBeVisible()
     await expect(
       canvas.getByRole("button", {
-        name: new RegExp(detail.followUps[1]!.record.question.prompt.slice(0, 16)),
+        name: new RegExp(detail.followUps[1]!.prompt.slice(0, 16)),
       }),
     ).toBeVisible()
   },
@@ -229,7 +224,7 @@ export const UnavailableWithLearning = meta.story({
     if (reference.status !== "ready") throw new Error("Ready reference required.")
     await userEvent.click(
       canvas.getByRole("button", {
-        name: new RegExp(detail.record.question.prompt.slice(0, 16)),
+        name: new RegExp(detail.prompt.slice(0, 16)),
       }),
     )
     await userEvent.click(canvas.getByRole("button", { name: /查看 RIVA 示例回答/ }))
@@ -248,7 +243,6 @@ export const ReferenceUnavailable = meta.story({
       const response = structuredClone(unavailableWithLearning)
       response.questionDetails[0]!.referenceAnswer = {
         status: "unavailable",
-        reason: "generationFailed",
       }
       return response
     })(),
@@ -258,7 +252,7 @@ export const ReferenceUnavailable = meta.story({
     const detail = unavailableWithLearning.questionDetails[0]!
     await userEvent.click(
       canvas.getByRole("button", {
-        name: new RegExp(detail.record.question.prompt.slice(0, 16)),
+        name: new RegExp(detail.prompt.slice(0, 16)),
       }),
     )
     await expect(canvas.getByText(/参考答案暂不可用/)).toBeVisible()
@@ -281,7 +275,7 @@ export const ReferenceGenerating = meta.story({
     const detail = response.questionDetails[0]!
     await userEvent.click(
       canvas.getByRole("button", {
-        name: new RegExp(detail.record.question.prompt.slice(0, 16)),
+        name: new RegExp(detail.prompt.slice(0, 16)),
       }),
     )
     await expect(
@@ -309,7 +303,7 @@ export const LongReferenceAnswer = meta.story({
     if (reference.status !== "ready") throw new Error("Ready reference required.")
     await userEvent.click(
       canvas.getByRole("button", {
-        name: new RegExp(detail.record.question.prompt.slice(0, 16)),
+        name: new RegExp(detail.prompt.slice(0, 16)),
       }),
     )
     await userEvent.click(canvas.getByRole("button", { name: /查看 RIVA 示例回答/ }))

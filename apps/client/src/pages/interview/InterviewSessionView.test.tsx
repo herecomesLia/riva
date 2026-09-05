@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
-import { createCandidateQuestionExchange } from "@/mocks/data/interview"
+import { createCandidateExchangeStoryFixture } from "./stories/interview-story-fixtures"
 import { renderWithProviders } from "@/test/render"
 
 import { InterviewSessionView, type InterviewSessionViewProps } from "./InterviewSessionView"
@@ -15,7 +15,7 @@ const summary = {
   difficulty: "pressure",
   completedMainQuestions: 0,
   totalMainQuestions: 3,
-  planRevision: 1,
+  planAdjusted: false,
 } as const
 
 function questionProps(
@@ -25,7 +25,6 @@ function questionProps(
     status: "question",
     summary,
     prompt: {
-      id: "question-1",
       kind: "question",
       content: "请先做一个简短的自我介绍。",
       questionOrder: 1,
@@ -153,7 +152,7 @@ describe("InterviewSessionView", () => {
           ...summary,
           completedMainQuestions: 1,
           totalMainQuestions: 4,
-          planRevision: 2,
+          planAdjusted: true,
         }}
       />,
       { router: false },
@@ -176,14 +175,12 @@ describe("InterviewSessionView", () => {
         {...questionProps()}
         history={[
           {
-            id: "main-question",
             kind: "question",
             questionOrder: 2,
             prompt: "请介绍一次性能优化。",
             answer: "我先定位长任务，再分阶段完成治理。",
           },
           {
-            id: "follow-up",
             kind: "followUp",
             questionOrder: 2,
             prompt: "你如何证明业务收益？",
@@ -206,7 +203,7 @@ describe("InterviewSessionView", () => {
     const question = "这个岗位入职六个月后的成功标准是什么？"
     renderWithProviders(
       <InterviewSessionView
-        exchanges={[createCandidateQuestionExchange("团队目前最大的挑战是什么？", 1)]}
+        exchanges={[createCandidateExchangeStoryFixture("团队目前最大的挑战是什么？")]}
         history={[]}
         isFinishing={false}
         isInteractionLocked={false}

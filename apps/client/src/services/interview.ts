@@ -1,76 +1,94 @@
-import { env } from "@/app/env"
-import * as interviewMockService from "@/mocks/services/interview"
+import { interviewFaker } from "@/mocks/fakers/interview"
 import type {
-  BeginInterviewQuestionsInput,
-  EndInterviewInput,
-  FinishInterviewInput,
-  GetInterviewReviewInput,
-  GetInterviewReviewResponse,
-  InterviewCompletionResponse,
-  InterviewMutationResponse,
-  InterviewPageResponse,
-  StartInterviewInput,
-  SubmitCandidateQuestionInput,
-  SubmitInterviewAnswerInput,
-} from "@/models/interview"
+  InterviewConfiguration,
+  InterviewData,
+  InterviewReview,
+  InterviewSetup,
+} from "@/models/interview-workflow"
+import type { RolesData } from "@/models/target-role-workflow"
+import { resolveInterviewTrainingEntry } from "@/models/training-entry"
 import type {
   InterviewTrainingEntryParameters,
   InterviewTrainingEntryPreparationResponse,
+  TrainingEntryRoleAvailability,
 } from "@/models/training-entry"
-import { getProfile } from "@/services/profile"
+import { getRoles } from "@/services/roles"
 
-function realApiUnavailable(): never {
-  throw new Error("Real interview API is not implemented.")
+function buildSetup(data: RolesData): InterviewSetup {
+  const roles = data.roles.filter((role) => !role.isArchived)
+  const ready = roles.filter((role) => role.jdState.status === "ready")
+  return {
+    availability:
+      roles.length === 0
+        ? { status: "available" }
+        : !data.profile.complete
+          ? { status: "blocked", reason: "profileIncomplete" }
+          : ready.length === 0
+            ? { status: "blocked", reason: "jobDescriptionMissing" }
+            : { status: "available" },
+    targetRoles: ready.map(({ id, title, company }) => ({
+      id,
+      title,
+      company,
+      supportedRounds: ["hr", "firstBusiness", "technical", "manager", "final", "comprehensive"],
+    })),
+    availableDifficulties: ["basic", "pressure"],
+    availableDurationMinutes: [15, 30, 45],
+    defaultConfiguration: {
+      targetRoleId: ready.find(({ id }) => id === data.activeRoleId)?.id ?? ready[0]?.id ?? null,
+      round: "technical",
+      difficulty: "pressure",
+      durationMinutes: 30,
+    },
+  }
 }
 
-export async function getInterviewPage(): Promise<InterviewPageResponse> {
-  return env.mock ? interviewMockService.getInterviewPage(await getProfile()) : realApiUnavailable()
-}
-
-export async function startInterview(
-  input: StartInterviewInput,
-): Promise<InterviewMutationResponse> {
-  return env.mock
-    ? interviewMockService.startInterview(input, await getProfile())
-    : realApiUnavailable()
+export async function getInterviewPage(): Promise<InterviewData> {
+  return { setup: buildSetup(await getRoles()), session: interviewFaker.get() }
 }
 
 export async function prepareInterviewTrainingEntry(
   input: InterviewTrainingEntryParameters,
 ): Promise<InterviewTrainingEntryPreparationResponse> {
-  return env.mock
-    ? interviewMockService.prepareInterviewTrainingEntry(input, await getProfile())
-    : realApiUnavailable()
+  const roles = await getRoles()
+  const setup = buildSetup(roles)
+  const role = roles.roles.find(({ id }) => id === input.targetRoleId)
+  const availability: TrainingEntryRoleAvailability = !role
+    ? { status: "unavailable", reason: "targetRoleDeleted" }
+    : role.isArchived
+      ? { status: "unavailable", reason: "targetRoleArchived" }
+      : !roles.profile.complete || role.jdState.status !== "ready"
+        ? { status: "unavailable", reason: "targetRolePrerequisiteUnavailable" }
+        : { status: "available" }
+  const resolution = resolveInterviewTrainingEntry(setup, input, availability)
+  return {
+    page: { setup: { ...setup, defaultConfiguration: resolution.configuration }, session: null },
+    resolution,
+  }
 }
 
-export function beginInterviewQuestions(
-  input: BeginInterviewQuestionsInput,
-): Promise<InterviewMutationResponse> {
-  return env.mock ? interviewMockService.beginInterviewQuestions(input) : realApiUnavailable()
+export async function startInterview(configuration: InterviewConfiguration) {
+  return interviewFaker.start(configuration)
+}
+export async function beginInterviewQuestions() {
+  return interviewFaker.begin()
+}
+export async function submitInterviewAnswer(content: string) {
+  return interviewFaker.answer(content)
+}
+export async function submitCandidateQuestion(content: string) {
+  return interviewFaker.ask(content)
+}
+export async function finishInterview() {
+  return interviewFaker.finish()
+}
+export async function endInterview() {
+  return interviewFaker.end()
 }
 
-export function submitInterviewAnswer(
-  input: SubmitInterviewAnswerInput,
-): Promise<InterviewMutationResponse> {
-  return env.mock ? interviewMockService.submitInterviewAnswer(input) : realApiUnavailable()
-}
-
-export function submitCandidateQuestion(
-  input: SubmitCandidateQuestionInput,
-): Promise<InterviewMutationResponse> {
-  return env.mock ? interviewMockService.submitCandidateQuestion(input) : realApiUnavailable()
-}
-
-export function finishInterview(input: FinishInterviewInput): Promise<InterviewCompletionResponse> {
-  return env.mock ? interviewMockService.finishInterview(input) : realApiUnavailable()
-}
-
-export function endInterview(input: EndInterviewInput): Promise<InterviewCompletionResponse> {
-  return env.mock ? interviewMockService.endInterview(input) : realApiUnavailable()
-}
-
-export function getInterviewReview(
-  input: GetInterviewReviewInput,
-): Promise<GetInterviewReviewResponse> {
-  return env.mock ? interviewMockService.getInterviewReview(input) : realApiUnavailable()
+export async function getInterviewReview(sessionId: string): Promise<InterviewReview | null> {
+  const session = interviewFaker.get()
+  return session?.status === "completed" && session.sessionId === sessionId
+    ? interviewFaker.getReview()
+    : null
 }

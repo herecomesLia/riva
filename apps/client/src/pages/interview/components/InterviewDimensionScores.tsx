@@ -2,9 +2,13 @@ import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import type { InterviewReviewResponse, InterviewScoreDimension } from "@/models/interview"
+import type { CompleteInterviewReview, InterviewScoreDimension } from "@/models/interview-workflow"
 
-export function InterviewDimensionScores({ review }: { review: InterviewReviewResponse }) {
+export function InterviewDimensionScores({
+  review,
+}: {
+  review: CompleteInterviewReview["review"]
+}) {
   const { t } = useTranslation()
   const dimensionLabels: Record<InterviewScoreDimension, string> = {
     relevance: t("interview.review.dimensions.relevance"),

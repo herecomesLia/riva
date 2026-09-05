@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import type { InterviewConfiguration, InterviewSetupViewData } from "@/models/interview"
+import type { InterviewConfiguration, InterviewSetup } from "@/models/interview-workflow"
 import type { InterviewTrainingEntryResolution } from "@/models/training-entry"
 
 import { InterviewSetupForm } from "./components/InterviewSetupForm"
@@ -40,7 +40,7 @@ export type InterviewViewProps =
     }
   | {
       status: "ready"
-      setup: InterviewSetupViewData
+      setup: InterviewSetup
       historyEntryResolution?: InterviewTrainingEntryResolution
       isStarting: boolean
       onStart: (input: InterviewConfiguration) => Promise<void>

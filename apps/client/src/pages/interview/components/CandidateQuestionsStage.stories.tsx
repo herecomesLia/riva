@@ -103,8 +103,8 @@ export const MultipleLongExchanges = meta.story({
   },
   play: async ({ canvas }) => {
     const exchanges = createLongCandidateExchangesStoryFixture()
-    await expect(canvas.getByText(exchanges[0]!.question.content)).toBeVisible()
-    await expect(canvas.getByText(exchanges[2]!.question.content)).toBeVisible()
+    await expect(canvas.getByText(exchanges[0]!.question)).toBeVisible()
+    await expect(canvas.getByText(exchanges[2]!.question)).toBeVisible()
   },
 })
 

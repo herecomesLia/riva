@@ -4,12 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import {
-  createInterviewMockResponse,
-  createInterviewSetupResponseMock,
-} from "@/mocks/data/interview"
-import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
-import { createRolesMockResponse } from "@/mocks/data/roles"
-import type { InterviewConfiguration, InterviewPageResponse } from "@/models/interview"
+  createInterviewPageStoryFixture,
+  createInterviewSetupStoryFixture,
+} from "./stories/interview-story-fixtures"
+import type { InterviewConfiguration, InterviewData } from "@/models/interview-workflow"
 import {
   getInterviewPage,
   prepareInterviewTrainingEntry,
@@ -43,33 +41,27 @@ function createStartedResponse(
     difficulty: "pressure",
     durationMinutes: 30,
   },
-): InterviewPageResponse {
-  const setupResponse = createInterviewMockResponse()
+): InterviewData {
+  const setupResponse = createInterviewPageStoryFixture()
   return {
     setup: setupResponse.setup,
     session: {
       status: "opening",
       sessionId: "mock-interview-session-page",
-      version: 1,
       configuration,
-      startedAt: "2026-07-24T02:00:00.000Z",
       progress: {
         completedMainQuestions: 0,
         totalMainQuestions: 3,
-        planRevision: 1,
+        planAdjusted: false,
       },
-      completedQuestions: [],
       openingMessage: "欢迎参加本次模拟面试。",
     },
   }
 }
 
-function createMultipleReadyRolesResponse(): InterviewPageResponse {
+function createMultipleReadyRolesResponse(): InterviewData {
   return {
-    setup: createInterviewSetupResponseMock(
-      createRolesMockResponse("multipleRolesReady"),
-      careerProfileFixture,
-    ),
+    setup: createInterviewSetupStoryFixture("multipleRolesReady"),
     session: null,
   }
 }
@@ -93,7 +85,7 @@ describe("InterviewPage", () => {
       const current =
         sessionState === "active"
           ? createStartedResponse()
-          : createInterviewMockResponse("completed")
+          : createInterviewPageStoryFixture("completed")
       const prepared = createMultipleReadyRolesResponse()
       prepared.setup.defaultConfiguration = {
         targetRoleId: "role_product_manager_meituan",
@@ -159,7 +151,9 @@ describe("InterviewPage", () => {
         adjustments: ["interviewRoundUnsupported", "difficultyUnavailable", "durationUnavailable"],
       },
     })
-    vi.mocked(startInterview).mockImplementation(async (input) => createStartedResponse(input))
+    vi.mocked(startInterview).mockImplementation(
+      async (input) => createStartedResponse(input).session,
+    )
 
     renderInterviewPage(
       "/interview?entry=history&targetRoleId=role_product_manager_meituan&round=technical&difficulty=pressure&durationMinutes=45",
@@ -189,7 +183,7 @@ describe("InterviewPage", () => {
 
   it("requires an explicit role choice when the historical interview role is unavailable", async () => {
     const user = userEvent.setup()
-    const current = createInterviewMockResponse("completed")
+    const current = createInterviewPageStoryFixture("completed")
     const prepared = createMultipleReadyRolesResponse()
     prepared.setup.defaultConfiguration.targetRoleId = null
     vi.mocked(getInterviewPage).mockResolvedValue(current)
@@ -201,7 +195,9 @@ describe("InterviewPage", () => {
         configuration: prepared.setup.defaultConfiguration,
       },
     })
-    vi.mocked(startInterview).mockImplementation(async (input) => createStartedResponse(input))
+    vi.mocked(startInterview).mockImplementation(
+      async (input) => createStartedResponse(input).session,
+    )
 
     renderInterviewPage(
       "/interview?entry=history&targetRoleId=role_archived&round=technical&difficulty=basic&durationMinutes=30",
@@ -226,7 +222,7 @@ describe("InterviewPage", () => {
 
   it("shows a dedicated history-entry preparation failure and retries", async () => {
     const user = userEvent.setup()
-    const current = createInterviewMockResponse("completed")
+    const current = createInterviewPageStoryFixture("completed")
     const prepared = createMultipleReadyRolesResponse()
     vi.mocked(getInterviewPage).mockResolvedValue(current)
     vi.mocked(prepareInterviewTrainingEntry)
@@ -263,7 +259,7 @@ describe("InterviewPage", () => {
   })
 
   it("maps service setup data to the ready view", async () => {
-    const response = createInterviewMockResponse()
+    const response = createInterviewPageStoryFixture()
     vi.mocked(getInterviewPage).mockResolvedValue(response)
 
     renderInterviewPage()
@@ -276,7 +272,7 @@ describe("InterviewPage", () => {
   })
 
   it("maps an empty target-role response to the empty view", async () => {
-    vi.mocked(getInterviewPage).mockResolvedValue(createInterviewMockResponse("noTargetRoles"))
+    vi.mocked(getInterviewPage).mockResolvedValue(createInterviewPageStoryFixture("noTargetRoles"))
 
     renderInterviewPage()
 
@@ -285,7 +281,9 @@ describe("InterviewPage", () => {
   })
 
   it("maps a service prerequisite to the matching existing completion route", async () => {
-    vi.mocked(getInterviewPage).mockResolvedValue(createInterviewMockResponse("prerequisiteNotMet"))
+    vi.mocked(getInterviewPage).mockResolvedValue(
+      createInterviewPageStoryFixture("prerequisiteNotMet"),
+    )
 
     renderInterviewPage()
 
@@ -301,11 +299,8 @@ describe("InterviewPage", () => {
   })
 
   it("maps roles without ready job descriptions to the existing blocked state", async () => {
-    const response: InterviewPageResponse = {
-      setup: createInterviewSetupResponseMock(
-        createRolesMockResponse("multipleRolesJdMissing"),
-        careerProfileFixture,
-      ),
+    const response: InterviewData = {
+      setup: createInterviewSetupStoryFixture("jobDescriptionMissing"),
       session: null,
     }
     vi.mocked(getInterviewPage).mockResolvedValue(response)
@@ -322,7 +317,7 @@ describe("InterviewPage", () => {
     const user = userEvent.setup()
     vi.mocked(getInterviewPage)
       .mockRejectedValueOnce(new Error("unsafe request details"))
-      .mockResolvedValueOnce(createInterviewMockResponse())
+      .mockResolvedValueOnce(createInterviewPageStoryFixture())
 
     renderInterviewPage()
 
@@ -336,10 +331,10 @@ describe("InterviewPage", () => {
 
   it("starts once, updates the query snapshot, and navigates to the session route", async () => {
     const user = userEvent.setup()
-    const setup = createInterviewMockResponse()
+    const setup = createInterviewPageStoryFixture()
     const started = createStartedResponse()
     vi.mocked(getInterviewPage).mockResolvedValue(setup)
-    vi.mocked(startInterview).mockResolvedValue(started)
+    vi.mocked(startInterview).mockResolvedValue(started.session)
     const renderResult = renderInterviewPage()
 
     await user.click(await screen.findByRole("button", { name: i18n.t("interview.actions.start") }))
@@ -358,7 +353,9 @@ describe("InterviewPage", () => {
     const user = userEvent.setup()
     const setup = createMultipleReadyRolesResponse()
     vi.mocked(getInterviewPage).mockResolvedValue(setup)
-    vi.mocked(startInterview).mockImplementation(async (input) => createStartedResponse(input))
+    vi.mocked(startInterview).mockImplementation(
+      async (input) => createStartedResponse(input).session,
+    )
     renderInterviewPage()
 
     await user.click(await screen.findByTestId("interview-target-role-trigger"))
@@ -376,8 +373,8 @@ describe("InterviewPage", () => {
 
   it("prevents a duplicate start while the first mutation is pending", async () => {
     const user = userEvent.setup()
-    const startRequest = createDeferred<InterviewPageResponse>()
-    vi.mocked(getInterviewPage).mockResolvedValue(createInterviewMockResponse())
+    const startRequest = createDeferred<InterviewData["session"]>()
+    vi.mocked(getInterviewPage).mockResolvedValue(createInterviewPageStoryFixture())
     vi.mocked(startInterview).mockReturnValue(startRequest.promise)
     const renderResult = renderInterviewPage()
 
@@ -390,7 +387,7 @@ describe("InterviewPage", () => {
     expect(startInterview).toHaveBeenCalledOnce()
 
     await act(async () => {
-      startRequest.resolve(createStartedResponse())
+      startRequest.resolve(createStartedResponse().session)
     })
     await waitFor(() =>
       expect(renderResult.router?.state.location.pathname).toContain("/interview/session/"),
@@ -399,10 +396,10 @@ describe("InterviewPage", () => {
 
   it("keeps the selected configuration retryable after start fails", async () => {
     const user = userEvent.setup()
-    vi.mocked(getInterviewPage).mockResolvedValue(createInterviewMockResponse())
+    vi.mocked(getInterviewPage).mockResolvedValue(createInterviewPageStoryFixture())
     vi.mocked(startInterview)
       .mockRejectedValueOnce(new Error("start failed"))
-      .mockResolvedValueOnce(createStartedResponse())
+      .mockResolvedValueOnce(createStartedResponse().session)
     const renderResult = renderInterviewPage()
 
     await user.click(await screen.findByRole("button", { name: i18n.t("interview.actions.start") }))

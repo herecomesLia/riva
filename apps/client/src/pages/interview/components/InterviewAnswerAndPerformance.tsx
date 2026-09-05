@@ -1,17 +1,13 @@
 import { useTranslation } from "react-i18next"
 
-import type {
-  InterviewFollowUpLearningDetailResponse,
-  InterviewQuestionReviewResponse,
-} from "@/models/interview"
+import type { InterviewPerformance } from "@/models/interview-workflow"
 
 export function InterviewAnswerAndPerformance({
   answer,
   performance,
 }: {
   answer: string | null
-  performance:
-    InterviewQuestionReviewResponse | InterviewFollowUpLearningDetailResponse["performance"]
+  performance: InterviewPerformance | null
 }) {
   const { t } = useTranslation()
   return (

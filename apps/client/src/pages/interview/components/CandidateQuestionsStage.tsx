@@ -18,12 +18,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
-import type { InterviewCandidateQuestionExchangeResponse } from "@/models/interview"
+import type { CandidateQuestionExchange } from "@/models/interview-workflow"
 
 import { CandidateQuestionComposer } from "./CandidateQuestionComposer"
 
 type CandidateQuestionsStageProps = {
-  exchanges: readonly InterviewCandidateQuestionExchangeResponse[]
+  exchanges: readonly CandidateQuestionExchange[]
   isFinishing: boolean
   isInteractionLocked: boolean
   isSubmittingQuestion: boolean
@@ -78,7 +78,7 @@ export function CandidateQuestionsStage({
           <CardContent>
             <ol className="flex flex-col gap-6">
               {exchanges.map((exchange, index) => (
-                <li className="flex min-w-0 flex-col gap-4" key={exchange.question.id}>
+                <li className="flex min-w-0 flex-col gap-4" key={index}>
                   {index > 0 ? <Separator /> : null}
                   <div className="flex flex-col gap-2">
                     <p className="text-xs font-medium text-muted-foreground">
@@ -86,7 +86,7 @@ export function CandidateQuestionsStage({
                         current: index + 1,
                       })}
                     </p>
-                    <p className="break-words font-medium leading-7">{exchange.question.content}</p>
+                    <p className="break-words font-medium leading-7">{exchange.question}</p>
                   </div>
                   <div className="rounded-lg bg-muted p-4">
                     <p className="mb-1 text-xs font-medium text-muted-foreground">

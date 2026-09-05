@@ -1,11 +1,11 @@
 import preview from "#storybook/preview"
 import { expect, userEvent } from "storybook/test"
 
-import { createInterviewReviewResponseMock } from "@/mocks/data/interview"
+import { createInterviewReviewStoryFixture } from "@/pages/interview/stories/interview-story-fixtures"
 
 import { InterviewFollowUpDetails } from "./InterviewFollowUpDetails"
 
-const response = createInterviewReviewResponseMock()
+const response = createInterviewReviewStoryFixture()
 if (response.status !== "complete") throw new Error("Complete review fixture required.")
 const followUps = response.questionDetails[1]!.followUps
 
@@ -19,9 +19,9 @@ export const Answered = meta.story({
   play: async ({ canvas }) => {
     await userEvent.click(
       canvas.getByRole("button", {
-        name: new RegExp(followUps[0]!.record.question.prompt.slice(0, 16)),
+        name: new RegExp(followUps[0]!.prompt.slice(0, 16)),
       }),
     )
-    await expect(canvas.getByText(followUps[0]!.record.answer!.content)).toBeVisible()
+    await expect(canvas.getByText(followUps[0]!.answer!)).toBeVisible()
   },
 })

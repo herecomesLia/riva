@@ -2,8 +2,8 @@ import type {
   InterviewDifficulty,
   InterviewDurationMinutes,
   InterviewRound,
-  InterviewSetupResponse,
-} from "./interview"
+  InterviewSetup,
+} from "./interview-workflow"
 import type {
   Difficulty,
   QuestionSource,
@@ -67,7 +67,7 @@ export type TrainingEntryResolution<TConfiguration> =
 export type PracticeTrainingEntryResolution = TrainingEntryResolution<PracticeSelection>
 
 export type InterviewTrainingEntryResolution = TrainingEntryResolution<
-  InterviewSetupResponse["defaultConfiguration"]
+  InterviewSetup["defaultConfiguration"]
 >
 
 export type PracticeTrainingEntryPreparationResponse = {
@@ -76,7 +76,7 @@ export type PracticeTrainingEntryPreparationResponse = {
 }
 
 export type InterviewTrainingEntryPreparationResponse = {
-  page: import("./interview").InterviewPageResponse
+  page: import("./interview-workflow").InterviewData
   resolution: InterviewTrainingEntryResolution
 }
 
@@ -186,7 +186,7 @@ export function resolvePracticeTrainingEntry(
 }
 
 export function resolveInterviewTrainingEntry(
-  setup: InterviewSetupResponse,
+  setup: InterviewSetup,
   parameters: InterviewTrainingEntryParameters,
   roleAvailability: TrainingEntryRoleAvailability,
 ): InterviewTrainingEntryResolution {

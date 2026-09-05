@@ -3,7 +3,7 @@ import { useNavigate, useSearch } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 
 import { parseInterviewEntrySearch, toInterviewEntryParameters } from "@/app/training-entry-search"
-import type { InterviewConfiguration, InterviewPageResponse } from "@/models/interview"
+import type { InterviewConfiguration, InterviewData } from "@/models/interview-workflow"
 import type { InterviewTrainingEntryResolution } from "@/models/training-entry"
 import {
   getInterviewPage,
@@ -33,8 +33,10 @@ export function InterviewPage() {
   })
   const startMutation = useMutation({
     mutationFn: startInterview,
-    onSuccess: (response) => {
-      queryClient.setQueryData<InterviewPageResponse>(INTERVIEW_QUERY_KEY, response)
+    onSuccess: (session) => {
+      queryClient.setQueryData<InterviewData>(INTERVIEW_QUERY_KEY, (current) =>
+        current === undefined ? current : { ...current, session },
+      )
     },
   })
   const prepareEntryMutation = useMutation({ mutationFn: prepareInterviewTrainingEntry })
@@ -54,7 +56,7 @@ export function InterviewPage() {
     void prepareEntryMutation
       .mutateAsync(toInterviewEntryParameters(entrySearch))
       .then(({ page, resolution }) => {
-        queryClient.setQueryData<InterviewPageResponse>(INTERVIEW_QUERY_KEY, page)
+        queryClient.setQueryData<InterviewData>(INTERVIEW_QUERY_KEY, page)
         setEntryPreparation({ key: entryKey, status: "success", resolution })
       })
       .catch(() => setEntryPreparation({ key: entryKey, status: "error" }))
@@ -72,9 +74,9 @@ export function InterviewPage() {
 
     startLock.current = true
     try {
-      const response = await startMutation.mutateAsync(input)
-      const session = response.session
-      if (session === null) throw new Error("Started interview response is missing its session.")
+      const session = await startMutation.mutateAsync(input)
+      if (session?.status !== "opening")
+        throw new Error("Started interview response is missing its session.")
       await navigate({
         to: "/interview/session/$sessionId",
         params: { sessionId: session.sessionId },

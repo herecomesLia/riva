@@ -1,53 +1,36 @@
 import preview from "#storybook/preview"
 import { expect, fn, screen, waitFor, within } from "storybook/test"
-
-import {
-  createInterviewAgentPlanMock,
-  defaultInterviewConfigurationMock,
-  type InterviewAgentMockScenario,
-} from "@/mocks/data/interview"
-import type { InterviewConversationRecordViewData } from "@/models/interview"
+import { interviewFixture } from "@/mocks/fixtures/interview"
+import type { InterviewConversationItem } from "@/models/interview-workflow"
 
 import { createInterviewSessionStoryFixture } from "./stories/interview-story-fixtures"
 import { InterviewSessionView, type InterviewSessionSummary } from "./InterviewSessionView"
 
 const fixture = createInterviewSessionStoryFixture()
-function createPlan(scenario: InterviewAgentMockScenario) {
-  return createInterviewAgentPlanMock({ ...defaultInterviewConfigurationMock, scenario })
-}
-
-const noFollowUpsPlan = createPlan("noFollowUps")
-const singleFollowUpPlan = createPlan("singleFollowUp")
-const multipleFollowUpsPlan = createPlan("multipleFollowUps")
-const lastQuestionFollowUpPlan = createPlan("lastQuestionFollowUp")
-const unknownTotalPlan = createPlan("unknownTotal")
-const adjustedPlan = createPlan("adjustedPlan")
-
-const projectQuestion = multipleFollowUpsPlan.questions[1]!
-const firstFollowUp = projectQuestion.followUps[0]!
-const secondFollowUp = projectQuestion.followUps[1]!
+const projectQuestion = { ...interviewFixture.question, questionOrder: 2 }
+const firstFollowUp = interviewFixture.followUp
+const secondFollowUp = { ...firstFollowUp, content: "如果结果不符合预期，你会如何调整行动？" }
 const answer = "我先定位关键链路，再协调上下游分阶段灰度，并持续观察性能与业务指标。"
 
 function summary(
   completedMainQuestions: number,
   totalMainQuestions: number | null,
-  planRevision = 1,
+  planAdjusted = false,
 ): InterviewSessionSummary {
   return {
     ...fixture.summary,
     completedMainQuestions,
     totalMainQuestions,
-    planRevision,
+    planAdjusted,
   }
 }
 
 function record(
-  id: string,
   kind: "question" | "followUp",
   questionOrder: number,
   prompt: string,
-): InterviewConversationRecordViewData {
-  return { id, kind, questionOrder, prompt, answer }
+): InterviewConversationItem {
+  return { kind, questionOrder, prompt, answer }
 }
 
 const activeActions = {
@@ -59,7 +42,7 @@ const activeActions = {
 const openingArgs = {
   ...activeActions,
   status: "opening",
-  summary: summary(0, singleFollowUpPlan.initialProgress.totalMainQuestions),
+  summary: summary(0, 2),
   openingMessage: fixture.openingMessage,
   isBeginning: false,
   beginFailed: false,
@@ -69,12 +52,11 @@ const openingArgs = {
 const questionArgs = {
   ...activeActions,
   status: "question",
-  summary: summary(1, multipleFollowUpsPlan.initialProgress.totalMainQuestions),
+  summary: summary(1, 2),
   prompt: {
-    id: projectQuestion.question.id,
     kind: "question",
-    content: projectQuestion.question.prompt,
-    questionOrder: projectQuestion.question.order,
+    content: projectQuestion.content,
+    questionOrder: projectQuestion.questionOrder,
   },
   history: [],
   isSubmitting: false,
@@ -114,12 +96,11 @@ export const OpeningInteractionLocked = meta.story({
 export const TwoQuestionsWithoutFollowUps = meta.story({
   args: {
     ...questionArgs,
-    summary: summary(0, noFollowUpsPlan.initialProgress.totalMainQuestions),
+    summary: summary(0, 2),
     prompt: {
-      id: noFollowUpsPlan.questions[0]!.question.id,
       kind: "question",
-      content: noFollowUpsPlan.questions[0]!.question.prompt,
-      questionOrder: noFollowUpsPlan.questions[0]!.question.order,
+      content: interviewFixture.question.content,
+      questionOrder: 1,
     },
   },
 })
@@ -128,19 +109,11 @@ export const SingleFollowUp = meta.story({
   args: {
     ...questionArgs,
     prompt: {
-      id: singleFollowUpPlan.questions[1]!.followUps[0]!.id,
       kind: "followUp",
-      content: singleFollowUpPlan.questions[1]!.followUps[0]!.prompt,
-      questionOrder: singleFollowUpPlan.questions[1]!.question.order,
+      content: firstFollowUp.content,
+      questionOrder: 2,
     },
-    history: [
-      record(
-        singleFollowUpPlan.questions[1]!.question.id,
-        "question",
-        singleFollowUpPlan.questions[1]!.question.order,
-        singleFollowUpPlan.questions[1]!.question.prompt,
-      ),
-    ],
+    history: [record("question", 2, projectQuestion.content)],
   },
 })
 
@@ -148,19 +121,13 @@ export const ConsecutiveFollowUps = meta.story({
   args: {
     ...questionArgs,
     prompt: {
-      id: secondFollowUp.id,
       kind: "followUp",
-      content: secondFollowUp.prompt,
-      questionOrder: projectQuestion.question.order,
+      content: secondFollowUp.content,
+      questionOrder: projectQuestion.questionOrder,
     },
     history: [
-      record(
-        projectQuestion.question.id,
-        "question",
-        projectQuestion.question.order,
-        projectQuestion.question.prompt,
-      ),
-      record(firstFollowUp.id, "followUp", projectQuestion.question.order, firstFollowUp.prompt),
+      record("question", projectQuestion.questionOrder, projectQuestion.content),
+      record("followUp", projectQuestion.questionOrder, firstFollowUp.content),
     ],
   },
 })
@@ -168,12 +135,11 @@ export const ConsecutiveFollowUps = meta.story({
 export const LastQuestionFollowUp = meta.story({
   args: {
     ...questionArgs,
-    summary: summary(1, lastQuestionFollowUpPlan.initialProgress.totalMainQuestions),
+    summary: summary(1, 2),
     prompt: {
-      id: lastQuestionFollowUpPlan.questions[1]!.followUps[0]!.id,
       kind: "followUp",
-      content: lastQuestionFollowUpPlan.questions[1]!.followUps[0]!.prompt,
-      questionOrder: lastQuestionFollowUpPlan.questions[1]!.question.order,
+      content: firstFollowUp.content,
+      questionOrder: 2,
     },
   },
 })
@@ -181,18 +147,14 @@ export const LastQuestionFollowUp = meta.story({
 export const UnknownTotal = meta.story({
   args: {
     ...questionArgs,
-    summary: summary(1, unknownTotalPlan.initialProgress.totalMainQuestions),
+    summary: summary(1, null),
   },
 })
 
 export const AdjustedPlan = meta.story({
   args: {
     ...questionArgs,
-    summary: summary(
-      1,
-      adjustedPlan.planChanges[0]!.totalMainQuestions,
-      adjustedPlan.planChanges[0]!.planRevision,
-    ),
+    summary: summary(1, 3, true),
   },
 })
 
@@ -201,12 +163,11 @@ export const LongContentNarrow = meta.story({
     ...questionArgs,
     prompt: {
       ...questionArgs.prompt,
-      id: "long-question",
-      content: `${projectQuestion.question.prompt} 请进一步说明在不能中断业务迭代、需要协调多个上下游团队且缺少完整历史监控数据的约束下，你会如何识别最高风险、规划迁移边界，并用可验证的数据判断治理是否成功？`,
+      content: `${projectQuestion.content} 请进一步说明在不能中断业务迭代、需要协调多个上下游团队且缺少完整历史监控数据的约束下，你会如何识别最高风险、规划迁移边界，并用可验证的数据判断治理是否成功？`,
     },
     history: [
       {
-        ...record("long-history", "question", 1, "请介绍相关背景。"),
+        ...record("question", 1, "请介绍相关背景。"),
         answer: answer.repeat(8),
       },
     ],

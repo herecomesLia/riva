@@ -1,29 +1,14 @@
-import {
-  candidateQuestionsPromptMock,
-  createCandidateQuestionExchange,
-  createInterviewCompletedSessionMock,
-  createInterviewMockResponse,
-  createInterviewReviewResponseMock,
-  createInterviewSetupResponseMock,
-  interviewOpeningMessageMock,
-} from "@/mocks/data/interview"
-import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
-import { createRolesMockResponse } from "@/mocks/data/roles"
+import { interviewFixture } from "@/mocks/fixtures/interview"
 import type {
-  GetInterviewReviewResponse,
-  InterviewCandidateQuestionExchangeResponse,
-  InterviewConversationRecordViewData,
-  InterviewSetupResponse,
-} from "@/models/interview"
-
+  CandidateQuestionExchange,
+  CompleteInterviewReview,
+  InterviewConversationItem,
+  InterviewData,
+  InterviewSetup,
+  PartialInterviewReview,
+  InterviewReview,
+} from "@/models/interview-workflow"
 import type { InterviewSessionSummary } from "../InterviewSessionView"
-
-type CompleteInterviewReviewResponse = Extract<GetInterviewReviewResponse, { status: "complete" }>
-type PartialInterviewReviewResponse = Extract<GetInterviewReviewResponse, { status: "partial" }>
-type UnavailableInterviewReviewResponse = Extract<
-  GetInterviewReviewResponse,
-  { status: "unavailable" }
->
 
 export function createInterviewSetupStoryFixture(
   scenario:
@@ -31,217 +16,201 @@ export function createInterviewSetupStoryFixture(
     | "prerequisiteNotMet"
     | "multipleRolesReady"
     | "jobDescriptionMissing" = "setupReady",
-): InterviewSetupResponse {
-  if (scenario === "multipleRolesReady") {
-    return createInterviewSetupResponseMock(
-      createRolesMockResponse("multipleRolesReady"),
-      careerProfileFixture,
-    )
+): InterviewSetup {
+  const setup: InterviewSetup = {
+    availability: { status: "available" },
+    targetRoles: [
+      {
+        id: "role_frontend_bytedance",
+        title: "Senior Frontend Engineer",
+        company: "ByteDance",
+        supportedRounds: ["hr", "firstBusiness", "technical", "manager", "final", "comprehensive"],
+      },
+    ],
+    availableDifficulties: ["basic", "pressure"],
+    availableDurationMinutes: [15, 30, 45],
+    defaultConfiguration: {
+      ...interviewFixture.configuration,
+      targetRoleId: "role_frontend_bytedance",
+    },
   }
+  if (scenario === "multipleRolesReady")
+    setup.targetRoles.push({
+      id: "role_product_manager_meituan",
+      title: "Product Manager",
+      company: "Meituan",
+      supportedRounds: ["hr", "firstBusiness", "manager", "final", "comprehensive"],
+    })
+  if (scenario === "prerequisiteNotMet")
+    setup.availability = { status: "blocked", reason: "profileIncomplete" }
   if (scenario === "jobDescriptionMissing") {
-    return createInterviewSetupResponseMock(
-      createRolesMockResponse("multipleRolesJdMissing"),
-      careerProfileFixture,
-    )
+    setup.availability = { status: "blocked", reason: "jobDescriptionMissing" }
+    setup.targetRoles = []
+    setup.defaultConfiguration.targetRoleId = null
   }
-  return structuredClone(createInterviewMockResponse(scenario).setup)
+  return setup
+}
+
+export function createInterviewPageStoryFixture(
+  scenario: "setupReady" | "prerequisiteNotMet" | "noTargetRoles" | "completed" = "setupReady",
+): InterviewData {
+  const setup = createInterviewSetupStoryFixture(
+    scenario === "prerequisiteNotMet" ? scenario : "setupReady",
+  )
+  if (scenario === "noTargetRoles") {
+    setup.targetRoles = []
+    setup.defaultConfiguration.targetRoleId = null
+  }
+  return {
+    setup,
+    session:
+      scenario === "completed"
+        ? {
+            status: "completed",
+            sessionId: interviewFixture.sessionId,
+            history: createInterviewSessionStoryFixture().history,
+          }
+        : null,
+  }
+}
+
+export function createCandidateExchangeStoryFixture(
+  question = "这个岗位入职后的成功标准是什么？",
+): CandidateQuestionExchange {
+  return {
+    question,
+    interviewerAnswer: interviewFixture.candidate.interviewerAnswer,
+    feedback: structuredClone(interviewFixture.candidate.feedback),
+  }
 }
 
 export function createInterviewSessionStoryFixture() {
-  const response = createInterviewMockResponse("completed")
-  const session = createInterviewCompletedSessionMock()
-  const targetRole = response.setup.targetRoles.find(
-    ({ id }) => id === session.configuration.targetRoleId,
-  )
-  if (targetRole === undefined) {
-    throw new Error("Completed interview target role fixture required.")
-  }
-  const candidateExchange = session.candidateQuestionExchanges[0]
-  if (candidateExchange === undefined) {
-    throw new Error("Candidate question exchange fixture required.")
-  }
-
-  const history: InterviewConversationRecordViewData[] = session.completedQuestions.flatMap(
-    ({ answer, followUps, question }) => [
-      {
-        id: question.id,
-        kind: "question" as const,
-        questionOrder: question.order,
-        prompt: question.prompt,
-        answer: answer.content,
-      },
-      ...followUps.map(({ answer: followUpAnswer, question: followUp }) => ({
-        id: followUp.id,
-        kind: "followUp" as const,
-        questionOrder: question.order,
-        prompt: followUp.prompt,
-        answer: followUpAnswer.content,
-      })),
-    ],
-  )
+  const history: InterviewConversationItem[] = [
+    {
+      kind: "question",
+      questionOrder: 1,
+      prompt: interviewFixture.question.content,
+      answer: "我先明确目标，再推动小范围验证并复盘结果。",
+    },
+    {
+      kind: "followUp",
+      questionOrder: 1,
+      prompt: interviewFixture.followUp.content,
+      answer: "我通过实验组和对照组排查同期变化的影响。",
+    },
+  ]
   const summary: InterviewSessionSummary = {
-    targetRole: targetRole.title,
-    company: targetRole.company,
-    round: session.configuration.round,
-    difficulty: session.configuration.difficulty,
-    completedMainQuestions: session.progress.completedMainQuestions,
-    totalMainQuestions: session.progress.totalMainQuestions,
-    planRevision: session.progress.planRevision,
+    targetRole: "Senior Frontend Engineer",
+    company: "ByteDance",
+    round: interviewFixture.configuration.round,
+    difficulty: interviewFixture.configuration.difficulty,
+    ...interviewFixture.progress,
+    completedMainQuestions: 1,
   }
-
   return {
-    candidateExchange: structuredClone(candidateExchange),
-    candidatePrompt: candidateQuestionsPromptMock,
-    completedQuestions: structuredClone(session.completedQuestions),
+    candidateExchange: createCandidateExchangeStoryFixture(),
+    candidatePrompt: interviewFixture.candidate.prompt,
     history,
-    openingMessage: interviewOpeningMessageMock,
+    openingMessage: interviewFixture.openingMessage,
     summary,
   }
 }
 
-export function createSparseInterviewReviewStoryFixture(): CompleteInterviewReviewResponse {
-  const response = createInterviewReviewResponseMock()
-  if (response.status !== "complete") {
-    throw new Error("Complete interview review fixture required.")
-  }
-  return {
-    ...response,
-    questionDetails: response.questionDetails.slice(0, 1),
-    review: {
-      ...response.review,
-      dimensionScores: response.review.dimensionScores.slice(0, 2),
-      questionReviews: response.review.questionReviews.slice(0, 1),
-      mainStrengths: response.review.mainStrengths.slice(0, 1),
-      frequentIssues: response.review.frequentIssues.slice(0, 1),
-      exposedWeaknesses: response.review.exposedWeaknesses.slice(0, 1),
-      riskPoints: response.review.riskPoints.slice(0, 1),
-      communicationSuggestions: response.review.communicationSuggestions.slice(0, 1),
-      preparationSuggestions: response.review.preparationSuggestions.slice(0, 1),
-      nextTraining: {
-        ...response.review.nextTraining,
-        focusAreas: response.review.nextTraining.focusAreas.slice(0, 1),
-      },
-    },
-  }
-}
-
-export function createUnavailableInterviewReviewStoryFixture() {
-  return createInterviewReviewResponseMock(
-    createInterviewCompletedSessionMock({
-      completionReason: "userEndedEarly",
-      completedMainQuestions: 0,
-    }),
-  )
-}
-
-export function createPartialInterviewReviewStoryFixture() {
-  return createInterviewReviewResponseMock(
-    createInterviewCompletedSessionMock({
-      completionReason: "userEndedEarly",
-      completedMainQuestions: 1,
-    }),
-  )
-}
-
-export function createUnavailableReviewWithLearningStoryFixture(): UnavailableInterviewReviewResponse {
-  const complete = createInterviewReviewResponseMock(
-    createInterviewCompletedSessionMock({ agentScenario: "noFollowUps" }),
-  )
-  if (complete.status !== "complete") throw new Error("Complete review fixture required.")
-  const detail = structuredClone(complete.questionDetails[0]!)
-  detail.record = {
-    status: "unanswered",
-    question: detail.record.question,
-    answer: null,
-    followUps: [],
-  }
-  detail.performance = null
-  detail.followUps = []
-  return {
-    status: "unavailable",
-    reason: "insufficientAnswers",
-    sessionId: complete.sessionId,
-    completionReason: "userEndedEarly",
-    questionDetails: [detail],
-  }
-}
-
-export function createPartialWithUnansweredQuestionStoryFixture(): PartialInterviewReviewResponse {
-  const partial = createPartialInterviewReviewStoryFixture()
-  const complete = createInterviewReviewResponseMock(
-    createInterviewCompletedSessionMock({ agentScenario: "noFollowUps" }),
-  )
-  if (partial.status !== "partial" || complete.status !== "complete") {
-    throw new Error("Partial and complete review fixtures required.")
-  }
-  const unanswered = structuredClone(complete.questionDetails[1]!)
-  unanswered.record = {
-    status: "unanswered",
-    question: unanswered.record.question,
-    answer: null,
-    followUps: [],
-  }
-  unanswered.performance = null
-  unanswered.followUps = []
-  return {
-    ...partial,
-    questionDetails: [...partial.questionDetails, unanswered],
-  }
-}
-
-export function createPartialWithUnansweredFollowUpStoryFixture(): PartialInterviewReviewResponse {
-  const response = createInterviewReviewResponseMock(
-    createInterviewCompletedSessionMock({
-      agentScenario: "singleFollowUp",
-      completionReason: "userEndedEarly",
-      completedMainQuestions: 2,
-    }),
-  )
-  if (response.status !== "partial") throw new Error("Partial review fixture required.")
-  const copy = structuredClone(response)
-  const followUp = copy.questionDetails[1]?.followUps[0]
-  if (followUp === undefined) throw new Error("Follow-up fixture required.")
-  followUp.record = {
-    status: "unanswered",
-    question: followUp.record.question,
-    answer: null,
-  }
-  followUp.performance = null
-  return copy
-}
-
-export function createMultipleFollowUpsReviewStoryFixture(): CompleteInterviewReviewResponse {
-  const response = createInterviewReviewResponseMock(
-    createInterviewCompletedSessionMock({ agentScenario: "multipleFollowUps" }),
-  )
-  if (response.status !== "complete") throw new Error("Complete review fixture required.")
+// Two questions and all labels exercise review layout, without an Agent plan.
+export function createInterviewReviewStoryFixture(): CompleteInterviewReview {
+  const response: CompleteInterviewReview = structuredClone(interviewFixture.review)
+  response.questionDetails[0]!.answer = "我明确了目标与约束。"
+  response.questionDetails[0]!.followUps = []
+  response.questionDetails.push({
+    ...structuredClone(interviewFixture.review.questionDetails[0]!),
+    questionOrder: 2,
+    prompt: "请进一步说明关键方案的取舍和验证过程。",
+    answer: "我通过灰度实验比较方案，再分阶段推进。",
+  })
+  response.questionDetails[1]!.followUps[0]!.answer = "我比较了同期对照数据。"
+  response.review.dimensionScores = (
+    [
+      "relevance",
+      "structure",
+      "specificity",
+      "personalContribution",
+      "resultsAndEvidence",
+      "roleAlignment",
+      "communication",
+      "riskControl",
+    ] as const
+  ).map((dimension) => ({ ...interviewFixture.review.review.dimensionScores[0]!, dimension }))
   return response
 }
 
-export function createGeneratingReferenceReviewStoryFixture(): CompleteInterviewReviewResponse {
-  const response = createInterviewReviewResponseMock()
-  if (response.status !== "complete") throw new Error("Complete review fixture required.")
-  const copy = structuredClone(response)
-  copy.questionDetails[0]!.referenceAnswer = { status: "generating" }
-  return copy
+export function createSparseInterviewReviewStoryFixture(): CompleteInterviewReview {
+  return structuredClone(interviewFixture.review)
 }
 
-export function createLongCandidateExchangesStoryFixture(): InterviewCandidateQuestionExchangeResponse[] {
+export function createUnavailableInterviewReviewStoryFixture(): Extract<
+  InterviewReview,
+  { status: "unavailable" }
+> {
+  return { status: "unavailable", questionDetails: [] }
+}
+
+export function createPartialInterviewReviewStoryFixture(): PartialInterviewReview {
+  return {
+    status: "partial",
+    review: structuredClone(interviewFixture.review.review),
+    questionDetails: createInterviewReviewStoryFixture().questionDetails.slice(0, 1),
+  }
+}
+
+export function createUnavailableReviewWithLearningStoryFixture(): Extract<
+  InterviewReview,
+  { status: "unavailable" }
+> {
+  const detail = structuredClone(interviewFixture.review.questionDetails[0]!)
+  return {
+    status: "unavailable",
+    questionDetails: [{ ...detail, answer: null, performance: null, followUps: [] }],
+  }
+}
+
+export function createPartialWithUnansweredQuestionStoryFixture(): PartialInterviewReview {
+  const response = createPartialInterviewReviewStoryFixture()
+  const detail = createInterviewReviewStoryFixture().questionDetails[1]!
+  response.questionDetails.push({ ...detail, answer: null, performance: null, followUps: [] })
+  return response
+}
+
+export function createPartialWithUnansweredFollowUpStoryFixture(): PartialInterviewReview {
+  const complete = createInterviewReviewStoryFixture()
+  const followUp = complete.questionDetails[1]!.followUps[0]!
+  followUp.answer = null
+  followUp.performance = null
+  return { status: "partial", review: complete.review, questionDetails: complete.questionDetails }
+}
+
+export function createMultipleFollowUpsReviewStoryFixture(): CompleteInterviewReview {
+  const response = createInterviewReviewStoryFixture()
+  const followUps = response.questionDetails[1]!.followUps
+  followUps.push({
+    ...structuredClone(followUps[0]!),
+    prompt: "如果结果不符合预期，你会如何调整？",
+  })
+  return response
+}
+
+export function createGeneratingReferenceReviewStoryFixture(): CompleteInterviewReview {
+  const response = createInterviewReviewStoryFixture()
+  response.questionDetails[0]!.referenceAnswer = { status: "generating" }
+  return response
+}
+
+export function createLongCandidateExchangesStoryFixture(): CandidateQuestionExchange[] {
   return [
-    createCandidateQuestionExchange(
-      "这个岗位在入职前三个月最重要的业务目标、衡量标准以及与上下游团队的协作边界分别是什么？",
-      1,
-    ),
-    createCandidateQuestionExchange(
-      "如果核心项目同时受到资源不足、跨团队优先级冲突和历史系统约束，团队通常如何做取舍并确保决策透明？",
-      2,
-    ),
-    createCandidateQuestionExchange(
-      "团队如何定义优秀成员的成长路径，又会通过哪些具体反馈机制帮助成员持续提升专业判断和影响力？",
-      3,
-    ),
-  ].map((exchange) => ({
-    ...exchange,
-    interviewerAnswer: `${exchange.interviewerAnswer}${exchange.interviewerAnswer}`,
+    "这个岗位在入职前三个月最重要的业务目标、衡量标准以及与上下游团队的协作边界分别是什么？",
+    "如果核心项目同时受到资源不足、跨团队优先级冲突和历史系统约束，团队通常如何做取舍并确保决策透明？",
+    "团队如何定义优秀成员的成长路径，又会通过哪些具体反馈机制帮助成员持续提升专业判断和影响力？",
+  ].map((question) => ({
+    ...createCandidateExchangeStoryFixture(question),
+    interviewerAnswer: interviewFixture.candidate.interviewerAnswer.repeat(2),
   }))
 }

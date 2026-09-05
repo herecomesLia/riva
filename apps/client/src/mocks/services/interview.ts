@@ -59,7 +59,6 @@ import type {
 import {
   resolveInterviewTrainingEntry,
   resolveTrainingEntryRoleAvailability,
-  type InterviewTrainingEntryPreparationResponse,
   type InterviewTrainingEntryParameters,
 } from "@/models/training-entry"
 
@@ -344,7 +343,10 @@ export async function getInterviewPage(
 export async function prepareInterviewTrainingEntry(
   input: InterviewTrainingEntryParameters,
   profile?: CareerProfileResponse | null,
-): Promise<InterviewTrainingEntryPreparationResponse> {
+): Promise<{
+  page: InterviewPageResponse
+  resolution: ReturnType<typeof resolveInterviewTrainingEntry>
+}> {
   await consumeOperation("prepareInterviewTrainingEntry", 0)
   const rolesSnapshot = getRolesMockSnapshot()
   const snapshot = getSnapshot(profile)

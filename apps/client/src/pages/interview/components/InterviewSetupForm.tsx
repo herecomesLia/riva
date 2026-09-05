@@ -30,13 +30,12 @@ import type {
   InterviewDifficulty,
   InterviewDurationMinutes,
   InterviewRound,
-  InterviewSetupViewData,
-  InterviewSetupFormState,
-} from "@/models/interview"
+  InterviewSetup,
+} from "@/models/interview-workflow"
 import type { InterviewTrainingEntryResolution } from "@/models/training-entry"
 
 type InterviewSetupFormProps = {
-  setup: InterviewSetupViewData
+  setup: InterviewSetup
   historyEntryResolution?: InterviewTrainingEntryResolution
   isPending: boolean
   onStart: (input: InterviewConfiguration) => Promise<void>
@@ -46,9 +45,9 @@ const interviewOptionStateClassName =
   "hover:bg-card focus:border-primary focus:text-primary focus-visible:border-primary focus-visible:text-primary aria-pressed:border-primary aria-pressed:bg-card aria-pressed:text-primary"
 
 function getInitialConfiguration(
-  setup: InterviewSetupViewData,
+  setup: InterviewSetup,
   historyEntryResolution?: InterviewTrainingEntryResolution,
-): InterviewSetupFormState["values"] {
+): InterviewSetup["defaultConfiguration"] {
   if (historyEntryResolution?.status === "roleUnavailable") {
     return { ...setup.defaultConfiguration, targetRoleId: null }
   }
