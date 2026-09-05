@@ -1,8 +1,10 @@
 import type {
   FollowUpReferenceAnswer,
+  PracticeEvaluation,
   PracticeFollowUp,
   PracticeQuestion,
   PracticeReferenceAnswer,
+  PracticeReview,
   PracticeSelection,
   PracticeSession,
   QuestionType,
@@ -108,6 +110,42 @@ export const practiceQuestions = {
     isWeak: false,
   },
 } satisfies Record<QuestionType, PracticeQuestion>
+
+export const practiceQuestionAlternates = {
+  projectDeepDive: {
+    id: "practice-question-project-deep-dive-alternate",
+    prompt: "请选择一个你深度参与的复杂项目，说明你做出的关键技术取舍、遇到的阻力以及最终结果。",
+    assessedCapabilities: ["问题分析", "技术决策", "跨团队协作"],
+    recommendedMaterials: ["复杂项目技术取舍经历"],
+  },
+  behavioral: {
+    id: "practice-question-behavioral-alternate",
+    prompt: "请回顾一次高压期限下出现突发问题的经历，你如何确定优先级、协调资源并控制影响？",
+    assessedCapabilities: ["压力应对", "优先级判断", "协作沟通"],
+    recommendedMaterials: ["线上突发事件处理经历"],
+  },
+  businessUnderstanding: {
+    id: "practice-question-business-understanding-alternate",
+    prompt: "面对用户体验与短期业务收益之间的冲突时，你会如何分析取舍并推动决策？",
+    assessedCapabilities: ["业务判断", "风险意识", "利益相关方沟通"],
+    recommendedMaterials: ["体验与收益取舍经历"],
+  },
+  motivation: {
+    id: "practice-question-motivation-alternate",
+    prompt: "请说明你选择这个职业方向的关键原因，以及当前岗位如何连接你的长期发展计划。",
+    assessedCapabilities: ["求职动机", "自我认知", "职业规划"],
+    recommendedMaterials: ["职业选择关键节点"],
+  },
+  technicalFoundation: {
+    id: "practice-question-technical-foundation-alternate",
+    prompt: "设计一个需要长期演进的前端数据请求层时，你会如何处理类型安全、缓存一致性和错误边界？",
+    assessedCapabilities: ["技术原理", "工程设计", "风险意识"],
+    recommendedMaterials: ["前端基础设施设计经历"],
+  },
+} satisfies Record<
+  QuestionType,
+  Pick<PracticeQuestion, "id" | "prompt" | "assessedCapabilities" | "recommendedMaterials">
+>
 
 export const practiceQuestionHelp = {
   projectDeepDive: {
@@ -270,3 +308,42 @@ export const practiceFollowUps: Partial<
     },
   },
 }
+
+export const practiceEvaluationFixture = {
+  overallScore: 78,
+  dimensionScores: [
+    {
+      dimension: "relevance",
+      score: 82,
+      explanation: "回答基本围绕问题展开，但部分证据还可以更具体。",
+    },
+    {
+      dimension: "structure",
+      score: 80,
+      explanation: "整体结构清楚，可以进一步强化结论与证据的连接。",
+    },
+    {
+      dimension: "specificity",
+      score: 74,
+      explanation: "关键行动较明确，但量化证据仍然不足。",
+    },
+    {
+      dimension: "roleAlignment",
+      score: 77,
+      explanation: "能够连接目标岗位，但还可以突出更直接的岗位价值。",
+    },
+  ],
+} satisfies PracticeEvaluation
+
+export const practiceReviewFixture = {
+  overallPerformance: "回答结构基本清楚，能够说明关键行动，但证据和决策边界仍可加强。",
+  highlights: ["围绕问题组织回答", "能够说明个人行动"],
+  mainIssues: ["量化证据不足", "部分决策边界不够明确"],
+  improvementSuggestions: ["补充可验证的结果指标", "明确个人贡献与团队成果的边界"],
+  reusableAnswerStructure: ["说明背景与目标", "展开关键行动与取舍", "用证据总结结果与复盘"],
+  exposedWeaknesses: ["量化证据", "决策边界"],
+  recommendation: {
+    action: "retryCurrent",
+    reason: "建议保留当前结构，并补充更具体的证据后重新回答。",
+  },
+} satisfies PracticeReview

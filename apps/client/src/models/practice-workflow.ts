@@ -106,6 +106,7 @@ export type GeneratingSession = {
   status: "generatingQuestion"
   sessionId: string
   selection: ActiveSelection
+  pendingQuestion: PracticeQuestion
 }
 
 export type AnsweringSession = {
@@ -148,5 +149,77 @@ export type EvaluatingSession = {
   followUpCompletion: FollowUpCompletion
 }
 
+export type ScoreDimension =
+  | "relevance"
+  | "structure"
+  | "specificity"
+  | "personalContribution"
+  | "resultsAndEvidence"
+  | "roleAlignment"
+  | "communication"
+  | "riskControl"
+
+export type DimensionScore = {
+  dimension: ScoreDimension
+  score: number
+  explanation: string
+}
+
+export type PracticeEvaluation = {
+  overallScore: number
+  dimensionScores: DimensionScore[]
+}
+
+export type PracticeRecommendation =
+  | {
+      action: "retryCurrent"
+      reason: string
+    }
+  | {
+      action: "nextQuestion"
+      reason: string
+      nextQuestion: {
+        questionType: QuestionType
+        difficulty: Difficulty
+        focusAreas: string[]
+      }
+    }
+
+export type PracticeReview = {
+  overallPerformance: string
+  highlights: string[]
+  mainIssues: string[]
+  improvementSuggestions: string[]
+  reusableAnswerStructure: string[]
+  exposedWeaknesses: string[]
+  recommendation: PracticeRecommendation
+}
+
+export type ReviewSession = Omit<EvaluatingSession, "status"> & {
+  status: "review"
+  attemptNumber: number
+  evaluation: PracticeEvaluation
+  review: PracticeReview
+}
+
+export type CompletedSession = {
+  status: "completed"
+  sessionId: string
+  selection: ActiveSelection
+  completionReason: "reviewCompleted" | "userEndedEarly"
+  questionsCompleted: number
+  retryCount: number
+  savedQuestionCount: number
+  weakQuestionCount: number
+  finalAttemptAverageScore: number
+  nextStepSuggestion: string
+}
+
 export type PracticeSession =
-  SetupSession | GeneratingSession | AnsweringSession | AnsweringFollowUpSession | EvaluatingSession
+  | SetupSession
+  | GeneratingSession
+  | AnsweringSession
+  | AnsweringFollowUpSession
+  | EvaluatingSession
+  | ReviewSession
+  | CompletedSession
