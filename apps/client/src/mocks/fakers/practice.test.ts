@@ -260,6 +260,12 @@ describe("practiceFaker", () => {
     if (nextAnswering.status !== "answering") throw new Error("Expected answering.")
     expect(nextAnswering.selection).toEqual(selection)
     expect(nextAnswering.question.difficulty).toBe(selection.difficulty)
+
+    await faker.answer("Second main answer")
+    await faker.answerFollowUp("Second follow-up answer")
+    const secondReview = await faker.pollEvaluation()
+    if (secondReview.status !== "review") throw new Error("Expected review.")
+    expect(secondReview.attemptNumber).toBe(2)
   })
 
   it("completes with summaries and resets progress for the next session", async () => {

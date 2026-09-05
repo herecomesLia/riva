@@ -114,21 +114,22 @@ export const practiceQuestions = {
 export const practiceQuestionAlternates = {
   projectDeepDive: {
     id: "practice-question-project-deep-dive-alternate",
-    prompt: "请选择一个你深度参与的复杂项目，说明你做出的关键技术取舍、遇到的阻力以及最终结果。",
-    assessedCapabilities: ["问题分析", "技术决策", "跨团队协作"],
-    recommendedMaterials: ["复杂项目技术取舍经历"],
+    prompt: "请介绍一次前端性能优化中多个方案的取舍，并说明你如何推动关键决策和验证最终效果。",
+    assessedCapabilities: ["问题分析", "技术决策", "结果量化"],
+    recommendedMaterials: ["前端性能优化方案取舍经历"],
   },
   behavioral: {
     id: "practice-question-behavioral-alternate",
-    prompt: "请回顾一次高压期限下出现突发问题的经历，你如何确定优先级、协调资源并控制影响？",
-    assessedCapabilities: ["压力应对", "优先级判断", "协作沟通"],
-    recommendedMaterials: ["线上突发事件处理经历"],
+    prompt: "请回顾一次你与关键协作方长期无法达成共识的经历，你如何识别核心诉求并推动目标完成？",
+    assessedCapabilities: ["协作沟通", "冲突处理", "复盘意识"],
+    recommendedMaterials: ["跨团队分歧处理经历"],
   },
   businessUnderstanding: {
     id: "practice-question-business-understanding-alternate",
-    prompt: "面对用户体验与短期业务收益之间的冲突时，你会如何分析取舍并推动决策？",
-    assessedCapabilities: ["业务判断", "风险意识", "利益相关方沟通"],
-    recommendedMaterials: ["体验与收益取舍经历"],
+    prompt:
+      "请介绍一次业务目标发生变化后你重新调整工作优先级的经历，并说明如何验证判断和及时纠偏。",
+    assessedCapabilities: ["业务判断", "优先级管理", "数据分析"],
+    recommendedMaterials: ["业务目标变化后的优先级调整经历"],
   },
   motivation: {
     id: "practice-question-motivation-alternate",
@@ -138,9 +139,9 @@ export const practiceQuestionAlternates = {
   },
   technicalFoundation: {
     id: "practice-question-technical-foundation-alternate",
-    prompt: "设计一个需要长期演进的前端数据请求层时，你会如何处理类型安全、缓存一致性和错误边界？",
-    assessedCapabilities: ["技术原理", "工程设计", "风险意识"],
-    recommendedMaterials: ["前端基础设施设计经历"],
+    prompt: "排查 React 性能问题时，你会如何确定首要的重复渲染假设，并验证它是真实瓶颈？",
+    assessedCapabilities: ["技术原理", "问题定位", "风险意识"],
+    recommendedMaterials: ["React 重复渲染排查经历"],
   },
 } satisfies Record<
   QuestionType,

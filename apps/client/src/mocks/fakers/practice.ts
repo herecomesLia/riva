@@ -299,7 +299,7 @@ export function createPracticeFaker(initial: PracticeSession = practiceSetupFixt
                 unanswered: revealFollowUp(session.followUpCompletion.unanswered),
               }
             : session.followUpCompletion,
-        attemptNumber: progress.retryCount + 1,
+        attemptNumber: progress.questionsCompleted + progress.retryCount + 1,
         evaluation: structuredClone(practiceEvaluationFixture),
         review: structuredClone(practiceReviewFixture),
       }
