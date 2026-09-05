@@ -72,4 +72,27 @@ export type QuestionSession = InterviewSessionBase & {
   prompt: InterviewPrompt
 }
 
-export type InterviewSession = OpeningSession | QuestionSession
+export type FollowUpSession = InterviewSessionBase & {
+  status: "followUp"
+  history: InterviewConversationItem[]
+  prompt: InterviewPrompt
+}
+
+export type CandidateQuestionExchange = {
+  question: string
+  interviewerAnswer: string
+  feedback: {
+    summary: string
+    suggestedAlternatives: string[]
+  }
+}
+
+export type CandidateQuestionsSession = InterviewSessionBase & {
+  status: "candidateQuestions"
+  history: InterviewConversationItem[]
+  prompt: string
+  exchanges: CandidateQuestionExchange[]
+}
+
+export type InterviewSession =
+  OpeningSession | QuestionSession | FollowUpSession | CandidateQuestionsSession

@@ -37,6 +37,58 @@ export function createInterviewFaker() {
       }
       return snapshot()
     },
+
+    answer(content: string) {
+      if (session?.status !== "question" && session?.status !== "followUp") return snapshot()
+
+      const history = [
+        ...session.history,
+        {
+          kind: session.prompt.kind,
+          questionOrder: session.prompt.questionOrder,
+          prompt: session.prompt.content,
+          answer: content,
+        },
+      ]
+
+      session =
+        session.status === "question"
+          ? {
+              status: "followUp",
+              sessionId: session.sessionId,
+              configuration: session.configuration,
+              progress: session.progress,
+              history,
+              prompt: structuredClone(interviewFixture.followUp),
+            }
+          : {
+              status: "candidateQuestions",
+              sessionId: session.sessionId,
+              configuration: session.configuration,
+              progress: { ...session.progress, completedMainQuestions: 1 },
+              history,
+              prompt: interviewFixture.candidate.prompt,
+              exchanges: [],
+            }
+      return snapshot()
+    },
+
+    ask(content: string) {
+      if (session?.status !== "candidateQuestions") return snapshot()
+
+      session = {
+        ...session,
+        exchanges: [
+          ...session.exchanges,
+          {
+            question: content,
+            interviewerAnswer: interviewFixture.candidate.interviewerAnswer,
+            feedback: structuredClone(interviewFixture.candidate.feedback),
+          },
+        ],
+      }
+      return snapshot()
+    },
   }
 }
 
