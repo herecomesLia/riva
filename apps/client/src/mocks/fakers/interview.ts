@@ -1,5 +1,9 @@
 import { interviewFixture } from "@/mocks/fixtures/interview"
-import type { InterviewConfiguration, InterviewSession } from "@/models/interview-workflow"
+import type {
+  CompleteInterviewReview,
+  InterviewConfiguration,
+  InterviewSession,
+} from "@/models/interview-workflow"
 
 export function createInterviewFaker() {
   let session: InterviewSession | null = null
@@ -88,6 +92,39 @@ export function createInterviewFaker() {
         ],
       }
       return snapshot()
+    },
+
+    finish() {
+      if (session?.status !== "candidateQuestions") return snapshot()
+
+      session = {
+        status: "completed",
+        sessionId: session.sessionId,
+        history: session.history,
+      }
+      return snapshot()
+    },
+
+    end() {
+      if (session === null || session.status === "completed") return snapshot()
+
+      session = {
+        status: "completed",
+        sessionId: session.sessionId,
+        history: "history" in session ? session.history : [],
+      }
+      return snapshot()
+    },
+
+    getReview(): CompleteInterviewReview | null {
+      if (session?.status !== "completed") return null
+
+      const review: CompleteInterviewReview = structuredClone(interviewFixture.review)
+      review.questionDetails[0]!.answer =
+        session.history.find(({ kind }) => kind === "question")?.answer ?? null
+      review.questionDetails[0]!.followUps[0]!.answer =
+        session.history.find(({ kind }) => kind === "followUp")?.answer ?? null
+      return review
     },
   }
 }

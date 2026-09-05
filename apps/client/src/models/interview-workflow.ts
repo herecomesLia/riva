@@ -94,5 +94,102 @@ export type CandidateQuestionsSession = InterviewSessionBase & {
   exchanges: CandidateQuestionExchange[]
 }
 
+export type CompletedSession = {
+  status: "completed"
+  sessionId: string
+  history: InterviewConversationItem[]
+}
+
 export type InterviewSession =
-  OpeningSession | QuestionSession | FollowUpSession | CandidateQuestionsSession
+  OpeningSession | QuestionSession | FollowUpSession | CandidateQuestionsSession | CompletedSession
+
+export type InterviewReferenceAnswer =
+  | {
+      status: "ready"
+      content: {
+        recommendedStructure: string[]
+        keyPoints: string[]
+        exampleAnswer: string
+        usageGuidance: string
+      }
+    }
+  | { status: "generating" }
+  | { status: "unavailable" }
+
+export type InterviewPerformance = {
+  score: number
+  summary: string
+  strengths: string[]
+  issues: string[]
+}
+
+export type InterviewFollowUpDetail = {
+  prompt: string
+  answer: string | null
+  performance: InterviewPerformance | null
+  referenceAnswer: InterviewReferenceAnswer
+}
+
+export type InterviewQuestionDetail = {
+  questionOrder: number
+  prompt: string
+  answer: string | null
+  performance: InterviewPerformance | null
+  referenceAnswer: InterviewReferenceAnswer
+  followUps: InterviewFollowUpDetail[]
+}
+
+export type InterviewScoreDimension =
+  | "relevance"
+  | "structure"
+  | "specificity"
+  | "personalContribution"
+  | "resultsAndEvidence"
+  | "roleAlignment"
+  | "communication"
+  | "riskControl"
+
+export type InterviewDimensionScore = {
+  dimension: InterviewScoreDimension
+  score: number
+  explanation: string
+}
+
+export type InterviewReviewNarrative = {
+  overallPerformance: string
+  mainStrengths: string[]
+  frequentIssues: string[]
+  exposedWeaknesses: string[]
+  riskPoints: string[]
+  communicationSuggestions: string[]
+  preparationSuggestions: string[]
+}
+
+export type InterviewTrainingSuggestion = {
+  action: "targetedPractice" | "mockInterview"
+  reason: string
+  focusAreas: string[]
+}
+
+export type PartialInterviewReview = {
+  status: "partial"
+  review: InterviewReviewNarrative
+  questionDetails: InterviewQuestionDetail[]
+}
+
+export type CompleteInterviewReview = {
+  status: "complete"
+  review: InterviewReviewNarrative & {
+    overallScore: number
+    dimensionScores: InterviewDimensionScore[]
+    nextTraining: InterviewTrainingSuggestion
+  }
+  questionDetails: InterviewQuestionDetail[]
+}
+
+export type InterviewReview =
+  | { status: "generating" }
+  | { status: "failed" }
+  | { status: "unavailable"; questionDetails: InterviewQuestionDetail[] }
+  | PartialInterviewReview
+  | CompleteInterviewReview

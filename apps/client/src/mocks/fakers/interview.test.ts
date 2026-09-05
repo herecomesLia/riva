@@ -107,4 +107,46 @@ describe("interviewFaker", () => {
     })
     expect(faker.get()).toEqual(next)
   })
+
+  it("finishes with conversation history and returns fixed review data with the user's answers", () => {
+    const faker = createInterviewFaker()
+    const opening = faker.start(configuration)
+    faker.begin()
+    faker.answer("我通过灰度实验验证方案。")
+    const candidate = faker.answer("我对比了实验组与对照组，并检查同期变化。")
+    if (candidate?.status !== "candidateQuestions") throw new Error("Expected candidate questions.")
+    faker.ask("团队如何协作？")
+
+    expect(faker.finish()).toEqual({
+      status: "completed",
+      sessionId: opening!.sessionId,
+      history: candidate.history,
+    })
+    const review = faker.getReview()
+    expect(review).toMatchObject({
+      status: "complete",
+      review: interviewFixture.review.review,
+    })
+    expect(review?.questionDetails).toEqual([
+      {
+        ...interviewFixture.review.questionDetails[0],
+        answer: "我通过灰度实验验证方案。",
+        followUps: [
+          {
+            ...interviewFixture.review.questionDetails[0]!.followUps[0],
+            answer: "我对比了实验组与对照组，并检查同期变化。",
+          },
+        ],
+      },
+    ])
+  })
+
+  it("allows early completion and immediately returns the complete review sample", () => {
+    const faker = createInterviewFaker()
+    faker.start(configuration)
+    faker.begin()
+
+    expect(faker.end()).toMatchObject({ status: "completed" })
+    expect(faker.getReview()).toEqual(interviewFixture.review)
+  })
 })
