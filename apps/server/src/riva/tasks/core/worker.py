@@ -1,5 +1,6 @@
 from riva.core.config import Settings
 from riva.tasks.core.app import app, create_task_connector
+from riva.tasks.core.context import task_resources
 from riva.tasks.registry import configure_task_registry
 
 
@@ -17,10 +18,14 @@ async def run_worker(
                 raise RuntimeError(
                     "Background task schema is not initialized. Run `riva db setup`."
                 )
-            await app.run_worker_async(
-                queues=queues,
-                concurrency=(
-                    settings.tasks.concurrency if concurrency is None else concurrency
-                ),
-                shutdown_graceful_timeout=settings.tasks.shutdown_timeout_seconds,
-            )
+            async with task_resources(settings) as resources:
+                await app.run_worker_async(
+                    queues=queues,
+                    concurrency=(
+                        settings.tasks.concurrency
+                        if concurrency is None
+                        else concurrency
+                    ),
+                    shutdown_graceful_timeout=settings.tasks.shutdown_timeout_seconds,
+                    additional_context={"resources": resources},
+                )
