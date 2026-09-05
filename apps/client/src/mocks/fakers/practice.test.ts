@@ -30,7 +30,6 @@ describe("practiceFaker", () => {
       question: practiceFixture.question,
     })
     await expect(faker.get()).resolves.toEqual(answering)
-    await expect(faker.pollQuestion()).rejects.toThrow("Unexpected practice stage: answering")
   })
 
   it("preserves assistance, answers, flags and reference visibility through review", async () => {
@@ -84,7 +83,6 @@ describe("practiceFaker", () => {
         },
       ],
     })
-    await expect(faker.pollEvaluation()).rejects.toThrow("Unexpected practice stage: review")
 
     await faker.nextQuestion()
     await faker.pollQuestion()
@@ -126,7 +124,6 @@ describe("practiceFaker", () => {
     expect(await faker.retryQuestion()).toMatchObject({
       status: "answering",
       question: {
-        id: practiceFixture.question.id,
         referenceAnswer: { status: "revealed", viewedBeforeSubmission: true },
       },
     })
@@ -144,16 +141,6 @@ describe("practiceFaker", () => {
       status: "review",
       attemptNumber: practiceFixture.attemptNumber,
     })
-    expect(await faker.endSession()).toMatchObject({
-      status: "completed",
-      questionsCompleted: 2,
-      retryCount: 1,
-      finalAttemptAverageScore: practiceFixture.evaluation.overallScore,
-    })
-    await faker.nextSession()
-    await faker.start(selection)
-    await faker.pollQuestion()
-    expect(await faker.endSession()).toMatchObject({ retryCount: 0 })
   })
 
   it("provides completion samples and preserves selection for the next session", async () => {
@@ -167,24 +154,14 @@ describe("practiceFaker", () => {
     await faker.weak(true)
     expect(await faker.endSession()).toMatchObject({
       status: "completed",
-      completionReason: "reviewCompleted",
-      questionsCompleted: 2,
-      retryCount: 1,
-      savedQuestionCount: 1,
-      weakQuestionCount: 1,
-      finalAttemptAverageScore: practiceFixture.evaluation.overallScore,
+      ...practiceFixture.completion,
     })
     expect(await faker.nextSession()).toEqual({ status: "setup", selection })
     await faker.start(selection)
     await faker.pollQuestion()
     expect(await faker.endSession()).toMatchObject({
       status: "completed",
-      completionReason: "userEndedEarly",
-      questionsCompleted: 0,
-      retryCount: 0,
-      savedQuestionCount: 0,
-      weakQuestionCount: 0,
-      finalAttemptAverageScore: 0,
+      ...practiceFixture.completion,
     })
   })
 })

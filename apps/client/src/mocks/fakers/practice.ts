@@ -19,27 +19,23 @@ export function createPracticeFaker() {
     async start(selection: ActiveSelection) {
       return update({
         status: "generatingQuestion",
-        sessionId: practiceFixture.sessionId,
         selection,
       })
     },
 
     // One call advances the loading sample; no background job is simulated.
     async pollQuestion() {
-      if (session.status !== "generatingQuestion")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "generatingQuestion") return structuredClone(session)
 
       return update({
         status: "answering",
-        sessionId: session.sessionId,
         selection: session.selection,
         question: practiceFixture.question,
       })
     },
 
     async hint() {
-      if (session.status !== "answering")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "answering") return structuredClone(session)
 
       const help = practiceFixture.questionHelp
       return update({
@@ -52,8 +48,7 @@ export function createPracticeFaker() {
     },
 
     async framework() {
-      if (session.status !== "answering")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "answering") return structuredClone(session)
 
       const help = practiceFixture.questionHelp
       return update({
@@ -66,8 +61,7 @@ export function createPracticeFaker() {
     },
 
     async reference() {
-      if (session.status !== "answering")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "answering") return structuredClone(session)
 
       const help = practiceFixture.questionHelp
       return update({
@@ -85,26 +79,24 @@ export function createPracticeFaker() {
 
     async save(value: boolean) {
       if (session.status !== "answering" && session.status !== "review") {
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+        return structuredClone(session)
       }
       return update({ ...session, question: { ...session.question, isSaved: value } })
     },
 
     async weak(value: boolean) {
       if (session.status !== "answering" && session.status !== "review") {
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+        return structuredClone(session)
       }
       return update({ ...session, question: { ...session.question, isWeak: value } })
     },
 
     async answer(content: string) {
-      if (session.status !== "answering")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "answering") return structuredClone(session)
 
       const mainAnswer = { content: content.trim() }
       return update({
         status: "answeringFollowUp",
-        sessionId: session.sessionId,
         selection: session.selection,
         question: session.question,
         mainAnswer,
@@ -114,8 +106,7 @@ export function createPracticeFaker() {
     },
 
     async followHint() {
-      if (session.status !== "answeringFollowUp")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "answeringFollowUp") return structuredClone(session)
 
       const help = practiceFixture.followUp
       return update({
@@ -128,8 +119,7 @@ export function createPracticeFaker() {
     },
 
     async followFramework() {
-      if (session.status !== "answeringFollowUp")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "answeringFollowUp") return structuredClone(session)
 
       const help = practiceFixture.followUp
       return update({
@@ -142,8 +132,7 @@ export function createPracticeFaker() {
     },
 
     async followReference() {
-      if (session.status !== "answeringFollowUp")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "answeringFollowUp") return structuredClone(session)
 
       const help = practiceFixture.followUp
       return update({
@@ -160,12 +149,10 @@ export function createPracticeFaker() {
     },
 
     async answerFollowUp(content: string) {
-      if (session.status !== "answeringFollowUp")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "answeringFollowUp") return structuredClone(session)
 
       return update({
         status: "evaluating",
-        sessionId: session.sessionId,
         selection: session.selection,
         question: session.question,
         mainAnswer: session.mainAnswer,
@@ -181,12 +168,10 @@ export function createPracticeFaker() {
     },
 
     async endFollowUps() {
-      if (session.status !== "answeringFollowUp")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "answeringFollowUp") return structuredClone(session)
 
       return update({
         status: "evaluating",
-        sessionId: session.sessionId,
         selection: session.selection,
         question: session.question,
         mainAnswer: session.mainAnswer,
@@ -200,8 +185,7 @@ export function createPracticeFaker() {
 
     // One call advances the evaluation sample to review.
     async pollEvaluation() {
-      if (session.status !== "evaluating")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "evaluating") return structuredClone(session)
 
       const questionHelp = practiceFixture.questionHelp
       const question = structuredClone(session.question)
@@ -246,8 +230,7 @@ export function createPracticeFaker() {
     },
 
     async retryQuestion() {
-      if (session.status !== "review")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "review") return structuredClone(session)
 
       const question = structuredClone(session.question)
       if (question.referenceAnswer.status === "revealed") {
@@ -255,52 +238,43 @@ export function createPracticeFaker() {
       }
       return update({
         status: "answering",
-        sessionId: session.sessionId,
         selection: session.selection,
         question,
       })
     },
 
     async nextQuestion() {
-      if (session.status !== "review")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "review") return structuredClone(session)
 
       return update({
         status: "generatingQuestion",
-        sessionId: session.sessionId,
         selection: session.selection,
       })
     },
 
     async skipQuestion() {
-      if (session.status !== "answering")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "answering") return structuredClone(session)
 
       return update({
         status: "generatingQuestion",
-        sessionId: session.sessionId,
         selection: session.selection,
       })
     },
 
     async endSession() {
       if (session.status !== "review" && session.status !== "answering") {
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+        return structuredClone(session)
       }
 
       return update({
-        ...practiceFixture.completion[
-          session.status === "review" ? "reviewCompleted" : "userEndedEarly"
-        ],
+        ...practiceFixture.completion,
         status: "completed",
-        sessionId: session.sessionId,
         selection: session.selection,
       })
     },
 
     async nextSession() {
-      if (session.status !== "completed")
-        throw new Error(`Unexpected practice stage: ${session.status}`)
+      if (session.status !== "completed") return structuredClone(session)
 
       return update({
         status: "setup",

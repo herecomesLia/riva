@@ -47,7 +47,6 @@ export type ReferenceAnswerState =
     }
 
 export type PracticeQuestion = {
-  id: string
   prompt: string
   assessedCapabilities: string[]
   recommendedMaterials: string[]
@@ -88,7 +87,6 @@ export type FollowUpReferenceState =
     }
 
 export type PracticeFollowUp = {
-  id: string
   prompt: string
   hints: Guidance<string[]>
   framework: Guidance<string[]>
@@ -102,20 +100,17 @@ export type SetupSession = {
 
 export type GeneratingSession = {
   status: "generatingQuestion"
-  sessionId: string
   selection: ActiveSelection
 }
 
 export type AnsweringSession = {
   status: "answering"
-  sessionId: string
   selection: ActiveSelection
   question: PracticeQuestion
 }
 
 export type AnsweringFollowUpSession = {
   status: "answeringFollowUp"
-  sessionId: string
   selection: ActiveSelection
   question: PracticeQuestion
   mainAnswer: PracticeAnswer
@@ -135,7 +130,6 @@ export type FollowUpCompletion =
 
 export type EvaluatingSession = {
   status: "evaluating"
-  sessionId: string
   selection: ActiveSelection
   question: PracticeQuestion
   mainAnswer: PracticeAnswer
@@ -201,9 +195,7 @@ export type ReviewSession = Omit<EvaluatingSession, "status"> & {
 
 export type CompletedSession = {
   status: "completed"
-  sessionId: string
   selection: ActiveSelection
-  completionReason: "reviewCompleted" | "userEndedEarly"
   questionsCompleted: number
   retryCount: number
   savedQuestionCount: number
