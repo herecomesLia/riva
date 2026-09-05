@@ -1,18 +1,20 @@
+from enum import StrEnum
+from typing import cast
 from uuid import UUID
 
-import procrastinate
 from sqlalchemy import select, text
 
 from riva.db import Database
 from riva.models import User
+from riva.tasks import Task
 from riva.tasks.core import cancel_job, defer_job, reset_task_schema
 
-task_app = procrastinate.App(connector=procrastinate.PsycopgConnector())
+
+class TaskName(StrEnum):
+    TRANSACTIONAL_DISPATCH = "test.transactional_dispatch"
 
 
-@task_app.task
-async def transactional_dispatch(user_id: str) -> None:
-    pass
+TRANSACTIONAL_TASK = cast(Task, TaskName.TRANSACTIONAL_DISPATCH)
 
 
 def _user(username: str) -> User:
@@ -40,6 +42,20 @@ async def _job_status(database: Database, job_id: int) -> tuple[str, bool] | Non
         return tuple(row) if row else None
 
 
+async def _job_task_name(database: Database, job_id: int) -> str | None:
+    async with database.sessionmaker() as session:
+        return await session.scalar(
+            text(
+                """
+                SELECT task_name
+                FROM procrastinate.procrastinate_jobs
+                WHERE id = :job_id
+                """
+            ),
+            {"job_id": job_id},
+        )
+
+
 async def _display_name(database: Database, user_id: UUID) -> str | None:
     async with database.sessionmaker() as session:
         return await session.scalar(select(User.display_name).where(User.id == user_id))
@@ -56,7 +72,7 @@ async def _create_user_and_job(
         await session.flush()
         job_id = await defer_job(
             session,
-            transactional_dispatch,
+            TRANSACTIONAL_TASK,
             user_id=str(user.id),
         )
         await session.commit()
@@ -70,6 +86,9 @@ async def test_defer_commits_with_business_write(database: Database) -> None:
 
     assert await _display_name(database, user_id) == "Before"
     assert await _job_status(database, job_id) == ("todo", False)
+    assert (
+        await _job_task_name(database, job_id) == TaskName.TRANSACTIONAL_DISPATCH.value
+    )
 
 
 async def test_defer_rolls_back_with_business_write(database: Database) -> None:
@@ -80,7 +99,7 @@ async def test_defer_rolls_back_with_business_write(database: Database) -> None:
         await session.flush()
         job_id = await defer_job(
             session,
-            transactional_dispatch,
+            TRANSACTIONAL_TASK,
             user_id=str(user.id),
         )
         await session.rollback()

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.schema import CreateSchema, DropSchema
 
 from riva.db import Database
-from riva.tasks.core.app import TASK_SCHEMA, create_task_app
+from riva.tasks.core.app import TASK_SCHEMA, app, create_task_connector
 
 JOBS_TABLE = "procrastinate_jobs"
 
@@ -36,8 +36,9 @@ async def _has_task_schema(connection: AsyncConnection) -> bool:
 
 
 async def _apply_task_schema(database: Database) -> None:
-    task_app = create_task_app(
+    connector = create_task_connector(
         database.engine.url.render_as_string(hide_password=False)
     )
-    async with task_app.open_async():
-        await task_app.schema_manager.apply_schema_async()
+    with app.replace_connector(connector):
+        async with app.open_async():
+            await app.schema_manager.apply_schema_async()

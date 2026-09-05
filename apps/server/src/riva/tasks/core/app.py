@@ -4,13 +4,15 @@ from sqlalchemy.engine import make_url
 TASK_SCHEMA = "procrastinate"
 
 
-def create_task_app(database_url: str) -> procrastinate.App:
+app = procrastinate.App(connector=procrastinate.PsycopgConnector())
+
+
+def create_task_connector(database_url: str) -> procrastinate.PsycopgConnector:
     conninfo = _to_psycopg_conninfo(database_url)
-    connector = procrastinate.PsycopgConnector(
+    return procrastinate.PsycopgConnector(
         conninfo=conninfo,
         kwargs={"options": f"-c search_path={TASK_SCHEMA}"},
     )
-    return procrastinate.App(connector=connector)
 
 
 def _to_psycopg_conninfo(database_url: str) -> str:

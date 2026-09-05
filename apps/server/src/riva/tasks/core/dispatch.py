@@ -3,12 +3,13 @@ from contextlib import asynccontextmanager
 
 import procrastinate
 import psycopg
-from procrastinate.tasks import Task
+from procrastinate.tasks import configure_task
 from procrastinate.types import JSONValue
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from riva.tasks.core.app import TASK_SCHEMA
+from riva.tasks.core.app import TASK_SCHEMA, app
+from riva.tasks.registry import Task
 
 
 async def defer_job(
@@ -17,7 +18,11 @@ async def defer_job(
     **task_kwargs: JSONValue,
 ) -> int:
     async with _task_connection(session) as connection:
-        return await task.configure(connection=connection).defer_async(**task_kwargs)
+        return await configure_task(
+            name=task.value,
+            job_manager=app.job_manager,
+            connection=connection,
+        ).defer_async(**task_kwargs)
 
 
 async def cancel_job(
@@ -29,8 +34,7 @@ async def cancel_job(
 ) -> bool:
     async with _task_connection(session) as connection:
         # Procrastinate 3.9 supports external connections for defer, but not yet cancel.
-        connector = procrastinate.PsycopgConnector()
-        rows = await connector.execute_query_all_async_with_connection(
+        rows = await app.connector.execute_query_all_async_with_connection(
             connection,
             query=procrastinate.sql.queries["cancel_job"],
             job_id=job_id,
