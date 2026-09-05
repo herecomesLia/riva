@@ -5,7 +5,12 @@ from uuid import UUID
 from pydantic import Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
-from riva.models.target_role import HardSkills, JobRequirements, RecruitmentTrack
+from riva.models.target_role import (
+    HardSkills,
+    JobDescriptionContent,
+    JobRequirements,
+    RecruitmentTrack,
+)
 from riva.models.types import NonBlankStr
 from riva.schemas.base import RequestModel, ResponseModel
 
@@ -26,13 +31,9 @@ class HardSkillsResponse(HardSkills, ResponseModel):
     pass
 
 
-class JobDescriptionResponse(ResponseModel):
-    responsibilities: list[str]
+class JobDescriptionResponse(JobDescriptionContent, ResponseModel):
     requirements: JobRequirementsResponse
     hard_skills: HardSkillsResponse
-    soft_skills: list[str]
-    preferred_qualifications: list[str]
-    business_domains: list[str]
 
 
 class TargetRoleResponse(ResponseModel):

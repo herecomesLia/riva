@@ -38,6 +38,15 @@ class HardSkills(BaseModel):
     other: list[NonBlankStr] = Field(default_factory=list)
 
 
+class JobDescriptionContent(BaseModel):
+    responsibilities: list[NonBlankStr] = Field(default_factory=list)
+    requirements: JobRequirements = Field(default_factory=JobRequirements)
+    hard_skills: HardSkills = Field(default_factory=HardSkills)
+    soft_skills: list[NonBlankStr] = Field(default_factory=list)
+    preferred_qualifications: list[NonBlankStr] = Field(default_factory=list)
+    business_domains: list[NonBlankStr] = Field(default_factory=list)
+
+
 class JobDescription(Base):
     __tablename__ = "job_descriptions"
 

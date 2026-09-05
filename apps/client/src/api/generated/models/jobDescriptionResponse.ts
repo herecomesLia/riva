@@ -8,10 +8,14 @@ import type { HardSkillsResponse } from "./hardSkillsResponse"
 import type { JobRequirementsResponse } from "./jobRequirementsResponse"
 
 export interface JobDescriptionResponse {
+  /** @items.minLength 1 */
   responsibilities: string[]
   requirements: JobRequirementsResponse
   hardSkills: HardSkillsResponse
+  /** @items.minLength 1 */
   softSkills: string[]
+  /** @items.minLength 1 */
   preferredQualifications: string[]
+  /** @items.minLength 1 */
   businessDomains: string[]
 }

@@ -33,7 +33,7 @@ export const getListTargetRolesResponseMock = (
         responsibilities: Array.from(
           { length: faker.number.int({ min: 1, max: 10 }) },
           (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
         requirements: {
           education: Array.from(
             { length: faker.number.int({ min: 1, max: 10 }) },
@@ -94,15 +94,15 @@ export const getListTargetRolesResponseMock = (
         softSkills: Array.from(
           { length: faker.number.int({ min: 1, max: 10 }) },
           (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
         preferredQualifications: Array.from(
           { length: faker.number.int({ min: 1, max: 10 }) },
           (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
         businessDomains: Array.from(
           { length: faker.number.int({ min: 1, max: 10 }) },
           (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
       },
       createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
       updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
@@ -131,7 +131,7 @@ export const getCreateTargetRoleResponseMock = (
     responsibilities: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
     requirements: {
       education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
         () => faker.string.alpha({ length: { min: 1, max: 20 } }),
@@ -186,16 +186,16 @@ export const getCreateTargetRoleResponseMock = (
       ),
     },
     softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-      () => faker.string.alpha({ length: { min: 10, max: 20 } }),
+      () => faker.string.alpha({ length: { min: 1, max: 20 } }),
     ),
     preferredQualifications: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
     businessDomains: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
   },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
@@ -221,7 +221,7 @@ export const getUpdateTargetRoleResponseMock = (
     responsibilities: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
     requirements: {
       education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
         () => faker.string.alpha({ length: { min: 1, max: 20 } }),
@@ -276,16 +276,16 @@ export const getUpdateTargetRoleResponseMock = (
       ),
     },
     softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-      () => faker.string.alpha({ length: { min: 10, max: 20 } }),
+      () => faker.string.alpha({ length: { min: 1, max: 20 } }),
     ),
     preferredQualifications: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
     businessDomains: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
   },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
@@ -311,7 +311,7 @@ export const getArchiveTargetRoleResponseMock = (
     responsibilities: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
     requirements: {
       education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
         () => faker.string.alpha({ length: { min: 1, max: 20 } }),
@@ -366,16 +366,16 @@ export const getArchiveTargetRoleResponseMock = (
       ),
     },
     softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-      () => faker.string.alpha({ length: { min: 10, max: 20 } }),
+      () => faker.string.alpha({ length: { min: 1, max: 20 } }),
     ),
     preferredQualifications: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
     businessDomains: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
   },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
@@ -401,7 +401,7 @@ export const getRestoreTargetRoleResponseMock = (
     responsibilities: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
     requirements: {
       education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
         () => faker.string.alpha({ length: { min: 1, max: 20 } }),
@@ -456,16 +456,16 @@ export const getRestoreTargetRoleResponseMock = (
       ),
     },
     softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-      () => faker.string.alpha({ length: { min: 10, max: 20 } }),
+      () => faker.string.alpha({ length: { min: 1, max: 20 } }),
     ),
     preferredQualifications: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
     businessDomains: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
   },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
@@ -491,7 +491,7 @@ export const getUpdateTargetRoleJdResponseMock = (
     responsibilities: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
     requirements: {
       education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
         () => faker.string.alpha({ length: { min: 1, max: 20 } }),
@@ -546,16 +546,16 @@ export const getUpdateTargetRoleJdResponseMock = (
       ),
     },
     softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-      () => faker.string.alpha({ length: { min: 10, max: 20 } }),
+      () => faker.string.alpha({ length: { min: 1, max: 20 } }),
     ),
     preferredQualifications: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
     businessDomains: Array.from(
       { length: faker.number.int({ min: 1, max: 10 }) },
       (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
   },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",

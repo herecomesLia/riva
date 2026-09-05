@@ -5,6 +5,7 @@ from pydantic import Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 from riva.models.career_profile import (
+    CareerProfileContent,
     EducationEntry,
     ProjectEntry,
     WorkExperienceEntry,
@@ -37,25 +38,12 @@ class ProjectEntryResponse(ProjectEntry, ResponseModel):
     pass
 
 
-class CreateCareerProfileRequest(RequestModel):
+class CreateCareerProfileRequest(CareerProfileContent, RequestModel):
     education: list[EducationEntryRequest] = Field(default_factory=list)
     work_experiences: list[WorkExperienceEntryRequest] = Field(
         default_factory=list,
     )
     projects: list[ProjectEntryRequest] = Field(default_factory=list)
-    skills: list[NonBlankStr] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def validate_skill_consistency(self) -> Self:
-        if any(
-            skill not in self.skills
-            for work_experience in self.work_experiences
-            for skill in work_experience.skills
-        ):
-            raise ValueError(
-                "work experience skills must exist in the career profile skills list"
-            )
-        return self
 
 
 class UpdateCareerProfileRequest(RequestModel):
@@ -110,10 +98,9 @@ class UpdateCareerProfileRequest(RequestModel):
         return self
 
 
-class CareerProfileResponse(ResponseModel):
+class CareerProfileResponse(CareerProfileContent, ResponseModel):
     education: list[EducationEntryResponse]
     work_experiences: list[WorkExperienceEntryResponse]
     projects: list[ProjectEntryResponse]
-    skills: list[NonBlankStr]
     created_at: datetime
     updated_at: datetime
