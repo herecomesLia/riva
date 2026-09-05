@@ -1,9 +1,8 @@
 import preview from "#storybook/preview"
 import { expect, fn, userEvent } from "storybook/test"
 
-import { createInterviewReviewStoryFixture } from "@/pages/interview/stories/interview-story-fixtures"
-
 import {
+  createInterviewReviewStoryFixture,
   createGeneratingReferenceReviewStoryFixture,
   createPartialInterviewReviewStoryFixture,
   createMultipleFollowUpsReviewStoryFixture,

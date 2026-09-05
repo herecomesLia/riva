@@ -302,7 +302,7 @@ export type MockInterviewOverallReviewState =
 
 export type MockInterviewRecordDetailResponse = TrainingRecordDetailBase & {
   kind: "mockInterview"
-  completionReason: InterviewCompletionReason
+  completionReason: "formalQuestionsCompleted" | "userEndedEarly"
   setup: {
     round: TrainingRecordInterviewRound
     difficulty: TrainingRecordDifficulty
@@ -330,4 +330,3 @@ export class TrainingRecordNotFoundError extends Error {
     this.recordId = recordId
   }
 }
-import type { InterviewCompletionReason } from "@/models/interview"

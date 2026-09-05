@@ -3,16 +3,14 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
-import {
-  createInterviewReviewStoryFixture,
-  createPartialInterviewReviewStoryFixture,
-  createUnavailableInterviewReviewStoryFixture,
-} from "./stories/interview-story-fixtures"
 import { getInterviewReview } from "@/services/interview"
 import { renderWithProviders } from "@/test/render"
 
 import { InterviewReviewContainer } from "./InterviewReviewPage"
 import {
+  createInterviewReviewStoryFixture,
+  createPartialInterviewReviewStoryFixture,
+  createUnavailableInterviewReviewStoryFixture,
   createPartialWithUnansweredFollowUpStoryFixture,
   createPartialWithUnansweredQuestionStoryFixture,
   createUnavailableReviewWithLearningStoryFixture,
