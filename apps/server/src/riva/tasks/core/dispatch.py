@@ -19,7 +19,8 @@ async def defer_job(
 ) -> int:
     async with _task_connection(session) as connection:
         return await configure_task(
-            name=task.value,
+            name=task.name,
+            queue=task.queue,
             job_manager=app.job_manager,
             connection=connection,
         ).defer_async(**task_kwargs)

@@ -7,6 +7,7 @@ async def run_worker(
     settings: Settings,
     *,
     concurrency: int | None = None,
+    queues: tuple[str, ...] | None = None,
 ) -> None:
     configure_task_registry(app)
     connector = create_task_connector(settings.database_url)
@@ -17,6 +18,7 @@ async def run_worker(
                     "Background task schema is not initialized. Run `riva db setup`."
                 )
             await app.run_worker_async(
+                queues=queues,
                 concurrency=(
                     settings.tasks.concurrency if concurrency is None else concurrency
                 ),

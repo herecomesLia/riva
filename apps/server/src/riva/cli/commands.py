@@ -142,6 +142,13 @@ def worker(
             help="Maximum concurrent jobs. Overrides RIVA_TASKS_CONCURRENCY.",
         ),
     ] = None,
+    queues: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--queue",
+            help="Only consume jobs from this queue. May be repeated.",
+        ),
+    ] = None,
     log_level: Annotated[
         LogLevel | None,
         typer.Option(
@@ -165,7 +172,13 @@ def worker(
 
     settings = Settings(_env_file=env_file, **overrides)
     configure_logging(settings.log_level, settings.log_format)
-    asyncio.run(run_worker(settings, concurrency=concurrency))
+    asyncio.run(
+        run_worker(
+            settings,
+            concurrency=concurrency,
+            queues=tuple(queues) if queues else None,
+        )
+    )
 
 
 def dev(

@@ -1,10 +1,23 @@
-from enum import StrEnum
+from dataclasses import dataclass
+from enum import Enum
 
 import procrastinate
 
 
-class Task(StrEnum):
-    pass
+@dataclass(frozen=True, slots=True)
+class TaskSpec:
+    name: str
+    queue: str
+
+
+class Task(Enum):
+    @property
+    def name(self) -> str:
+        return self.value.name
+
+    @property
+    def queue(self) -> str:
+        return self.value.queue
 
 
 IMPORT_PATHS: tuple[str, ...] = ()
