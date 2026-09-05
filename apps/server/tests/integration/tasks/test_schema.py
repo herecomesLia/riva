@@ -1,7 +1,7 @@
 from sqlalchemy import text
 
 from riva.db import Database
-from riva.tasks import reset_task_schema, setup_task_schema
+from riva.tasks.core import reset_task_schema, setup_task_schema
 
 
 async def _table_exists(

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.schema import CreateSchema, DropSchema
 
 from riva.db import Database
-from riva.tasks.app import TASK_SCHEMA, create_task_app
+from riva.tasks.core.app import TASK_SCHEMA, create_task_app
 
 JOBS_TABLE = "procrastinate_jobs"
 

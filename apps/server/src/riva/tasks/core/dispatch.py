@@ -8,7 +8,7 @@ from procrastinate.types import JSONValue
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from riva.tasks.app import TASK_SCHEMA
+from riva.tasks.core.app import TASK_SCHEMA
 
 
 async def defer_job(

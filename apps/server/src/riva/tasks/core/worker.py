@@ -1,5 +1,5 @@
 from riva.core.config import Settings
-from riva.tasks.app import create_task_app
+from riva.tasks.core.app import create_task_app
 
 
 async def run_worker(

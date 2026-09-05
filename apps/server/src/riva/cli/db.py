@@ -7,7 +7,7 @@ from rich import print as rprint
 
 from riva.core.config import Settings
 from riva.db import Database
-from riva.tasks import reset_task_schema, setup_task_schema
+from riva.tasks.core import reset_task_schema, setup_task_schema
 
 app = typer.Typer(
     invoke_without_command=True,
