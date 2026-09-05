@@ -2,7 +2,7 @@ import { useRef } from "react"
 
 import {
   requestAnswerFramework,
-  requestEndPracticeSession,
+  endPracticeSession,
   requestPracticeHint,
   requestPracticeReferenceAnswer,
   setQuestionSaved,
@@ -38,17 +38,14 @@ export function usePracticeAnsweringActions(runAction: RunPracticeAction): {
   actions: PracticeAnsweringActions
   pending: PracticeAnsweringPending
 } {
-  const hintMutation = usePracticeMutation("questionUpdate", requestPracticeHint)
-  const frameworkMutation = usePracticeMutation("questionUpdate", requestAnswerFramework)
-  const referenceAnswerMutation = usePracticeMutation(
-    "questionUpdate",
-    requestPracticeReferenceAnswer,
-  )
-  const savedMutation = usePracticeMutation("questionFlagUpdate", setQuestionSaved)
-  const weakMutation = usePracticeMutation("questionFlagUpdate", setQuestionWeak)
-  const submitAnswerMutation = usePracticeMutation("submitPrimaryAnswer", submitPrimaryAnswer)
-  const skipMutation = usePracticeMutation("skipQuestion", skipPracticeQuestion)
-  const endMutation = usePracticeMutation("endQuestionSession", requestEndPracticeSession)
+  const hintMutation = usePracticeMutation(requestPracticeHint)
+  const frameworkMutation = usePracticeMutation(requestAnswerFramework)
+  const referenceAnswerMutation = usePracticeMutation(requestPracticeReferenceAnswer)
+  const savedMutation = usePracticeMutation(setQuestionSaved)
+  const weakMutation = usePracticeMutation(setQuestionWeak)
+  const submitAnswerMutation = usePracticeMutation(submitPrimaryAnswer)
+  const skipMutation = usePracticeMutation(skipPracticeQuestion)
+  const endMutation = usePracticeMutation(endPracticeSession)
   const interactionLocked =
     hintMutation.isPending ||
     frameworkMutation.isPending ||
@@ -61,14 +58,13 @@ export function usePracticeAnsweringActions(runAction: RunPracticeAction): {
 
   return {
     actions: {
-      onEnd: (input) => runAction(() => endMutation.mutateAsync(input)),
-      onRequestFramework: (input) => runAction(() => frameworkMutation.mutateAsync(input)),
-      onRequestHint: (input) => runAction(() => hintMutation.mutateAsync(input)),
-      onRequestReferenceAnswer: (input) =>
-        runAction(() => referenceAnswerMutation.mutateAsync(input)),
+      onEnd: () => runAction(() => endMutation.mutateAsync()),
+      onRequestFramework: () => runAction(() => frameworkMutation.mutateAsync()),
+      onRequestHint: () => runAction(() => hintMutation.mutateAsync()),
+      onRequestReferenceAnswer: () => runAction(() => referenceAnswerMutation.mutateAsync()),
       onSetSaved: (input) => runAction(() => savedMutation.mutateAsync(input)),
       onSetWeak: (input) => runAction(() => weakMutation.mutateAsync(input)),
-      onSkip: (input) => runAction(() => skipMutation.mutateAsync(input)),
+      onSkip: () => runAction(() => skipMutation.mutateAsync()),
       onSubmitAnswer: (input) => runAction(() => submitAnswerMutation.mutateAsync(input)),
     },
     pending: {

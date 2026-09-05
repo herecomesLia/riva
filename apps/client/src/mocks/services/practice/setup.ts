@@ -13,7 +13,7 @@ import type { RolesPageResponse, TargetRole } from "@/models/roles"
 import {
   resolvePracticeTrainingEntry,
   resolveTrainingEntryRoleAvailability,
-  type PracticeTrainingEntryPreparationResponse,
+  type PracticeTrainingEntryResolution,
   type PracticeTrainingEntryParameters,
 } from "@/models/training-entry"
 
@@ -172,7 +172,7 @@ export async function prepareNextPracticeSession(
 
 export async function preparePracticeTrainingEntry(
   input: PracticeTrainingEntryParameters,
-): Promise<PracticeTrainingEntryPreparationResponse> {
+): Promise<{ page: PracticePageResponse; resolution: PracticeTrainingEntryResolution }> {
   await consumePracticeMockOperation("preparePracticeTrainingEntry", 0)
   const current = getPracticeMockState()
   const rolesResponse = await getRolesPage()

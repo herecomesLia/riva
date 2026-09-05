@@ -37,13 +37,13 @@ import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import type {
-  ActivePracticeSelection,
-  PracticeDifficulty,
-  PracticeQuestionSource,
-  PracticeQuestionType,
+  ActiveSelection,
+  Difficulty,
+  QuestionSource,
+  QuestionType,
   PracticeSetupContext,
-  PracticeSetupSelection,
-} from "@/models/practice"
+  PracticeSelection,
+} from "@/models/practice-workflow"
 import type { PracticeTrainingEntryResolution } from "@/models/training-entry"
 
 const setupSchema = z.object({
@@ -60,23 +60,23 @@ const setupSchema = z.object({
   prioritizeWeaknesses: z.boolean(),
 })
 
-const questionTypes: PracticeQuestionType[] = [
+const questionTypes: QuestionType[] = [
   "projectDeepDive",
   "behavioral",
   "businessUnderstanding",
   "motivation",
   "technicalFoundation",
 ]
-const sources: PracticeQuestionSource[] = ["personalized", "saved", "history"]
+const sources: QuestionSource[] = ["personalized", "saved", "history"]
 const practiceOptionStateClassName =
   "hover:bg-card focus:border-primary focus:text-primary focus-visible:border-primary focus-visible:text-primary aria-pressed:border-primary aria-pressed:bg-card aria-pressed:text-primary"
 
 type PracticeSetupFormProps = {
   context: PracticeSetupContext
   historyEntryResolution?: PracticeTrainingEntryResolution
-  initialSelection: PracticeSetupSelection
+  initialSelection: PracticeSelection
   isPending: boolean
-  onStart: (input: ActivePracticeSelection) => Promise<void>
+  onStart: (input: ActiveSelection) => Promise<void>
 }
 
 export function PracticeSetupForm({
@@ -202,7 +202,7 @@ export function PracticeSetupForm({
                         disabled={pending}
                         onValueChange={(values) => {
                           const value = values[0]
-                          if (value) field.handleChange(value as PracticeQuestionType)
+                          if (value) field.handleChange(value as QuestionType)
                         }}
                         spacing={2}
                         value={[field.state.value]}
@@ -245,7 +245,7 @@ export function PracticeSetupForm({
                   disabled={pending}
                   onValueChange={(values) => {
                     const value = values[0]
-                    if (value) field.handleChange(value as PracticeDifficulty)
+                    if (value) field.handleChange(value as Difficulty)
                   }}
                   spacing={2}
                   value={[field.state.value]}
@@ -282,7 +282,7 @@ export function PracticeSetupForm({
                     disabled={pending}
                     onValueChange={(values) => {
                       const value = values[0]
-                      if (value) field.handleChange(value as PracticeQuestionSource)
+                      if (value) field.handleChange(value as QuestionSource)
                     }}
                     spacing={2}
                     value={[field.state.value]}

@@ -1,69 +1,38 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
+import type { PracticeData } from "@/models/practice-workflow"
+import { getPracticeEvaluationStatus } from "@/services/practice"
+import { usePracticeMutation } from "./usePracticeSession"
 
-import type {
-  GetPracticeEvaluationStatusInput,
-  PracticePageResponse,
-  RetryPracticeEvaluationInput,
-} from "@/models/practice"
-import { getPracticeEvaluationStatus, retryPracticeEvaluation } from "@/services/practice"
-
-import { synchronizePracticeEvaluationResponse } from "../practice-cache"
-import { usePracticeMutation, PRACTICE_QUERY_KEY } from "./usePracticeSession"
-
-export function usePracticeEvaluationPolling(data: PracticePageResponse | undefined) {
-  const queryClient = useQueryClient()
+export function usePracticeEvaluationPolling(data: PracticeData | undefined) {
+  const active = data?.session.status === "evaluating"
+  const requested = useRef(false)
   const retryLock = useRef(false)
-  const retryMutation = usePracticeMutation("retryEvaluation", retryPracticeEvaluation)
-  const evaluationSession = data?.session.status === "evaluating" ? data.session : null
-  const sessionId = evaluationSession?.sessionId
-  const version = evaluationSession?.version
-  const questionId = evaluationSession?.question.id
-  const evaluationQuery = useQuery({
-    enabled: evaluationSession !== null,
-    queryFn: () => {
-      if (!sessionId || version === undefined || !questionId) {
-        throw new Error("An evaluating practice session is required.")
-      }
-      return getPracticeEvaluationStatus({ sessionId, version, questionId })
-    },
-    queryKey: [...PRACTICE_QUERY_KEY, "evaluation", sessionId, version, questionId],
-    refetchInterval: (query) => (query.state.data?.session.status === "evaluating" ? 500 : false),
-    retry: false,
-  })
-
+  const [failed, setFailed] = useState(false)
+  const { mutate, reset, isError, isPending } = usePracticeMutation(getPracticeEvaluationStatus)
   useEffect(() => {
-    if (!evaluationQuery.data || !sessionId || version === undefined || !questionId) return
-
-    const request: GetPracticeEvaluationStatusInput = { sessionId, version, questionId }
-    queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
-      synchronizePracticeEvaluationResponse(current, evaluationQuery.data, request),
-    )
-  }, [evaluationQuery.data, queryClient, questionId, sessionId, version])
-
-  function retryEvaluation() {
-    if (evaluationSession === null || retryMutation.isPending || retryLock.current) return
-
-    const input: RetryPracticeEvaluationInput = {
-      sessionId: evaluationSession.sessionId,
-      version: evaluationSession.version,
-      questionId: evaluationSession.question.id,
+    if (!active) {
+      requested.current = false
+      reset()
+      setFailed(false)
+    } else if (!requested.current) {
+      requested.current = true
+      mutate()
     }
-    retryLock.current = true
-    void retryMutation
-      .mutateAsync(input)
-      .catch(() => undefined)
-      .finally(() => {
-        retryLock.current = false
-      })
-  }
-
+  }, [active, mutate, reset])
+  useEffect(() => {
+    if (isError) setFailed(true)
+  }, [isError])
   return {
-    evaluationError:
-      evaluationQuery.isError ||
-      evaluationQuery.errorUpdatedAt > evaluationQuery.dataUpdatedAt ||
-      retryMutation.isError,
-    isEvaluationRetrying: retryMutation.isPending,
-    retryEvaluation,
+    evaluationError: failed || isError,
+    isEvaluationRetrying: isPending,
+    retryEvaluation: () => {
+      if (!active || isPending || retryLock.current) return
+      retryLock.current = true
+      mutate(undefined, {
+        onSettled: () => {
+          retryLock.current = false
+        },
+      })
+    },
   }
 }

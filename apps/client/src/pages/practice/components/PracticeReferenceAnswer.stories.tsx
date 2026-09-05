@@ -1,41 +1,14 @@
+import { practiceFixture } from "@/mocks/fixtures/practice"
 import preview from "#storybook/preview"
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test"
 import { useState } from "react"
 
-import {
-  createGeneratedPracticeQuestion,
-  createPracticeReferenceAnswer,
-} from "@/mocks/data/practice"
-import type { ActivePracticeSelection, PracticeReferenceAnswerState } from "@/models/practice"
+import {} from "@/pages/practice/stories/practice-scenarios"
+import type { ReferenceAnswerState } from "@/models/practice-workflow"
 
 import { PracticeReferenceAnswer } from "./PracticeReferenceAnswer"
 
-const selection = {
-  targetRoleId: "role_frontend_bytedance",
-  questionType: "projectDeepDive",
-  difficulty: "basic",
-  source: "personalized",
-  prioritizeWeaknesses: false,
-} satisfies ActivePracticeSelection
-const projectQuestion = createGeneratedPracticeQuestion({
-  sessionId: "reference_story",
-  ordinal: 1,
-  selection,
-})
-const technicalQuestion = createGeneratedPracticeQuestion({
-  sessionId: "reference_story_technical",
-  ordinal: 1,
-  selection: { ...selection, questionType: "technicalFoundation" },
-})
-function answerFor(question: typeof projectQuestion) {
-  return createPracticeReferenceAnswer({
-    templateId: question.templateId,
-    questionType: question.questionType,
-    targetRoleTitle: "Senior Frontend Engineer",
-    questionPrompt: question.prompt,
-    recommendedMaterials: question.recommendedMaterials,
-  })
-}
+const personalizedAnswer = practiceFixture.questionHelp.reference
 const notRequested = {
   status: "notRequested",
   content: null,
@@ -43,12 +16,12 @@ const notRequested = {
 } as const
 const personalized = {
   status: "revealed",
-  content: answerFor(projectQuestion),
+  content: personalizedAnswer,
   viewedBeforeSubmission: false,
 } as const
 const technical = {
   status: "revealed",
-  content: answerFor(technicalQuestion),
+  content: { ...personalizedAnswer, kind: "technicalReference" as const },
   viewedBeforeSubmission: false,
 } as const
 const request = fn(async () => "executed" as const)
@@ -59,7 +32,7 @@ function Answering({
   isPending = false,
   assistedRetry = false,
 }: {
-  state?: PracticeReferenceAnswerState
+  state?: ReferenceAnswerState
   onRequest?: () => Promise<"executed">
   isPending?: boolean
   assistedRetry?: boolean
@@ -81,7 +54,7 @@ const meta = preview.meta({ title: "Practice/PracticeReferenceAnswer" })
 export const NotRequested = meta.story({ render: () => <Answering /> })
 
 function ConfirmationStory() {
-  const [state, setState] = useState<PracticeReferenceAnswerState>(notRequested)
+  const [state, setState] = useState<ReferenceAnswerState>(notRequested)
   return (
     <Answering
       onRequest={async () => {

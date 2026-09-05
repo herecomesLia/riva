@@ -1,8 +1,4 @@
-export {
-  createPracticeMockResponse,
-  createPracticeReferenceAnswer,
-  getPracticeFollowUpPlan,
-} from "@/mocks/data/practice"
+export { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
 export {
   continueToNextPracticeQuestion,
   endPracticeFollowUps,
@@ -13,14 +9,12 @@ export {
   prepareNextPracticeSession,
   preparePracticeTrainingEntry,
   requestAnswerFramework,
-  requestEndPracticeSession,
   requestPracticeFollowUpFramework,
   requestPracticeFollowUpHint,
   requestPracticeFollowUpReferenceAnswer,
   requestPracticeHint,
   requestPracticeReferenceAnswer,
   retryCurrentPracticeQuestion,
-  retryPracticeEvaluation,
   setQuestionSaved,
   setQuestionWeak,
   skipPracticeQuestion,

@@ -6,13 +6,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
-import type { PracticeGuidance } from "@/models/practice"
+import type { Guidance } from "@/models/practice-workflow"
 
 import type { PracticeInteractionResult } from "../practice-interaction"
 
 type PracticeQuestionGuidanceProps = {
-  answerFramework: PracticeGuidance<string[]>
-  answerHints: PracticeGuidance<string[]>
+  framework: Guidance<string[]>
+  hints: Guidance<string[]>
   interactionLocked: boolean
   isFrameworkPending: boolean
   isHintPending: boolean
@@ -21,8 +21,8 @@ type PracticeQuestionGuidanceProps = {
 }
 
 export function PracticeQuestionGuidance({
-  answerFramework,
-  answerHints,
+  framework,
+  hints,
   interactionLocked,
   isFrameworkPending,
   isHintPending,
@@ -34,7 +34,7 @@ export function PracticeQuestionGuidance({
   const [frameworkError, setFrameworkError] = useState(false)
 
   async function requestHint() {
-    if (interactionLocked || answerHints.status !== "notRequested") return
+    if (interactionLocked || hints.status !== "notRequested") return
     setHintError(false)
     try {
       await onRequestHint()
@@ -44,7 +44,7 @@ export function PracticeQuestionGuidance({
   }
 
   async function requestFramework() {
-    if (interactionLocked || answerFramework.status !== "notRequested") return
+    if (interactionLocked || framework.status !== "notRequested") return
     setFrameworkError(false)
     try {
       await onRequestFramework()
@@ -56,7 +56,7 @@ export function PracticeQuestionGuidance({
   return (
     <section className="grid gap-4 md:grid-cols-2" aria-label={t("practice.guidance.title")}>
       <GuidanceCard
-        content={answerHints.content}
+        content={hints.content}
         description={t("practice.guidance.hintDescription")}
         error={hintError}
         errorDescription={t("practice.errors.hintDescription")}
@@ -66,12 +66,12 @@ export function PracticeQuestionGuidance({
         interactionLocked={interactionLocked}
         onRequest={() => void requestHint()}
         requestLabel={t("practice.guidance.requestHint")}
-        status={answerHints.status}
+        status={hints.status}
         title={t("practice.guidance.hintTitle")}
         unavailableLabel={t("practice.guidance.hintUnavailable")}
       />
       <GuidanceCard
-        content={answerFramework.content}
+        content={framework.content}
         description={t("practice.guidance.frameworkDescription")}
         error={frameworkError}
         errorDescription={t("practice.errors.frameworkDescription")}
@@ -81,7 +81,7 @@ export function PracticeQuestionGuidance({
         interactionLocked={interactionLocked}
         onRequest={() => void requestFramework()}
         requestLabel={t("practice.guidance.requestFramework")}
-        status={answerFramework.status}
+        status={framework.status}
         title={t("practice.guidance.frameworkTitle")}
         unavailableLabel={t("practice.guidance.frameworkUnavailable")}
       />
@@ -100,7 +100,7 @@ type GuidanceCardProps = {
   isPending: boolean
   onRequest: () => void
   requestLabel: string
-  status: PracticeGuidance<string[]>["status"]
+  status: Guidance<string[]>["status"]
   title: string
   unavailableLabel: string
 }

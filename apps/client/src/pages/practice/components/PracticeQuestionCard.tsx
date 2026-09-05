@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import type { PracticeQuestionCard as PracticeQuestionCardModel } from "@/models/practice"
+import type { PracticeQuestion as PracticeQuestionCardModel } from "@/models/practice-workflow"
 
 type PracticeQuestionCardProps = {
   question: PracticeQuestionCardModel
@@ -18,7 +18,7 @@ export function PracticeQuestionCard({ question }: PracticeQuestionCardProps) {
         <CardTitle>
           <h3 className="wrap-break-word text-xl leading-8">{question.prompt}</h3>
         </CardTitle>
-        {question.isSaved || question.isMarkedWeak ? (
+        {question.isSaved || question.isWeak ? (
           <CardAction
             className="flex flex-wrap items-center justify-end gap-2"
             data-testid="practice-question-statuses"
@@ -29,7 +29,7 @@ export function PracticeQuestionCard({ question }: PracticeQuestionCardProps) {
                 {t("practice.question.saved")}
               </Badge>
             ) : null}
-            {question.isMarkedWeak ? (
+            {question.isWeak ? (
               <Badge variant="secondary">
                 <BrainIcon aria-hidden="true" />
                 {t("practice.question.weak")}

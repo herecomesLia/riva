@@ -1,20 +1,20 @@
 import preview from "#storybook/preview"
 
-import { createPracticeMockResponse } from "@/mocks/data/practice"
+import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
 
 import { PracticeConversationTimeline } from "./PracticeConversationTimeline"
 
-const multipleFollowUps = createPracticeMockResponse("answeringFollowUp")
+const multipleFollowUps = createPracticeScenario("answeringFollowUp")
 if (multipleFollowUps.session.status !== "answeringFollowUp") {
   throw new Error("The follow-up timeline story requires a follow-up fixture.")
 }
 
-const completed = createPracticeMockResponse("evaluatingAnswer")
+const completed = createPracticeScenario("evaluatingAnswer")
 if (completed.session.status !== "evaluating") {
   throw new Error("The completed timeline story requires an evaluating fixture.")
 }
 
-const endedEarly = createPracticeMockResponse("evaluatingFollowUpEndedEarly")
+const endedEarly = createPracticeScenario("evaluatingFollowUpEndedEarly")
 if (endedEarly.session.status !== "evaluating") {
   throw new Error("The ended-early timeline story requires an evaluating fixture.")
 }
@@ -27,7 +27,7 @@ const meta = preview.meta({
 export const MultipleFollowUps = meta.story({
   args: {
     currentFollowUp: multipleFollowUps.session.currentFollowUp,
-    followUpExchanges: multipleFollowUps.session.followUpExchanges,
+    followUps: multipleFollowUps.session.followUps,
     mainAnswer: multipleFollowUps.session.mainAnswer,
     question: multipleFollowUps.session.question,
   },
@@ -36,7 +36,7 @@ export const MultipleFollowUps = meta.story({
 export const Completed = meta.story({
   args: {
     followUpCompletion: completed.session.followUpCompletion,
-    followUpExchanges: completed.session.followUpExchanges,
+    followUps: completed.session.followUps,
     mainAnswer: completed.session.mainAnswer,
     question: completed.session.question,
   },
@@ -45,7 +45,7 @@ export const Completed = meta.story({
 export const FollowUpEndedEarly = meta.story({
   args: {
     followUpCompletion: endedEarly.session.followUpCompletion,
-    followUpExchanges: endedEarly.session.followUpExchanges,
+    followUps: endedEarly.session.followUps,
     mainAnswer: endedEarly.session.mainAnswer,
     question: endedEarly.session.question,
   },

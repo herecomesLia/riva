@@ -1,12 +1,12 @@
 import preview from "#storybook/preview"
 import { expect, within } from "storybook/test"
 
-import { createPracticeMockResponse } from "@/mocks/data/practice"
+import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
 
 import { PracticeQuestionCard } from "./PracticeQuestionCard"
 
-function getQuestion(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
-  const response = createPracticeMockResponse(scenario)
+function getQuestion(scenario: Parameters<typeof createPracticeScenario>[0]) {
+  const response = createPracticeScenario(scenario)
   if (!("question" in response.session)) throw new Error("A question fixture is required.")
   return response.session.question
 }
@@ -46,7 +46,7 @@ export const SavedAndWeakQuestion = meta.story({
   args: {
     question: {
       ...getQuestion("answeringQuestion"),
-      isMarkedWeak: true,
+      isWeak: true,
       isSaved: true,
     },
   },

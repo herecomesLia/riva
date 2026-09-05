@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import type { PracticeEvaluation } from "@/models/practice"
+import type { PracticeEvaluation } from "@/models/practice-workflow"
 
 export function PracticeScoreOverview({
   evaluation,

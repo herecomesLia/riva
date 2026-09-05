@@ -15,7 +15,11 @@ import {
   submitInterviewAnswer,
 } from "@/services/interview"
 import { getDashboardData } from "@/services/dashboard"
-import { endPracticeSession, getPracticePage, requestEndPracticeSession } from "@/services/practice"
+import {
+  endPracticeSession,
+  getPracticePage,
+  requestEndPracticeSession,
+} from "@/mocks/services/practice"
 import { getProfile } from "@/services/profile"
 import {
   getMockInterviewRecord,

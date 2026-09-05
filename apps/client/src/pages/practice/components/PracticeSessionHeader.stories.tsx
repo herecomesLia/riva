@@ -1,10 +1,10 @@
 import preview from "#storybook/preview"
 
-import { createPracticeMockResponse } from "@/mocks/data/practice"
+import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
 
 import { PracticeSessionHeader } from "./PracticeSessionHeader"
 
-const response = createPracticeMockResponse("answeringQuestion")
+const response = createPracticeScenario("answeringQuestion")
 if (response.session.status !== "answering") throw new Error("An answering fixture is required.")
 
 const meta = preview.meta({

@@ -1,11 +1,11 @@
 import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
-import type { ActivePracticeSelection, PracticeSetupContext } from "@/models/practice"
+import type { ActiveSelection, PracticeSetupContext } from "@/models/practice-workflow"
 
 type PracticeSessionHeaderProps = {
   context: PracticeSetupContext
-  selection: ActivePracticeSelection
+  selection: ActiveSelection
 }
 
 export function PracticeSessionHeader({ context, selection }: PracticeSessionHeaderProps) {

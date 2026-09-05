@@ -4,25 +4,25 @@ import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Message, MessageContent, MessageHeader } from "@/components/ui/message"
 import type {
-  AnsweredPracticeFollowUpExchange,
-  AwaitingPracticeFollowUpExchange,
+  EvaluatingSession,
+  PracticeFollowUp,
   PracticeAnswer,
-  PracticeFollowUpCompletion,
-  PracticeQuestionCard,
-} from "@/models/practice"
+  FollowUpCompletion,
+  PracticeQuestion,
+} from "@/models/practice-workflow"
 
 type PracticeConversationTimelineProps = {
-  question: PracticeQuestionCard
+  question: PracticeQuestion
   mainAnswer: PracticeAnswer
-  followUpExchanges: AnsweredPracticeFollowUpExchange[]
-  currentFollowUp?: AwaitingPracticeFollowUpExchange
-  followUpCompletion?: PracticeFollowUpCompletion
+  followUps: EvaluatingSession["followUps"]
+  currentFollowUp?: PracticeFollowUp
+  followUpCompletion?: FollowUpCompletion
 }
 
 export function PracticeConversationTimeline({
   question,
   mainAnswer,
-  followUpExchanges,
+  followUps,
   currentFollowUp,
   followUpCompletion,
 }: PracticeConversationTimelineProps) {
@@ -37,17 +37,17 @@ export function PracticeConversationTimeline({
       <CardContent className="flex flex-col gap-5">
         <CoachMessage label={t("practice.followUp.mainQuestion")} text={question.prompt} />
         <CandidateMessage label={t("practice.followUp.yourMainAnswer")} text={mainAnswer.content} />
-        {followUpExchanges.map((exchange) => (
-          <div className="flex flex-col gap-5" key={exchange.question.id}>
+        {followUps.map((exchange, index) => (
+          <div className="flex flex-col gap-5" key={index}>
             <CoachMessage
               label={t("practice.followUp.followUpNumber", {
-                count: exchange.question.order,
+                count: index + 1,
               })}
               text={exchange.question.prompt}
             />
             <CandidateMessage
               label={t("practice.followUp.yourFollowUpAnswer", {
-                count: exchange.question.order,
+                count: index + 1,
               })}
               text={exchange.answer.content}
             />
@@ -57,9 +57,9 @@ export function PracticeConversationTimeline({
           <CoachMessage
             current
             label={t("practice.followUp.currentFollowUp", {
-              count: currentFollowUp.question.order,
+              count: followUps.length + 1,
             })}
-            text={currentFollowUp.question.prompt}
+            text={currentFollowUp.prompt}
           />
         ) : null}
         {followUpCompletion?.status === "endedEarly" ? (
@@ -67,9 +67,9 @@ export function PracticeConversationTimeline({
             <CoachMessage
               incomplete
               label={t("practice.followUp.unansweredFollowUp", {
-                count: followUpCompletion.unansweredQuestion.order,
+                count: followUps.length + 1,
               })}
-              text={followUpCompletion.unansweredQuestion.prompt}
+              text={followUpCompletion.unanswered.prompt}
             />
             <p
               className="text-sm text-muted-foreground"

@@ -75,7 +75,7 @@ export const FollowUpReferenceError = meta.story({
     followUpActions: {
       ...createPracticeViewArgs("answeringSingleFollowUp").followUpActions,
       onRequestReferenceAnswer: fn(async () => {
-        throw new Error("internal sessionId=secret version=9 stack")
+        throw new Error("internal private=secret stack")
       }),
     },
   },
@@ -88,7 +88,7 @@ export const FollowUpReferenceError = meta.story({
     await userEvent.click(
       within(dialog).getByRole("button", { name: /查看参考补充|view reference supplement/i }),
     )
-    await expect(canvas.getByRole("alert")).not.toHaveTextContent(/sessionId|version=9|stack/)
+    await expect(canvas.getByRole("alert")).not.toHaveTextContent(/private|stack/)
     await expect(canvas.getByRole("textbox")).toHaveValue("保留草稿")
   },
 })

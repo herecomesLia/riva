@@ -2,11 +2,7 @@ import { beforeEach, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
-import {
-  createPracticeMockResponse,
-  createPracticeReferenceAnswer,
-  getPracticeFollowUpPlan,
-} from "@/mocks/data/practice"
+import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
 import { PracticePage } from "@/pages/practice"
 import {
   endPracticeFollowUps,
@@ -14,16 +10,14 @@ import {
   getPracticeEvaluationStatus,
   getQuestionGenerationStatus,
   requestAnswerFramework,
-  requestEndPracticeSession,
+  endPracticeSession,
   requestPracticeHint,
   requestPracticeReferenceAnswer,
   requestPracticeFollowUpFramework,
   requestPracticeFollowUpHint,
   requestPracticeFollowUpReferenceAnswer,
-  retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
-  endPracticeSession,
   prepareNextPracticeSession,
   preparePracticeTrainingEntry,
   setQuestionSaved,
@@ -58,16 +52,14 @@ beforeEach(async () => {
   vi.mocked(getQuestionGenerationStatus).mockReset()
   vi.mocked(endPracticeFollowUps).mockReset()
   vi.mocked(requestAnswerFramework).mockReset()
-  vi.mocked(requestEndPracticeSession).mockReset()
+  vi.mocked(endPracticeSession).mockReset()
   vi.mocked(requestPracticeHint).mockReset()
   vi.mocked(requestPracticeReferenceAnswer).mockReset()
   vi.mocked(requestPracticeFollowUpFramework).mockReset()
   vi.mocked(requestPracticeFollowUpHint).mockReset()
   vi.mocked(requestPracticeFollowUpReferenceAnswer).mockReset()
-  vi.mocked(retryPracticeEvaluation).mockReset()
   vi.mocked(retryCurrentPracticeQuestion).mockReset()
   vi.mocked(continueToNextPracticeQuestion).mockReset()
-  vi.mocked(endPracticeSession).mockReset()
   vi.mocked(prepareNextPracticeSession).mockReset()
   vi.mocked(preparePracticeTrainingEntry).mockReset()
   vi.mocked(setQuestionSaved).mockReset()
@@ -79,24 +71,20 @@ beforeEach(async () => {
 })
 
 export {
-  createPracticeMockResponse,
-  createPracticeReferenceAnswer,
-  getPracticeFollowUpPlan,
+  createPracticeScenario,
   getPracticePage,
   getPracticeEvaluationStatus,
   getQuestionGenerationStatus,
   endPracticeFollowUps,
   requestAnswerFramework,
-  requestEndPracticeSession,
+  endPracticeSession,
   requestPracticeHint,
   requestPracticeReferenceAnswer,
   requestPracticeFollowUpFramework,
   requestPracticeFollowUpHint,
   requestPracticeFollowUpReferenceAnswer,
-  retryPracticeEvaluation,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
-  endPracticeSession,
   prepareNextPracticeSession,
   preparePracticeTrainingEntry,
   setQuestionSaved,

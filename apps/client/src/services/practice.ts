@@ -1,175 +1,87 @@
-import { env } from "@/app/env"
-import * as practiceMockService from "@/mocks/services/practice"
-import type {
-  GetQuestionGenerationStatusInput,
-  GetPracticeEvaluationStatusInput,
-  EndPracticeFollowUpsInput,
-  PracticeMutationResponse,
-  PracticePageResponse,
-  PrepareNextPracticeSessionInput,
-  RequestAnswerFrameworkInput,
-  RequestEndPracticeSessionInput,
-  RequestPracticeHintInput,
-  RequestPracticeReferenceAnswerInput,
-  RequestPracticeFollowUpFrameworkInput,
-  RequestPracticeFollowUpHintInput,
-  RequestPracticeFollowUpReferenceAnswerInput,
-  RetryPracticeEvaluationInput,
-  RetryCurrentPracticeQuestionInput,
-  ContinueToNextPracticeQuestionInput,
-  EndPracticeSessionInput,
-  SetPracticeQuestionSavedInput,
-  SetPracticeQuestionWeakInput,
-  SkipPracticeQuestionInput,
-  StartPracticeSessionInput,
-  SubmitFollowUpAnswerInput,
-  SubmitPrimaryAnswerInput,
-} from "@/models/practice"
+import { practiceFaker } from "@/mocks/fakers/practice"
+import type { PracticeData, PracticeSetupContext, QuestionType } from "@/models/practice-workflow"
+import { resolvePracticeTrainingEntry } from "@/models/training-entry"
 import type {
   PracticeTrainingEntryParameters,
   PracticeTrainingEntryPreparationResponse,
+  TrainingEntryRoleAvailability,
 } from "@/models/training-entry"
+import type { RolesData } from "@/models/target-role-workflow"
+import { getRoles } from "@/services/roles"
 
-function realApiUnavailable(): never {
-  throw new Error("Real practice API is not implemented.")
+function setupContext(roles: RolesData["roles"]): PracticeSetupContext {
+  const supportedQuestionTypes: QuestionType[] = [
+    "projectDeepDive",
+    "behavioral",
+    "businessUnderstanding",
+    "motivation",
+    "technicalFoundation",
+  ]
+  return {
+    targetRoles: roles
+      .filter((role) => !role.isArchived)
+      .map(({ id, title, company }) => ({
+        id,
+        title,
+        company,
+        supportedQuestionTypes,
+      })),
+    availableDifficulties: ["basic", "pressure"],
+    eligibleQuestionCounts: { saved: 1, history: 1 },
+  }
 }
 
-export function getPracticePage(): Promise<PracticePageResponse> {
-  return env.mock ? practiceMockService.getPracticePage() : realApiUnavailable()
+export async function getPracticePage(): Promise<PracticeData> {
+  const [roles, session] = await Promise.all([getRoles(), practiceFaker.get()])
+  const context = setupContext(roles.roles)
+  if (session.status === "setup") {
+    const available = (id: string | null) => context.targetRoles.some((role) => role.id === id)
+    session.selection.targetRoleId = available(session.selection.targetRoleId)
+      ? session.selection.targetRoleId
+      : available(roles.activeRoleId)
+        ? roles.activeRoleId
+        : (context.targetRoles[0]?.id ?? null)
+  }
+  return { setupContext: context, session }
 }
 
-export function startPracticeSession(
-  input: StartPracticeSessionInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.startPracticeSession(input) : realApiUnavailable()
-}
-
-export function prepareNextPracticeSession(
-  input: PrepareNextPracticeSessionInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.prepareNextPracticeSession(input) : realApiUnavailable()
-}
-
-export function preparePracticeTrainingEntry(
+export async function preparePracticeTrainingEntry(
   input: PracticeTrainingEntryParameters,
 ): Promise<PracticeTrainingEntryPreparationResponse> {
-  return env.mock ? practiceMockService.preparePracticeTrainingEntry(input) : realApiUnavailable()
+  const [roles, session] = await Promise.all([getRoles(), practiceFaker.get()])
+  const context = setupContext(roles.roles)
+  const role = roles.roles.find((role) => role.id === input.targetRoleId)
+  const availability: TrainingEntryRoleAvailability = !role
+    ? { status: "unavailable", reason: "targetRoleDeleted" }
+    : role.isArchived
+      ? { status: "unavailable", reason: "targetRoleArchived" }
+      : { status: "available" }
+  const resolution = resolvePracticeTrainingEntry(context, session.selection, input, availability)
+  return {
+    page: {
+      setupContext: context,
+      session: { status: "setup", selection: resolution.configuration },
+    },
+    resolution,
+  }
 }
 
-export function getQuestionGenerationStatus(
-  input: GetQuestionGenerationStatusInput,
-): Promise<PracticePageResponse> {
-  return env.mock ? practiceMockService.getQuestionGenerationStatus(input) : realApiUnavailable()
-}
-
-export function getPracticeEvaluationStatus(
-  input: GetPracticeEvaluationStatusInput,
-): Promise<PracticePageResponse> {
-  return env.mock ? practiceMockService.getPracticeEvaluationStatus(input) : realApiUnavailable()
-}
-
-export function retryPracticeEvaluation(
-  input: RetryPracticeEvaluationInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.retryPracticeEvaluation(input) : realApiUnavailable()
-}
-
-export function retryCurrentPracticeQuestion(
-  input: RetryCurrentPracticeQuestionInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.retryCurrentPracticeQuestion(input) : realApiUnavailable()
-}
-
-export function continueToNextPracticeQuestion(
-  input: ContinueToNextPracticeQuestionInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.continueToNextPracticeQuestion(input) : realApiUnavailable()
-}
-
-export function endPracticeSession(
-  input: EndPracticeSessionInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.endPracticeSession(input) : realApiUnavailable()
-}
-
-export function requestPracticeHint(
-  input: RequestPracticeHintInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.requestPracticeHint(input) : realApiUnavailable()
-}
-
-export function requestAnswerFramework(
-  input: RequestAnswerFrameworkInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.requestAnswerFramework(input) : realApiUnavailable()
-}
-
-export function requestPracticeReferenceAnswer(
-  input: RequestPracticeReferenceAnswerInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.requestPracticeReferenceAnswer(input) : realApiUnavailable()
-}
-
-export function requestPracticeFollowUpHint(
-  input: RequestPracticeFollowUpHintInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.requestPracticeFollowUpHint(input) : realApiUnavailable()
-}
-
-export function requestPracticeFollowUpFramework(
-  input: RequestPracticeFollowUpFrameworkInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock
-    ? practiceMockService.requestPracticeFollowUpFramework(input)
-    : realApiUnavailable()
-}
-
-export function requestPracticeFollowUpReferenceAnswer(
-  input: RequestPracticeFollowUpReferenceAnswerInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock
-    ? practiceMockService.requestPracticeFollowUpReferenceAnswer(input)
-    : realApiUnavailable()
-}
-
-export function setQuestionSaved(
-  input: SetPracticeQuestionSavedInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.setQuestionSaved(input) : realApiUnavailable()
-}
-
-export function setQuestionWeak(
-  input: SetPracticeQuestionWeakInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.setQuestionWeak(input) : realApiUnavailable()
-}
-
-export function submitPrimaryAnswer(
-  input: SubmitPrimaryAnswerInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.submitPrimaryAnswer(input) : realApiUnavailable()
-}
-
-export function submitFollowUpAnswer(
-  input: SubmitFollowUpAnswerInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.submitFollowUpAnswer(input) : realApiUnavailable()
-}
-
-export function endPracticeFollowUps(
-  input: EndPracticeFollowUpsInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.endPracticeFollowUps(input) : realApiUnavailable()
-}
-
-export function skipPracticeQuestion(
-  input: SkipPracticeQuestionInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.skipPracticeQuestion(input) : realApiUnavailable()
-}
-
-export function requestEndPracticeSession(
-  input: RequestEndPracticeSessionInput,
-): Promise<PracticeMutationResponse> {
-  return env.mock ? practiceMockService.requestEndPracticeSession(input) : realApiUnavailable()
-}
+export const startPracticeSession = practiceFaker.start
+export const getQuestionGenerationStatus = practiceFaker.pollQuestion
+export const requestPracticeHint = practiceFaker.hint
+export const requestAnswerFramework = practiceFaker.framework
+export const requestPracticeReferenceAnswer = practiceFaker.reference
+export const setQuestionSaved = practiceFaker.save
+export const setQuestionWeak = practiceFaker.weak
+export const submitPrimaryAnswer = practiceFaker.answer
+export const requestPracticeFollowUpHint = practiceFaker.followHint
+export const requestPracticeFollowUpFramework = practiceFaker.followFramework
+export const requestPracticeFollowUpReferenceAnswer = practiceFaker.followReference
+export const submitFollowUpAnswer = practiceFaker.answerFollowUp
+export const endPracticeFollowUps = practiceFaker.endFollowUps
+export const getPracticeEvaluationStatus = practiceFaker.pollEvaluation
+export const retryCurrentPracticeQuestion = practiceFaker.retryQuestion
+export const continueToNextPracticeQuestion = practiceFaker.nextQuestion
+export const skipPracticeQuestion = practiceFaker.skipQuestion
+export const endPracticeSession = practiceFaker.endSession
+export const prepareNextPracticeSession = practiceFaker.nextSession

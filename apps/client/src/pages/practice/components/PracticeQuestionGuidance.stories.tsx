@@ -1,23 +1,20 @@
 import preview from "#storybook/preview"
 import { expect, fn, userEvent } from "storybook/test"
 
-import {
-  createGeneratedPracticeQuestionGuidance,
-  createPracticeMockResponse,
-} from "@/mocks/data/practice"
+import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
 
 import { PracticeQuestionGuidance } from "./PracticeQuestionGuidance"
 
-function getQuestion(scenario: Parameters<typeof createPracticeMockResponse>[0]) {
-  const response = createPracticeMockResponse(scenario)
+function getQuestion(scenario: Parameters<typeof createPracticeScenario>[0]) {
+  const response = createPracticeScenario(scenario)
   if (!("question" in response.session)) throw new Error("A question fixture is required.")
   return response.session.question
 }
 
 const defaultQuestion = getQuestion("answeringQuestion")
 const defaultArgs = {
-  answerFramework: defaultQuestion.answerFramework,
-  answerHints: defaultQuestion.answerHints,
+  framework: defaultQuestion.framework,
+  hints: defaultQuestion.hints,
   interactionLocked: false,
   isFrameworkPending: false,
   isHintPending: false,
@@ -43,48 +40,48 @@ export const RequestHint = meta.story({
 export const HintRevealed = meta.story({
   args: {
     ...defaultArgs,
-    answerHints: getQuestion("answeringHintRevealed").answerHints,
+    hints: getQuestion("answeringHintRevealed").hints,
   },
 })
 
 export const FrameworkRevealed = meta.story({
   args: {
     ...defaultArgs,
-    answerFramework: getQuestion("answeringFrameworkRevealed").answerFramework,
+    framework: getQuestion("answeringFrameworkRevealed").framework,
   },
 })
 
-const behavioralGuidance = createGeneratedPracticeQuestionGuidance("behavioral")
+const behavioralGuidance = { hints: ["具体情境、个人行动和结果。"] }
 
 export const BehavioralHintRevealed = meta.story({
   args: {
     ...defaultArgs,
-    answerHints: { status: "revealed", content: behavioralGuidance.hints },
+    hints: { status: "revealed", content: behavioralGuidance.hints },
   },
   play: async ({ canvas }) => {
     await expect(canvas.getByText(/具体情境|specific situation/i)).toBeVisible()
   },
 })
 
-const motivationGuidance = createGeneratedPracticeQuestionGuidance("motivation")
+const motivationGuidance = { framework: ["岗位吸引力、匹配经历和发展目标。"] }
 
 export const MotivationFrameworkRevealed = meta.story({
   args: {
     ...defaultArgs,
-    answerFramework: { status: "revealed", content: motivationGuidance.framework },
+    framework: { status: "revealed", content: motivationGuidance.framework },
   },
   play: async ({ canvas }) => {
     await expect(canvas.getByText(/岗位吸引力|role appeal/i)).toBeVisible()
   },
 })
 
-const technicalGuidance = createGeneratedPracticeQuestionGuidance("technicalFoundation")
+const technicalGuidance = { hints: ["说明相关概念。"], framework: ["说明权衡与验证。"] }
 
 export const TechnicalGuidanceRevealed = meta.story({
   args: {
     ...defaultArgs,
-    answerHints: { status: "revealed", content: technicalGuidance.hints },
-    answerFramework: { status: "revealed", content: technicalGuidance.framework },
+    hints: { status: "revealed", content: technicalGuidance.hints },
+    framework: { status: "revealed", content: technicalGuidance.framework },
   },
   play: async ({ canvas }) => {
     await expect(canvas.getByText(/相关概念|related concepts/i)).toBeVisible()

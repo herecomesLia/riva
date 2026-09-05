@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 
 type PracticeFlagActionsProps = {
   disabled: boolean
-  isMarkedWeak: boolean
+  isWeak: boolean
   isSaved: boolean
   isSavedPending: boolean
   isWeakPending: boolean
@@ -19,7 +19,7 @@ type PracticeFlagActionsProps = {
 
 export function PracticeFlagActions({
   disabled,
-  isMarkedWeak,
+  isWeak,
   isSaved,
   isSavedPending,
   isWeakPending,
@@ -51,7 +51,7 @@ export function PracticeFlagActions({
       </Button>
       <Button
         className="w-full sm:w-auto"
-        aria-pressed={isMarkedWeak}
+        aria-pressed={isWeak}
         disabled={disabled}
         onClick={onWeakClick}
         type="button"
@@ -60,11 +60,9 @@ export function PracticeFlagActions({
         {isWeakPending ? (
           <Spinner aria-hidden="true" data-icon="inline-start" />
         ) : (
-          <BrainIcon className={cn(isMarkedWeak && "text-amber-500")} data-icon="inline-start" />
+          <BrainIcon className={cn(isWeak && "text-amber-500")} data-icon="inline-start" />
         )}
-        {isMarkedWeak
-          ? t("practice.questionActions.unmarkWeak")
-          : t("practice.questionActions.markWeak")}
+        {isWeak ? t("practice.questionActions.unmarkWeak") : t("practice.questionActions.markWeak")}
       </Button>
     </>
   )

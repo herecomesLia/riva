@@ -1,63 +1,22 @@
+import { practiceFixture } from "@/mocks/fixtures/practice"
 import preview from "#storybook/preview"
 import { expect, fn, waitFor, within } from "storybook/test"
 
-import {
-  createGeneratedPracticeQuestion,
-  createPracticeFollowUpQuestion,
-  createPracticeFollowUpReferenceAnswer,
-  createPracticeMockResponse,
-  getPracticeFollowUpPlan,
-} from "@/mocks/data/practice"
-import type { PracticeAnswer, PracticeFollowUpQuestion } from "@/models/practice"
+import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
+import type { PracticeFollowUp } from "@/models/practice-workflow"
 
 import { PracticeFollowUpAssistance } from "./PracticeFollowUpAssistance"
 
-const response = createPracticeMockResponse("answeringFirstFollowUp")
+const response = createPracticeScenario("answeringFirstFollowUp")
 if (response.session.status !== "answeringFollowUp") throw new Error("Follow-up fixture required.")
 const session = response.session
-const baseQuestion = session.currentFollowUp.question
-const template = getPracticeFollowUpPlan(session.question.templateId)[0]!
-const reference = createPracticeFollowUpReferenceAnswer({
-  mainQuestion: session.question,
-  mainAnswer: session.mainAnswer,
-  previousFollowUpExchanges: [],
-  currentFollowUp: baseQuestion,
-  targetRoleTitle: "Senior Frontend Engineer",
-})
+const baseQuestion = session.currentFollowUp
+const template = practiceFixture.followUp
+const reference = practiceFixture.followUp.reference
+const technicalQuestion = structuredClone(baseQuestion)
+const technicalReference = { ...reference, kind: "technicalReference" as const }
 
-const technicalMainQuestion = createGeneratedPracticeQuestion({
-  sessionId: "follow_up_story_technical",
-  ordinal: 1,
-  selection: {
-    targetRoleId: "role_frontend_bytedance",
-    questionType: "technicalFoundation",
-    difficulty: "pressure",
-    source: "personalized",
-    prioritizeWeaknesses: false,
-  },
-})
-const technicalMainAnswer = {
-  id: "follow_up_story_technical_answer",
-  content: "我会先用 Profiler 定位更新来源，再验证优化前后的 commit 和交互耗时。",
-  createdAt: "2026-07-20T03:00:00.000Z",
-  order: 1,
-} satisfies PracticeAnswer
-const technicalQuestion = createPracticeFollowUpQuestion({
-  question: technicalMainQuestion,
-  order: 1,
-  createdAt: "2026-07-20T03:01:00.000Z",
-})
-const technicalReference = createPracticeFollowUpReferenceAnswer({
-  mainQuestion: technicalMainQuestion,
-  mainAnswer: technicalMainAnswer,
-  previousFollowUpExchanges: [],
-  currentFollowUp: technicalQuestion,
-  targetRoleTitle: "Senior Frontend Engineer",
-})
-
-function revealedQuestion(
-  overrides: Partial<PracticeFollowUpQuestion> = {},
-): PracticeFollowUpQuestion {
+function revealedQuestion(overrides: Partial<PracticeFollowUp> = {}): PracticeFollowUp {
   return { ...structuredClone(baseQuestion), ...overrides }
 }
 
@@ -94,7 +53,7 @@ export const FollowUpHintRevealed = meta.story({
   args: {
     ...baseArgs,
     question: revealedQuestion({
-      answerHints: { status: "revealed", content: [...template.answerHints] },
+      hints: { status: "revealed", content: [...template.hints] },
     }),
   },
 })
@@ -103,7 +62,7 @@ export const FollowUpFrameworkRevealed = meta.story({
   args: {
     ...baseArgs,
     question: revealedQuestion({
-      answerFramework: { status: "revealed", content: [...template.answerFramework] },
+      framework: { status: "revealed", content: [...template.framework] },
     }),
   },
 })
@@ -186,12 +145,12 @@ export const FollowUpReferenceError = meta.story({
   args: {
     ...baseArgs,
     onRequestHint: fn(async () => {
-      throw new Error("internal sessionId=secret stack")
+      throw new Error("internal private=secret stack")
     }),
   },
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole("button", { name: /查看追问提示|view follow-up hint/i }))
-    await expect(canvas.getByRole("alert")).not.toHaveTextContent(/sessionId|stack|secret/)
+    await expect(canvas.getByRole("alert")).not.toHaveTextContent(/private|stack|secret/)
   },
 })
 

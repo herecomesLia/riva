@@ -12,7 +12,7 @@ function createDefaultArgs() {
   return {
     interactionLocked: false,
     isEndPending: false,
-    isMarkedWeak: question.isMarkedWeak,
+    isWeak: question.isWeak,
     isNextPending: false,
     isRetryPending: false,
     isSaved: question.isSaved,
@@ -38,7 +38,7 @@ export const Default = meta.story({
 export const SavedAndMarkedWeak = meta.story({
   args: {
     ...createDefaultArgs(),
-    isMarkedWeak: true,
+    isWeak: true,
     isSaved: true,
   },
   play: async ({ canvas }) => {
@@ -81,7 +81,7 @@ export const Pending = meta.story({
 })
 
 const retryFailure = fn(async () => {
-  throw new Error("sessionId=private retry stack")
+  throw new Error("detail=private retry stack")
 })
 
 export const RetryFailure = meta.story({
@@ -95,12 +95,12 @@ export const RetryFailure = meta.story({
     )
     await expect(retryFailure).toHaveBeenCalledTimes(1)
     await expect(canvas.getByRole("alert")).toBeVisible()
-    await expect(canvas.getByRole("alert")).not.toHaveTextContent(/sessionId|private|retry stack/i)
+    await expect(canvas.getByRole("alert")).not.toHaveTextContent(/detail|private|retry stack/i)
   },
 })
 
 const nextFailure = fn(async () => {
-  throw new Error("questionId=private next stack")
+  throw new Error("detail=private next stack")
 })
 
 export const NextQuestionFailure = meta.story({
@@ -112,13 +112,13 @@ export const NextQuestionFailure = meta.story({
     await userEvent.click(canvas.getByRole("button", { name: /继续下一题|next question/i }))
     await expect(nextFailure).toHaveBeenCalledTimes(1)
     await expect(canvas.getByRole("alert")).toBeVisible()
-    await expect(canvas.getByRole("alert")).not.toHaveTextContent(/questionId|private|next stack/i)
+    await expect(canvas.getByRole("alert")).not.toHaveTextContent(/detail|private|next stack/i)
   },
 })
 
 const endFailureThenSuccess = fn(async () => {
   if (endFailureThenSuccess.mock.calls.length === 1) {
-    throw new Error("version=17 end stack")
+    throw new Error("detail end stack")
   }
   return "executed" as const
 })
@@ -160,7 +160,7 @@ export const EndFailureRetry = meta.story({
       expect(errorAlert).toBeVisible()
     })
 
-    await expect(errorAlert).not.toHaveTextContent(/version=17|end stack/i)
+    await expect(errorAlert).not.toHaveTextContent(/detail|end stack/i)
 
     await userEvent.click(
       within(dialog).getByRole("button", {

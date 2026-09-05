@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import type { ActivePracticeSelection, PracticeSetupContext } from "@/models/practice"
+import type { ActiveSelection, PracticeSetupContext } from "@/models/practice-workflow"
 
 export function PracticeLoadingState() {
   const { t } = useTranslation()
@@ -118,7 +118,7 @@ export function PracticeGeneratingState({
   selection,
 }: {
   context: PracticeSetupContext
-  selection: ActivePracticeSelection
+  selection: ActiveSelection
 }) {
   const { t } = useTranslation()
 
@@ -148,7 +148,7 @@ export function PracticeGenerationErrorState({
   context: PracticeSetupContext
   isRetrying: boolean
   onRetry: () => void
-  selection: ActivePracticeSelection
+  selection: ActiveSelection
 }) {
   const { t } = useTranslation()
 
@@ -185,7 +185,7 @@ export function PracticeSelectionSummary({
   selection,
 }: {
   context: PracticeSetupContext
-  selection: ActivePracticeSelection
+  selection: ActiveSelection
 }) {
   const { t } = useTranslation()
   const role = context.targetRoles.find((candidate) => candidate.id === selection.targetRoleId)

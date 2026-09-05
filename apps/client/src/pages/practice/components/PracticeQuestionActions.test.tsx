@@ -11,7 +11,7 @@ import { PracticeQuestionActions } from "./PracticeQuestionActions"
 const defaultProps = {
   interactionLocked: false,
   isEndPending: false,
-  isMarkedWeak: false,
+  isWeak: false,
   isSaved: false,
   isSavedPending: false,
   isSkipPending: false,
@@ -64,7 +64,7 @@ describe("PracticeQuestionActions", () => {
     expect(unsavedIcon).not.toHaveClass("fill-destructive", "text-destructive")
     expect(unmarkedWeakIcon).not.toHaveClass("text-amber-500")
 
-    rerender(<PracticeQuestionActions {...defaultProps} isMarkedWeak isSaved />)
+    rerender(<PracticeQuestionActions {...defaultProps} isWeak isSaved />)
 
     const savedIcon = screen
       .getByRole("button", { name: i18n.t("practice.questionActions.unsave") })
@@ -139,7 +139,7 @@ describe("PracticeQuestionActions", () => {
     const user = userEvent.setup()
     const onEnd = vi
       .fn<() => Promise<"executed">>()
-      .mockRejectedValueOnce(new Error("sessionId=secret version=42"))
+      .mockRejectedValueOnce(new Error("private=secret"))
       .mockResolvedValueOnce("executed")
     renderWithProviders(<PracticeQuestionActions {...defaultProps} onEnd={onEnd} />, {
       router: false,
@@ -156,7 +156,7 @@ describe("PracticeQuestionActions", () => {
     expect(within(dialog).getByRole("alert")).toHaveTextContent(
       i18n.t("practice.errors.endDescription"),
     )
-    expect(within(dialog).queryByText(/sessionId|version=42|secret/i)).not.toBeInTheDocument()
+    expect(within(dialog).queryByText(/private|secret/i)).not.toBeInTheDocument()
 
     await user.click(confirm)
     expect(onEnd).toHaveBeenCalledTimes(2)

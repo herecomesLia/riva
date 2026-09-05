@@ -23,14 +23,14 @@ import { PracticeFlagActions } from "./PracticeFlagActions"
 type PracticeQuestionActionsProps = {
   interactionLocked: boolean
   isEndPending: boolean
-  isMarkedWeak: boolean
+  isWeak: boolean
   isSaved: boolean
   isSavedPending: boolean
   isSkipPending: boolean
   isWeakPending: boolean
   onEnd: () => Promise<PracticeInteractionResult>
   onSetSaved: (isSaved: boolean) => Promise<PracticeInteractionResult>
-  onSetWeak: (isMarkedWeak: boolean) => Promise<PracticeInteractionResult>
+  onSetWeak: (isWeak: boolean) => Promise<PracticeInteractionResult>
   onSkip: () => Promise<PracticeInteractionResult>
 }
 
@@ -39,7 +39,7 @@ type ActionError = "saved" | "weak" | "skip" | "end" | null
 export function PracticeQuestionActions({
   interactionLocked,
   isEndPending,
-  isMarkedWeak,
+  isWeak,
   isSaved,
   isSavedPending,
   isSkipPending,
@@ -68,7 +68,7 @@ export function PracticeQuestionActions({
     if (interactionLocked) return
     setActionError(null)
     try {
-      await onSetWeak(!isMarkedWeak)
+      await onSetWeak(!isWeak)
     } catch {
       setActionError("weak")
     }
@@ -115,7 +115,7 @@ export function PracticeQuestionActions({
     >
       <PracticeFlagActions
         disabled={interactionLocked}
-        isMarkedWeak={isMarkedWeak}
+        isWeak={isWeak}
         isSaved={isSaved}
         isSavedPending={isSavedPending}
         isWeakPending={isWeakPending}

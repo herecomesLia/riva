@@ -29,6 +29,7 @@ export function createPracticeFaker() {
 
       return update({
         status: "answering",
+        assistedRetry: false,
         selection: session.selection,
         question: practiceFixture.question,
       })
@@ -238,6 +239,7 @@ export function createPracticeFaker() {
       }
       return update({
         status: "answering",
+        assistedRetry: true,
         selection: session.selection,
         question,
       })

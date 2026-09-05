@@ -10,7 +10,7 @@ import { PracticeFlagActions } from "./PracticeFlagActions"
 
 const defaultProps = {
   disabled: false,
-  isMarkedWeak: false,
+  isWeak: false,
   isSaved: false,
   isSavedPending: false,
   isWeakPending: false,
@@ -27,7 +27,7 @@ describe("PracticeFlagActions", () => {
 
   it("uses consistent icons, pressed state and callbacks", async () => {
     const user = userEvent.setup()
-    renderWithProviders(<PracticeFlagActions {...defaultProps} isMarkedWeak isSaved />, {
+    renderWithProviders(<PracticeFlagActions {...defaultProps} isWeak isSaved />, {
       router: false,
     })
 

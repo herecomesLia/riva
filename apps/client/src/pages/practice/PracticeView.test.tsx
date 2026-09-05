@@ -4,12 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
-import { createPracticeMockResponse } from "@/mocks/data/practice"
-import type {
-  ActivePracticeSelection,
-  PracticePageResponse,
-  PracticeSessionState,
-} from "@/models/practice"
+import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
+import type { ActiveSelection, PracticeData, PracticeSession } from "@/models/practice-workflow"
 import { renderWithProviders } from "@/test/render"
 
 import {
@@ -22,33 +18,7 @@ import {
   type PracticeReviewActions,
   type PracticeReviewPending,
 } from "./PracticeView"
-import { isCurrentPracticeAttemptRetry } from "./practice-attempt"
 import { PracticeReviewActions as PracticeReviewActionsComponent } from "./components/PracticeReviewActions"
-
-describe("isCurrentPracticeAttemptRetry", () => {
-  it("uses the previous archived question ID instead of attempt number", () => {
-    const answering = createPracticeMockResponse("answeringQuestion")
-    const completed = createPracticeMockResponse("completedSession")
-    if (answering.session.status !== "answering" || completed.session.status !== "completed") {
-      throw new Error("Practice fixtures required.")
-    }
-    const previousAttempt = structuredClone(completed.session.attemptRecords[0])
-    if (!previousAttempt) throw new Error("Attempt fixture required.")
-
-    answering.session.attemptNumber = 2
-    answering.session.attemptRecords = [
-      { ...previousAttempt, question: answering.session.question },
-    ]
-    expect(isCurrentPracticeAttemptRetry(answering.session)).toBe(true)
-
-    answering.session.attemptRecords = [previousAttempt]
-    answering.session.question = {
-      ...answering.session.question,
-      id: `${answering.session.question.id}_next`,
-    }
-    expect(isCurrentPracticeAttemptRetry(answering.session)).toBe(false)
-  })
-})
 
 function createAnsweringActions(
   overrides: Partial<PracticeAnsweringActions> = {},
@@ -123,13 +93,13 @@ const reviewPending: PracticeReviewPending = {
 }
 
 function renderReadyView(
-  data: PracticePageResponse,
+  data: PracticeData,
   options: {
     generationError?: boolean
     isGenerationRetrying?: boolean
     isStarting?: boolean
     onRetryGeneration?: () => void
-    onStart?: (input: ActivePracticeSelection) => Promise<void>
+    onStart?: (input: ActiveSelection) => Promise<void>
     answeringActions?: PracticeAnsweringActions
     answeringPending?: PracticeAnsweringPending
     followUpActions?: PracticeFollowUpActions
@@ -146,7 +116,7 @@ function renderReadyView(
   const onStart = options.onStart ?? vi.fn(async () => undefined)
   const actions = options.answeringActions ?? createAnsweringActions()
   const followUpActions = options.followUpActions ?? createFollowUpActions()
-  const renderView = (viewData: PracticePageResponse) => (
+  const renderView = (viewData: PracticeData) => (
     <PracticeView
       answeringActions={actions}
       answeringPending={options.answeringPending ?? answeringPending}
@@ -176,7 +146,7 @@ function renderReadyView(
   return {
     actions,
     onStart,
-    rerenderReady: (viewData: PracticePageResponse) => renderResult.rerender(renderView(viewData)),
+    rerenderReady: (viewData: PracticeData) => renderResult.rerender(renderView(viewData)),
     ...renderResult,
   }
 }
@@ -222,9 +192,9 @@ const sessionStateCases = {
   review: { scenario: "reviewBalanced", testId: "practice-review-state" },
   completed: { scenario: "completedSession", testId: "practice-completed-state" },
 } as const satisfies Record<
-  PracticeSessionState["status"],
+  PracticeSession["status"],
   {
-    scenario: Parameters<typeof createPracticeMockResponse>[0]
+    scenario: Parameters<typeof createPracticeScenario>[0]
     testId: string
   }
 >
@@ -233,7 +203,7 @@ describe("PracticeView", () => {
   it.each(Object.entries(sessionStateCases))(
     "renders the explicit %s session branch",
     async (status, { scenario, testId }) => {
-      const data = createPracticeMockResponse(scenario)
+      const data = createPracticeScenario(scenario)
       expect(data.session.status).toBe(status)
 
       renderReadyView(data)
@@ -244,7 +214,7 @@ describe("PracticeView", () => {
   )
 
   it("shows a safe label instead of an internal role ID when selection metadata is missing", async () => {
-    const data = createPracticeMockResponse("generatingQuestion")
+    const data = createPracticeScenario("generatingQuestion")
     if (data.session.status !== "generatingQuestion") {
       throw new Error("Generating fixture required.")
     }
@@ -259,7 +229,7 @@ describe("PracticeView", () => {
   })
 
   it("renders the completed summary with next-round and training-history actions", async () => {
-    const data = createPracticeMockResponse("completedSession")
+    const data = createPracticeScenario("completedSession")
     if (data.session.status !== "completed") throw new Error("Completed fixture required.")
     renderReadyView(data)
 
@@ -284,7 +254,7 @@ describe("PracticeView", () => {
   it("keeps the completed summary and actions safe when next-round preparation is ignored", async () => {
     const user = userEvent.setup()
     const onPrepareNextRound = vi.fn(async () => "ignored" as const)
-    renderReadyView(createPracticeMockResponse("completedSession"), {
+    renderReadyView(createPracticeScenario("completedSession"), {
       completedActions: { onPrepareNextRound },
     })
 
@@ -301,7 +271,7 @@ describe("PracticeView", () => {
   })
 
   it("keeps all review actions in a fixed, sidebar-aware bottom bar", async () => {
-    renderReadyView(createPracticeMockResponse("reviewBalanced"))
+    renderReadyView(createPracticeScenario("reviewBalanced"))
 
     const review = await screen.findByTestId("practice-review-state")
     expect(review).toHaveClass("pb-80", "min-[360px]:pb-52", "sm:pb-40", "lg:pb-28")
@@ -330,7 +300,7 @@ describe("PracticeView", () => {
   it("confirms ending a reviewed session before invoking the action", async () => {
     const user = userEvent.setup()
     const onEndSession = vi.fn(async () => "executed" as const)
-    renderReadyView(createPracticeMockResponse("reviewBalanced"), {
+    renderReadyView(createPracticeScenario("reviewBalanced"), {
       reviewActions: createReviewActions({ onEndSession }),
     })
     await screen.findByTestId("practice-review-state")
@@ -345,10 +315,10 @@ describe("PracticeView", () => {
 
   it("shows safe review-action errors without exposing service details", async () => {
     const user = userEvent.setup()
-    renderReadyView(createPracticeMockResponse("reviewBalanced"), {
+    renderReadyView(createPracticeScenario("reviewBalanced"), {
       reviewActions: createReviewActions({
         onRetryCurrent: vi.fn(async () => {
-          throw new Error("internal version 99")
+          throw new Error("internal detail")
         }),
       }),
     })
@@ -357,7 +327,7 @@ describe("PracticeView", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       i18n.t("practice.errors.retryDescription"),
     )
-    expect(screen.queryByText("internal version 99")).not.toBeInTheDocument()
+    expect(screen.queryByText("internal detail")).not.toBeInTheDocument()
   })
 
   it("keeps review actions safe when retry, next, or end are ignored", async () => {
@@ -367,7 +337,7 @@ describe("PracticeView", () => {
       onNextQuestion: vi.fn(async () => "ignored" as const),
       onRetryCurrent: vi.fn(async () => "ignored" as const),
     })
-    renderReadyView(createPracticeMockResponse("reviewBalanced"), { reviewActions: actions })
+    renderReadyView(createPracticeScenario("reviewBalanced"), { reviewActions: actions })
     await screen.findByTestId("practice-review-state")
     await user.click(screen.getByRole("button", { name: /重练当前题/i }))
     await user.click(screen.getByRole("button", { name: /继续下一题/i }))
@@ -386,7 +356,7 @@ describe("PracticeView", () => {
 
   it("shows safe next and end failures while remaining in review", async () => {
     const user = userEvent.setup()
-    const internal = "Practice session version 17 is stale"
+    const internal = "Private request detail"
     const onEndSession = vi
       .fn<() => Promise<"executed">>()
       .mockRejectedValueOnce(new Error(internal))
@@ -397,7 +367,7 @@ describe("PracticeView", () => {
         throw new Error(internal)
       }),
     })
-    renderReadyView(createPracticeMockResponse("reviewBalanced"), { reviewActions: actions })
+    renderReadyView(createPracticeScenario("reviewBalanced"), { reviewActions: actions })
     await screen.findByTestId("practice-review-state")
     await user.click(screen.getByRole("button", { name: /继续下一题/i }))
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -425,7 +395,7 @@ describe("PracticeView", () => {
     "disables all review actions while %s is pending",
     async (pendingAction) => {
       const pending = { ...reviewPending, interactionLocked: true, [pendingAction]: true }
-      renderReadyView(createPracticeMockResponse("reviewBalanced"), { reviewPending: pending })
+      renderReadyView(createPracticeScenario("reviewBalanced"), { reviewPending: pending })
       await screen.findByTestId("practice-review-state")
       for (const name of [
         /重练当前题/i,
@@ -442,7 +412,7 @@ describe("PracticeView", () => {
   it("disables both end confirmation controls while ending is pending", async () => {
     const user = userEvent.setup()
     const props = {
-      isMarkedWeak: false,
+      isWeak: false,
       isSaved: false,
       isSavedPending: false,
       isWeakPending: false,
@@ -450,7 +420,7 @@ describe("PracticeView", () => {
       onNextQuestion: vi.fn(async () => "executed" as const),
       onRetryCurrent: vi.fn(async () => "executed" as const),
       onSetSaved: vi.fn(async (_isSaved: boolean) => "executed" as const),
-      onSetWeak: vi.fn(async (_isMarkedWeak: boolean) => "executed" as const),
+      onSetWeak: vi.fn(async (_isWeak: boolean) => "executed" as const),
     }
     const { rerender } = renderWithProviders(
       <PracticeReviewActionsComponent
@@ -495,8 +465,8 @@ describe("PracticeView", () => {
   })
 
   it("moves focus to the current practice region after a session phase changes", async () => {
-    const answering = createPracticeMockResponse("answeringQuestion")
-    const review = createPracticeMockResponse("reviewBalanced")
+    const answering = createPracticeScenario("answeringQuestion")
+    const review = createPracticeScenario("reviewBalanced")
     const actions = createAnsweringActions()
     const followUpActions = createFollowUpActions()
     const reviewActions = createReviewActions()
@@ -554,7 +524,7 @@ describe("PracticeView", () => {
   })
 
   it("selects the current target role and recommended defaults", async () => {
-    const data = createPracticeMockResponse("setupReady")
+    const data = createPracticeScenario("setupReady")
     renderReadyView(data)
 
     expect(await screen.findByTestId("practice-target-role-trigger")).toHaveTextContent(
@@ -576,7 +546,7 @@ describe("PracticeView", () => {
 
   it("keeps the selected option styling after focus moves away", async () => {
     const user = userEvent.setup()
-    renderReadyView(createPracticeMockResponse("setupReady"))
+    renderReadyView(createPracticeScenario("setupReady"))
     await screen.findByTestId("practice-setup-state")
 
     const selectedQuestionType = screen.getByRole("button", {
@@ -596,7 +566,7 @@ describe("PracticeView", () => {
   })
 
   it("separates the setup sections with responsive theme dividers", async () => {
-    renderReadyView(createPracticeMockResponse("setupReady"))
+    renderReadyView(createPracticeScenario("setupReady"))
     const setupCard = await screen.findByTestId("practice-setup-state")
     expect(setupCard.querySelector('[data-slot="card-header"]')).toHaveClass("border-b")
 
@@ -626,7 +596,7 @@ describe("PracticeView", () => {
   })
 
   it("renders the setup selection returned by the service without reapplying a default", async () => {
-    const data = createPracticeMockResponse("setupReady")
+    const data = createPracticeScenario("setupReady")
     if (data.session.status !== "setup") return
     data.session.selection.targetRoleId = "role_product_manager_meituan"
 
@@ -640,7 +610,7 @@ describe("PracticeView", () => {
   it("submits changed question type, difficulty, source, and weakness preference", async () => {
     const user = userEvent.setup()
     const onStart = vi.fn(async () => undefined)
-    renderReadyView(createPracticeMockResponse("setupReady"), { onStart })
+    renderReadyView(createPracticeScenario("setupReady"), { onStart })
     await screen.findByTestId("practice-setup-state")
 
     await user.click(
@@ -664,7 +634,7 @@ describe("PracticeView", () => {
 
   it("derives technical-question availability from the selected role", async () => {
     const user = userEvent.setup()
-    renderReadyView(createPracticeMockResponse("setupReady"))
+    renderReadyView(createPracticeScenario("setupReady"))
     await screen.findByTestId("practice-setup-state")
 
     expect(
@@ -688,7 +658,7 @@ describe("PracticeView", () => {
           resolveStart = resolve
         }),
     )
-    renderReadyView(createPracticeMockResponse("setupReady"), { onStart })
+    renderReadyView(createPracticeScenario("setupReady"), { onStart })
     await screen.findByTestId("practice-setup-state")
 
     await user.click(
@@ -744,7 +714,7 @@ describe("PracticeView", () => {
   })
 
   it("disables every selection-changing action while external start state is pending", async () => {
-    renderReadyView(createPracticeMockResponse("noEligibleSavedQuestions"), {
+    renderReadyView(createPracticeScenario("noEligibleSavedQuestions"), {
       isStarting: true,
     })
     const setup = await screen.findByTestId("practice-setup-state")
@@ -767,7 +737,7 @@ describe("PracticeView", () => {
     ["noEligibleHistoryQuestions", "history"],
   ] as const)("explains and recovers from %s", async (scenario, source) => {
     const user = userEvent.setup()
-    renderReadyView(createPracticeMockResponse(scenario))
+    renderReadyView(createPracticeScenario(scenario))
 
     const alert = await screen.findByTestId(`practice-no-${source}-questions`)
     expect(alert).toBeInTheDocument()
@@ -785,7 +755,7 @@ describe("PracticeView", () => {
     const onStart = vi.fn(async () => {
       throw new Error("unsafe backend details")
     })
-    renderReadyView(createPracticeMockResponse("setupReady"), { onStart })
+    renderReadyView(createPracticeScenario("setupReady"), { onStart })
     await screen.findByTestId("practice-setup-state")
 
     const pressureButton = screen.getByRole("button", {
@@ -803,7 +773,7 @@ describe("PracticeView", () => {
 
   it("keeps settings visible after generation fails and retries once", async () => {
     const user = userEvent.setup()
-    const data = createPracticeMockResponse("generatingQuestion")
+    const data = createPracticeScenario("generatingQuestion")
     if (data.session.status !== "generatingQuestion") return
     data.session.selection.difficulty = "pressure"
     const onRetryGeneration = vi.fn()
@@ -821,7 +791,7 @@ describe("PracticeView", () => {
   })
 
   it("shows the question card without internal scoring or answer content", async () => {
-    const data = createPracticeMockResponse("answeringQuestion")
+    const data = createPracticeScenario("answeringQuestion")
     renderReadyView(data)
     if (data.session.status !== "answering") return
 
@@ -849,9 +819,9 @@ describe("PracticeView", () => {
   })
 
   it("renders service-provided question data for an unknown template ID", async () => {
-    const data = createPracticeMockResponse("answeringQuestion")
+    const data = createPracticeScenario("answeringQuestion")
     if (data.session.status !== "answering") return
-    data.session.question.templateId = "backend.new-question-template"
+
     data.session.question.prompt = "后端新增模板返回的问题正文"
     data.session.question.assessedCapabilities = ["后端返回的能力"]
     data.session.question.recommendedMaterials = ["后端返回的材料"]
@@ -862,7 +832,6 @@ describe("PracticeView", () => {
         answer: "后端返回的参考答案",
         keyPoints: ["后端返回的要点"],
         commonMistakes: ["后端返回的常见问题"],
-        generatedAt: "2026-07-24T00:00:00.000Z",
       },
       viewedBeforeSubmission: false,
     }
@@ -878,7 +847,7 @@ describe("PracticeView", () => {
   })
 
   it("only gives the answering view fixed actions and responsive bottom clearance", async () => {
-    const { rerenderReady } = renderReadyView(createPracticeMockResponse("answeringQuestion"))
+    const { rerenderReady } = renderReadyView(createPracticeScenario("answeringQuestion"))
 
     const answering = await screen.findByTestId("practice-answering-state")
     expect(answering).toHaveClass("pb-56", "min-[360px]:pb-40", "sm:pb-28")
@@ -889,7 +858,7 @@ describe("PracticeView", () => {
       "reviewBalanced",
       "completedSession",
     ] as const) {
-      rerenderReady(createPracticeMockResponse(scenario))
+      rerenderReady(createPracticeScenario(scenario))
       await waitFor(() => {
         expect(screen.queryByTestId("practice-question-actions-bar")).not.toBeInTheDocument()
       })
@@ -897,7 +866,7 @@ describe("PracticeView", () => {
   })
 
   it("keeps an empty answer from being submitted", async () => {
-    const { actions } = renderReadyView(createPracticeMockResponse("answeringQuestion"))
+    const { actions } = renderReadyView(createPracticeScenario("answeringQuestion"))
 
     expect(
       await screen.findByRole("button", { name: i18n.t("practice.answer.submit") }),
@@ -907,7 +876,7 @@ describe("PracticeView", () => {
 
   it("submits the main answer with the current session contract", async () => {
     const user = userEvent.setup()
-    const data = createPracticeMockResponse("answeringQuestion")
+    const data = createPracticeScenario("answeringQuestion")
     const { actions } = renderReadyView(data)
     if (data.session.status !== "answering") return
 
@@ -917,12 +886,9 @@ describe("PracticeView", () => {
     )
     await user.click(screen.getByRole("button", { name: i18n.t("practice.answer.submit") }))
 
-    expect(actions.onSubmitAnswer).toHaveBeenCalledWith({
-      sessionId: data.session.sessionId,
-      version: data.session.version,
-      questionId: data.session.question.id,
-      content: "我先定位性能瓶颈，再推动团队按阶段上线优化。",
-    })
+    expect(actions.onSubmitAnswer).toHaveBeenCalledWith(
+      "我先定位性能瓶颈，再推动团队按阶段上线优化。",
+    )
   })
 
   it("preserves the answer draft after a safe submission error", async () => {
@@ -933,7 +899,7 @@ describe("PracticeView", () => {
         throw new Error("unsafe submission detail")
       }),
     })
-    renderReadyView(createPracticeMockResponse("answeringQuestion"), { answeringActions: actions })
+    renderReadyView(createPracticeScenario("answeringQuestion"), { answeringActions: actions })
 
     const textarea = await screen.findByLabelText(i18n.t("practice.answer.label"))
     await user.type(textarea, answer)
@@ -948,14 +914,9 @@ describe("PracticeView", () => {
 
   it("requests hint and answer framework separately", async () => {
     const user = userEvent.setup()
-    const data = createPracticeMockResponse("answeringQuestion")
+    const data = createPracticeScenario("answeringQuestion")
     const { actions } = renderReadyView(data)
     if (data.session.status !== "answering") return
-    const expectedInput = {
-      sessionId: data.session.sessionId,
-      version: data.session.version,
-      questionId: data.session.question.id,
-    }
 
     await user.click(
       await screen.findByRole("button", { name: i18n.t("practice.guidance.requestHint") }),
@@ -964,8 +925,8 @@ describe("PracticeView", () => {
       screen.getByRole("button", { name: i18n.t("practice.guidance.requestFramework") }),
     )
 
-    expect(actions.onRequestHint).toHaveBeenCalledWith(expectedInput)
-    expect(actions.onRequestFramework).toHaveBeenCalledWith(expectedInput)
+    expect(actions.onRequestHint).toHaveBeenCalledWith()
+    expect(actions.onRequestFramework).toHaveBeenCalledWith()
   })
 
   it("keeps ignored guidance requests available without showing errors", async () => {
@@ -978,7 +939,7 @@ describe("PracticeView", () => {
       .fn<PracticeAnsweringActions["onRequestFramework"]>()
       .mockResolvedValueOnce("ignored")
       .mockResolvedValueOnce("executed")
-    renderReadyView(createPracticeMockResponse("answeringQuestion"), {
+    renderReadyView(createPracticeScenario("answeringQuestion"), {
       answeringActions: createAnsweringActions({
         onRequestFramework: requestFramework,
         onRequestHint: requestHint,
@@ -1013,7 +974,7 @@ describe("PracticeView", () => {
       .fn<PracticeAnsweringActions["onRequestFramework"]>()
       .mockRejectedValueOnce(new Error("unsafe framework details"))
       .mockResolvedValueOnce("executed")
-    renderReadyView(createPracticeMockResponse("answeringQuestion"), {
+    renderReadyView(createPracticeScenario("answeringQuestion"), {
       answeringActions: createAnsweringActions({
         onRequestFramework: requestFramework,
         onRequestHint: requestHint,
@@ -1044,7 +1005,7 @@ describe("PracticeView", () => {
 
   it("requests saved and weak state changes without optimistic UI", async () => {
     const user = userEvent.setup()
-    const data = createPracticeMockResponse("answeringQuestion")
+    const data = createPracticeScenario("answeringQuestion")
     const { actions } = renderReadyView(data)
     if (data.session.status !== "answering") return
 
@@ -1057,18 +1018,8 @@ describe("PracticeView", () => {
     await user.click(saveButton)
     await user.click(weakButton)
 
-    expect(actions.onSetSaved).toHaveBeenCalledWith({
-      sessionId: data.session.sessionId,
-      version: data.session.version,
-      questionId: data.session.question.id,
-      isSaved: true,
-    })
-    expect(actions.onSetWeak).toHaveBeenCalledWith({
-      sessionId: data.session.sessionId,
-      version: data.session.version,
-      questionId: data.session.question.id,
-      isMarkedWeak: true,
-    })
+    expect(actions.onSetSaved).toHaveBeenCalledWith(true)
+    expect(actions.onSetWeak).toHaveBeenCalledWith(true)
     expect(saveButton).toHaveAttribute("aria-pressed", "false")
     expect(weakButton).toHaveAttribute("aria-pressed", "false")
   })
@@ -1083,7 +1034,7 @@ describe("PracticeView", () => {
         throw new Error("unsafe weak details")
       }),
     })
-    renderReadyView(createPracticeMockResponse("answeringQuestion"), { answeringActions: actions })
+    renderReadyView(createPracticeScenario("answeringQuestion"), { answeringActions: actions })
 
     const saveButton = await screen.findByRole("button", {
       name: i18n.t("practice.questionActions.save"),
@@ -1103,7 +1054,7 @@ describe("PracticeView", () => {
 
   it("requires confirmation before skipping the current question", async () => {
     const user = userEvent.setup()
-    const { actions } = renderReadyView(createPracticeMockResponse("answeringQuestion"))
+    const { actions } = renderReadyView(createPracticeScenario("answeringQuestion"))
 
     await user.click(
       await screen.findByRole("button", { name: i18n.t("practice.questionActions.skip") }),
@@ -1118,7 +1069,7 @@ describe("PracticeView", () => {
 
   it("requires confirmation before ending the practice session", async () => {
     const user = userEvent.setup()
-    const { actions } = renderReadyView(createPracticeMockResponse("answeringQuestion"))
+    const { actions } = renderReadyView(createPracticeScenario("answeringQuestion"))
 
     await user.click(
       await screen.findByRole("button", { name: i18n.t("practice.questionActions.end") }),
@@ -1133,7 +1084,7 @@ describe("PracticeView", () => {
 
   it("blocks route changes while an unsubmitted draft exists", async () => {
     const user = userEvent.setup()
-    const { router } = renderReadyView(createPracticeMockResponse("answeringQuestion"))
+    const { router } = renderReadyView(createPracticeScenario("answeringQuestion"))
 
     await user.type(await screen.findByLabelText(i18n.t("practice.answer.label")), "尚未提交的回答")
     act(() => {
@@ -1146,7 +1097,7 @@ describe("PracticeView", () => {
   })
 
   it("renders the complete follow-up timeline in conversation order", async () => {
-    const data = createPracticeMockResponse("answeringFollowUp")
+    const data = createPracticeScenario("answeringFollowUp")
     renderReadyView(data)
     if (data.session.status !== "answeringFollowUp") return
 
@@ -1155,9 +1106,9 @@ describe("PracticeView", () => {
     const orderedText = [
       data.session.question.prompt,
       data.session.mainAnswer.content,
-      data.session.followUpExchanges[0]?.question.prompt ?? "",
-      data.session.followUpExchanges[0]?.answer.content ?? "",
-      data.session.currentFollowUp.question.prompt,
+      data.session.followUps[0]?.question.prompt ?? "",
+      data.session.followUps[0]?.answer.content ?? "",
+      data.session.currentFollowUp.prompt,
     ]
     let previousIndex = -1
     for (const text of orderedText) {
@@ -1167,7 +1118,7 @@ describe("PracticeView", () => {
     }
     expect(
       within(timeline)
-        .getByText(data.session.currentFollowUp.question.prompt)
+        .getByText(data.session.currentFollowUp.prompt)
         .closest("[aria-current='step']"),
     ).toBeInTheDocument()
     const composer = screen.getByTestId("practice-follow-up-composer")
@@ -1182,10 +1133,10 @@ describe("PracticeView", () => {
   })
 
   it("renders a service-provided follow-up with an unknown template ID", async () => {
-    const data = createPracticeMockResponse("answeringFirstFollowUp")
+    const data = createPracticeScenario("answeringFirstFollowUp")
     if (data.session.status !== "answeringFollowUp") return
-    data.session.currentFollowUp.question.templateId = "backend.new-follow-up-template"
-    data.session.currentFollowUp.question.prompt = "后端新增追问模板返回的正文"
+
+    data.session.currentFollowUp.prompt = "后端新增追问模板返回的正文"
 
     renderReadyView(data)
 
@@ -1193,9 +1144,9 @@ describe("PracticeView", () => {
     expect(screen.queryByText("backend.new-follow-up-template")).not.toBeInTheDocument()
   })
 
-  it("submits the current follow-up with its exact version and question IDs", async () => {
+  it("submits the current follow-up with its exact answer content", async () => {
     const user = userEvent.setup()
-    const data = createPracticeMockResponse("answeringSingleFollowUp")
+    const data = createPracticeScenario("answeringSingleFollowUp")
     const actions = createFollowUpActions()
     renderReadyView(data, { followUpActions: actions })
     if (data.session.status !== "answeringFollowUp") return
@@ -1206,17 +1157,13 @@ describe("PracticeView", () => {
     )
     await user.click(screen.getByRole("button", { name: i18n.t("practice.followUp.submit") }))
 
-    expect(actions.onSubmitFollowUp).toHaveBeenCalledWith({
-      sessionId: data.session.sessionId,
-      version: data.session.version,
-      questionId: data.session.question.id,
-      followUpQuestionId: data.session.currentFollowUp.question.id,
-      content: "我会把验证标准前置，并在关键节点主动同步风险。",
-    })
+    expect(actions.onSubmitFollowUp).toHaveBeenCalledWith(
+      "我会把验证标准前置，并在关键节点主动同步风险。",
+    )
   })
 
   it("shows three follow-up assistance entries without preloading hidden content", async () => {
-    const data = createPracticeMockResponse("answeringSingleFollowUp")
+    const data = createPracticeScenario("answeringSingleFollowUp")
     renderReadyView(data)
     if (data.session.status !== "answeringFollowUp") return
 
@@ -1246,17 +1193,17 @@ describe("PracticeView", () => {
   })
 
   it("reveals each follow-up aid in its own card and removes its request button", async () => {
-    const data = createPracticeMockResponse("answeringSingleFollowUp")
+    const data = createPracticeScenario("answeringSingleFollowUp")
     if (data.session.status !== "answeringFollowUp") return
-    data.session.currentFollowUp.question.answerHints = {
+    data.session.currentFollowUp.hints = {
       status: "revealed",
       content: ["追问提示内容"],
     }
-    data.session.currentFollowUp.question.answerFramework = {
+    data.session.currentFollowUp.framework = {
       status: "revealed",
       content: ["回答思路内容"],
     }
-    data.session.currentFollowUp.question.referenceAnswer = {
+    data.session.currentFollowUp.referenceAnswer = {
       status: "revealed",
       content: {
         kind: "personalizedSupplement",
@@ -1264,7 +1211,6 @@ describe("PracticeView", () => {
         answer: "参考补充内容",
         keyPoints: ["参考关键点"],
         commonMistakes: ["参考常见误区"],
-        generatedAt: "2026-07-23T12:00:00.000Z",
       },
       viewedBeforeSubmission: true,
     }
@@ -1294,18 +1240,12 @@ describe("PracticeView", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("requests follow-up hint and framework with the exact versioned input", async () => {
+  it("requests follow-up hint and framework with the exact input", async () => {
     const user = userEvent.setup()
-    const data = createPracticeMockResponse("answeringSingleFollowUp")
+    const data = createPracticeScenario("answeringSingleFollowUp")
     const actions = createFollowUpActions()
     renderReadyView(data, { followUpActions: actions })
     if (data.session.status !== "answeringFollowUp") return
-    const input = {
-      sessionId: data.session.sessionId,
-      version: data.session.version,
-      questionId: data.session.question.id,
-      followUpQuestionId: data.session.currentFollowUp.question.id,
-    }
 
     await user.click(
       await screen.findByRole("button", {
@@ -1317,13 +1257,13 @@ describe("PracticeView", () => {
         name: i18n.t("practice.followUpAssistance.viewFramework"),
       }),
     )
-    expect(actions.onRequestHint).toHaveBeenCalledWith(input)
-    expect(actions.onRequestFramework).toHaveBeenCalledWith(input)
+    expect(actions.onRequestHint).toHaveBeenCalledWith()
+    expect(actions.onRequestFramework).toHaveBeenCalledWith()
   })
 
   it("requests a follow-up reference only after confirmation and preserves the draft", async () => {
     const user = userEvent.setup()
-    const data = createPracticeMockResponse("answeringSingleFollowUp")
+    const data = createPracticeScenario("answeringSingleFollowUp")
     const actions = createFollowUpActions()
     renderReadyView(data, { followUpActions: actions })
     if (data.session.status !== "answeringFollowUp") return
@@ -1355,12 +1295,7 @@ describe("PracticeView", () => {
       }),
     )
     expect(actions.onRequestReferenceAnswer).toHaveBeenCalledTimes(1)
-    expect(actions.onRequestReferenceAnswer).toHaveBeenCalledWith({
-      sessionId: data.session.sessionId,
-      version: data.session.version,
-      questionId: data.session.question.id,
-      followUpQuestionId: data.session.currentFollowUp.question.id,
-    })
+    expect(actions.onRequestReferenceAnswer).toHaveBeenCalledWith()
     expect(textbox).toHaveValue("先保留这段追问草稿")
   })
 
@@ -1368,7 +1303,7 @@ describe("PracticeView", () => {
     const user = userEvent.setup()
     let resolveRequest!: (result: "executed") => void
     const request = vi.fn(() => new Promise<"executed">((resolve) => (resolveRequest = resolve)))
-    renderReadyView(createPracticeMockResponse("answeringSingleFollowUp"), {
+    renderReadyView(createPracticeScenario("answeringSingleFollowUp"), {
       followUpActions: createFollowUpActions({ onRequestReferenceAnswer: request }),
     })
     await user.click(
@@ -1385,8 +1320,8 @@ describe("PracticeView", () => {
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument())
   })
 
-  it("locks every versioned follow-up action during assistance while keeping the draft editable", async () => {
-    renderReadyView(createPracticeMockResponse("answeringSingleFollowUp"), {
+  it("locks every follow-up action during assistance while keeping the draft editable", async () => {
+    renderReadyView(createPracticeScenario("answeringSingleFollowUp"), {
       followUpPending: {
         end: false,
         framework: false,
@@ -1423,10 +1358,10 @@ describe("PracticeView", () => {
     const user = userEvent.setup()
     const actions = createFollowUpActions({
       onRequestHint: vi.fn(async () => {
-        throw new Error("internal sessionId=secret version=77 stack")
+        throw new Error("internal secret stack")
       }),
     })
-    renderReadyView(createPracticeMockResponse("answeringSingleFollowUp"), {
+    renderReadyView(createPracticeScenario("answeringSingleFollowUp"), {
       followUpActions: actions,
     })
     const textbox = await screen.findByLabelText(i18n.t("practice.followUp.answerLabel"))
@@ -1438,31 +1373,28 @@ describe("PracticeView", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       i18n.t("practice.followUpAssistance.requestErrorDescription"),
     )
-    expect(screen.queryByText(/sessionId=secret|stack|version=77/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/secret|stack/)).not.toBeInTheDocument()
     expect(textbox).toHaveValue("错误后保留草稿")
   })
 
   it("resets follow-up assistance errors when the current follow-up changes", async () => {
     const user = userEvent.setup()
-    const first = createPracticeMockResponse("answeringFirstFollowUp")
-    const second = createPracticeMockResponse("answeringFollowUp")
+    const first = createPracticeScenario("answeringFirstFollowUp")
+    const second = createPracticeScenario("answeringFollowUp")
     if (
       first.session.status !== "answeringFollowUp" ||
       second.session.status !== "answeringFollowUp"
     ) {
       throw new Error("Answering follow-up fixtures required.")
     }
-    expect(second.session.sessionId).toBe(first.session.sessionId)
-    expect(second.session.currentFollowUp.question.id).not.toBe(
-      first.session.currentFollowUp.question.id,
-    )
-    expect(second.session.currentFollowUp.question.answerHints.status).toBe("notRequested")
-    expect(second.session.currentFollowUp.question.answerFramework.status).toBe("notRequested")
-    expect(second.session.currentFollowUp.question.referenceAnswer.status).toBe("notRequested")
+
+    expect(second.session.currentFollowUp.hints.status).toBe("notRequested")
+    expect(second.session.currentFollowUp.framework.status).toBe("notRequested")
+    expect(second.session.currentFollowUp.referenceAnswer.status).toBe("notRequested")
 
     const actions = createFollowUpActions({
       onRequestHint: vi.fn(async () => {
-        throw new Error("internal sessionId=secret version=77 stack")
+        throw new Error("internal secret stack")
       }),
     })
     const { rerenderReady } = renderReadyView(first, { followUpActions: actions })
@@ -1475,7 +1407,7 @@ describe("PracticeView", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       i18n.t("practice.followUpAssistance.requestErrorDescription"),
     )
-    expect(screen.queryByText(/sessionId=secret|stack|version=77/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/secret|stack/)).not.toBeInTheDocument()
 
     rerenderReady(second)
 
@@ -1501,8 +1433,8 @@ describe("PracticeView", () => {
 
   it("resets the reference confirmation dialog when the current follow-up changes", async () => {
     const user = userEvent.setup()
-    const first = createPracticeMockResponse("answeringFirstFollowUp")
-    const second = createPracticeMockResponse("answeringFollowUp")
+    const first = createPracticeScenario("answeringFirstFollowUp")
+    const second = createPracticeScenario("answeringFollowUp")
     if (
       first.session.status !== "answeringFollowUp" ||
       second.session.status !== "answeringFollowUp"
@@ -1539,7 +1471,7 @@ describe("PracticeView", () => {
         throw new Error("unsafe details")
       }),
     })
-    renderReadyView(createPracticeMockResponse("answeringSingleFollowUp"), {
+    renderReadyView(createPracticeScenario("answeringSingleFollowUp"), {
       followUpActions: actions,
     })
     const textbox = await screen.findByLabelText(i18n.t("practice.followUp.answerLabel"))
@@ -1554,7 +1486,7 @@ describe("PracticeView", () => {
   })
 
   it("shows real processing state while waiting for the next follow-up", async () => {
-    renderReadyView(createPracticeMockResponse("answeringSingleFollowUp"), {
+    renderReadyView(createPracticeScenario("answeringSingleFollowUp"), {
       followUpPending: {
         end: false,
         framework: false,
@@ -1574,7 +1506,7 @@ describe("PracticeView", () => {
 
   it("requires an explicit confirmation before ending an unanswered follow-up", async () => {
     const user = userEvent.setup()
-    const data = createPracticeMockResponse("answeringSingleFollowUp")
+    const data = createPracticeScenario("answeringSingleFollowUp")
     const actions = createFollowUpActions()
     renderReadyView(data, { followUpActions: actions })
     if (data.session.status !== "answeringFollowUp") return
@@ -1589,16 +1521,11 @@ describe("PracticeView", () => {
       }),
     )
 
-    expect(actions.onEndFollowUps).toHaveBeenCalledWith({
-      sessionId: data.session.sessionId,
-      version: data.session.version,
-      questionId: data.session.question.id,
-      followUpQuestionId: data.session.currentFollowUp.question.id,
-    })
+    expect(actions.onEndFollowUps).toHaveBeenCalledWith()
   })
 
   it("keeps the completed timeline visible while scoring is pending", async () => {
-    const data = createPracticeMockResponse("evaluatingNoFollowUp")
+    const data = createPracticeScenario("evaluatingNoFollowUp")
     renderReadyView(data)
     if (data.session.status !== "evaluating") return
 
@@ -1612,7 +1539,7 @@ describe("PracticeView", () => {
   })
 
   it("shows the unanswered follow-up in order after follow-ups end early", async () => {
-    const data = createPracticeMockResponse("evaluatingFollowUpEndedEarly")
+    const data = createPracticeScenario("evaluatingFollowUpEndedEarly")
     renderReadyView(data)
     if (
       data.session.status !== "evaluating" ||
@@ -1622,9 +1549,9 @@ describe("PracticeView", () => {
     }
 
     const timeline = await screen.findByTestId("practice-conversation-timeline")
-    const answered = data.session.followUpExchanges[0]
+    const answered = data.session.followUps[0]
     if (!answered) throw new Error("The ended-early fixture must contain an answered follow-up.")
-    const unanswered = data.session.followUpCompletion.unansweredQuestion
+    const unanswered = data.session.followUpCompletion.unanswered
     const orderedText = [
       data.session.question.prompt,
       data.session.mainAnswer.content,
@@ -1641,17 +1568,17 @@ describe("PracticeView", () => {
     }
 
     expect(timeline).toHaveTextContent(
-      i18n.t("practice.followUp.unansweredFollowUp", { count: unanswered.order }),
+      i18n.t("practice.followUp.unansweredFollowUp", { count: data.session.followUps.length + 1 }),
     )
     expect(timeline).not.toHaveTextContent(
-      i18n.t("practice.followUp.yourFollowUpAnswer", { count: unanswered.order }),
+      i18n.t("practice.followUp.yourFollowUpAnswer", { count: data.session.followUps.length + 1 }),
     )
     expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
   })
 
   it("shows a safe evaluation error and retries without losing the conversation", async () => {
     const user = userEvent.setup()
-    const data = createPracticeMockResponse("evaluatingAnswer")
+    const data = createPracticeScenario("evaluatingAnswer")
     const onRetryEvaluation = vi.fn()
     renderReadyView(data, { evaluationError: true, onRetryEvaluation })
     if (data.session.status !== "evaluating") return
@@ -1667,7 +1594,7 @@ describe("PracticeView", () => {
   })
 
   it("renders all eight score dimensions with response explanations", async () => {
-    const data = createPracticeMockResponse("reviewBalanced")
+    const data = createPracticeScenario("reviewBalanced")
     renderReadyView(data)
     if (data.session.status !== "review") return
 
@@ -1682,7 +1609,7 @@ describe("PracticeView", () => {
   })
 
   it("keeps highlights, issues, improvements, structure, and weaknesses in distinct sections", async () => {
-    const data = createPracticeMockResponse("reviewRetryRecommended")
+    const data = createPracticeScenario("reviewRetryRecommended")
     renderReadyView(data)
     if (data.session.status !== "review") return
 
@@ -1698,7 +1625,7 @@ describe("PracticeView", () => {
   })
 
   it("shows retry and next-question recommendations directly from the response", async () => {
-    const retry = createPracticeMockResponse("reviewRetryRecommended")
+    const retry = createPracticeScenario("reviewRetryRecommended")
     const { unmount } = renderReadyView(retry)
     if (retry.session.status !== "review") return
     expect(await screen.findByTestId("practice-recommendation")).toHaveTextContent(
@@ -1709,7 +1636,7 @@ describe("PracticeView", () => {
     )
     unmount()
 
-    const next = createPracticeMockResponse("reviewNextRecommended")
+    const next = createPracticeScenario("reviewNextRecommended")
     renderReadyView(next)
     if (
       next.session.status !== "review" ||
@@ -1726,7 +1653,7 @@ describe("PracticeView", () => {
   })
 
   it("exposes implemented review lifecycle actions alongside saved and weak actions", async () => {
-    const data = createPracticeMockResponse("reviewBalanced")
+    const data = createPracticeScenario("reviewBalanced")
     renderReadyView(data)
 
     await screen.findByTestId("practice-review-state")
@@ -1744,7 +1671,7 @@ describe("PracticeView", () => {
   })
 
   it("keeps the complete read-only conversation in the review context", async () => {
-    const data = createPracticeMockResponse("reviewFollowUpEndedEarly")
+    const data = createPracticeScenario("reviewFollowUpEndedEarly")
     renderReadyView(data)
     if (
       data.session.status !== "review" ||
@@ -1756,11 +1683,11 @@ describe("PracticeView", () => {
     const timeline = await screen.findByTestId("practice-conversation-timeline")
     expect(timeline).toHaveTextContent(data.session.question.prompt)
     expect(timeline).toHaveTextContent(data.session.mainAnswer.content)
-    for (const exchange of data.session.followUpExchanges) {
+    for (const exchange of data.session.followUps) {
       expect(timeline).toHaveTextContent(exchange.question.prompt)
       expect(timeline).toHaveTextContent(exchange.answer.content)
     }
-    expect(timeline).toHaveTextContent(data.session.followUpCompletion.unansweredQuestion.prompt)
+    expect(timeline).toHaveTextContent(data.session.followUpCompletion.unanswered.prompt)
     expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
     const review = screen.getByTestId("practice-follow-up-review")
     expect(review).toHaveTextContent(i18n.t("practice.followUpAssistance.unanswered"))
@@ -1769,14 +1696,14 @@ describe("PracticeView", () => {
     })
     await userEvent.click(expandButtons.at(-1)!)
     expect(review).toHaveTextContent(
-      data.session.followUpCompletion.unansweredQuestion.referenceAnswer.status === "revealed"
-        ? data.session.followUpCompletion.unansweredQuestion.referenceAnswer.content.addressedGap
+      data.session.followUpCompletion.unanswered.referenceAnswer.status === "revealed"
+        ? data.session.followUpCompletion.unanswered.referenceAnswer.content.addressedGap
         : "",
     )
   })
 
   it("renders long review content and the no-new-weaknesses state", async () => {
-    const long = createPracticeMockResponse("reviewLongContent")
+    const long = createPracticeScenario("reviewLongContent")
     const { unmount } = renderReadyView(long)
     if (long.session.status !== "review") return
     expect(await screen.findByTestId("practice-review-state")).toHaveTextContent(
@@ -1784,7 +1711,7 @@ describe("PracticeView", () => {
     )
     unmount()
 
-    renderReadyView(createPracticeMockResponse("reviewNoNewWeaknesses"))
+    renderReadyView(createPracticeScenario("reviewNoNewWeaknesses"))
     expect(await screen.findByText(i18n.t("practice.review.noNewWeaknesses"))).toBeVisible()
   })
 })

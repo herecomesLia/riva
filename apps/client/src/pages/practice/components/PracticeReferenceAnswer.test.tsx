@@ -1,9 +1,10 @@
+import { practiceFixture } from "@/mocks/fixtures/practice"
 import { fireEvent, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
-import { createPracticeMockResponse, createPracticeReferenceAnswer } from "@/mocks/data/practice"
+import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
 import { renderWithProviders } from "@/test/render"
 
 import { PracticeReferenceAnswer } from "./PracticeReferenceAnswer"
@@ -73,9 +74,9 @@ describe("PracticeReferenceAnswer", () => {
   })
 
   it("renders an archived attempt directly in readonly mode", async () => {
-    const response = createPracticeMockResponse("completedSession")
-    if (response.session.status !== "completed") throw new Error("Completed fixture required.")
-    const archivedState = response.session.attemptRecords[0]?.question.referenceAnswer
+    const response = createPracticeScenario("reviewBalanced")
+    if (response.session.status !== "review") throw new Error("Completed fixture required.")
+    const archivedState = response.session.question.referenceAnswer
     if (!archivedState) throw new Error("Archived reference answer required.")
     const user = userEvent.setup()
     renderWithProviders(<PracticeReferenceAnswer mode="readonly" state={archivedState} />, {
@@ -110,20 +111,12 @@ describe("PracticeReferenceAnswer", () => {
   })
 
   it("shows technical content and safe request errors", async () => {
-    const technicalResponse = createPracticeMockResponse("answeringQuestion")
+    const technicalResponse = createPracticeScenario("answeringQuestion")
     if (technicalResponse.session.status !== "answering") throw new Error("Question required.")
-    const technicalQuestion = {
-      ...technicalResponse.session.question,
-      templateId: "technicalFoundation.reactRepeatedRendering" as const,
-      questionType: "technicalFoundation" as const,
+    const technical = {
+      ...structuredClone(practiceFixture.questionHelp.reference),
+      kind: "technicalReference" as const,
     }
-    const technical = createPracticeReferenceAnswer({
-      templateId: technicalQuestion.templateId,
-      questionType: technicalQuestion.questionType,
-      targetRoleTitle: "Senior Frontend Engineer",
-      questionPrompt: technicalQuestion.prompt,
-      recommendedMaterials: technicalQuestion.recommendedMaterials,
-    })
     const { rerender } = renderWithProviders(
       <PracticeReferenceAnswer
         mode="review"

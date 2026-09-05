@@ -17,12 +17,12 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
-import type { PracticeFollowUpQuestion, PracticeGuidance } from "@/models/practice"
+import type { PracticeFollowUp, Guidance } from "@/models/practice-workflow"
 
 import type { PracticeInteractionResult } from "../practice-interaction"
 
 type Props = {
-  question: PracticeFollowUpQuestion
+  question: PracticeFollowUp
   pending: { hint: boolean; framework: boolean; referenceAnswer: boolean }
   interactionLocked: boolean
   onRequestHint: () => Promise<PracticeInteractionResult>
@@ -87,7 +87,7 @@ export function PracticeFollowUpAssistance({
           onRequest={() => void request("hint", onRequestHint)}
           pendingLabel={t("practice.followUpAssistance.hintGenerating")}
           requestLabel={t("practice.followUpAssistance.viewHint")}
-          state={question.answerHints}
+          state={question.hints}
           title={t("practice.followUpAssistance.hintTitle")}
         />
         <FollowUpGuidanceCard
@@ -100,7 +100,7 @@ export function PracticeFollowUpAssistance({
           onRequest={() => void request("framework", onRequestFramework)}
           pendingLabel={t("practice.followUpAssistance.frameworkGenerating")}
           requestLabel={t("practice.followUpAssistance.viewFramework")}
-          state={question.answerFramework}
+          state={question.framework}
           title={t("practice.followUpAssistance.frameworkTitle")}
         />
       </div>
@@ -223,7 +223,7 @@ function FollowUpGuidanceCard({
   onRequest: () => void
   pendingLabel: string
   requestLabel: string
-  state: PracticeGuidance<string[]>
+  state: Guidance<string[]>
   title: string
 }) {
   const { t } = useTranslation()

@@ -1,15 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
-
-import { trainingRecordQueryKeys } from "@/app/training-record-query"
-import { dashboardQueryKeys } from "@/app/dashboard-query"
 import { toPracticeEntryParameters, type PracticeEntrySearch } from "@/app/training-entry-search"
-import type {
-  PracticeMutationResponse,
-  PracticePageResponse,
-  PrepareNextPracticeSessionInput,
-  StartPracticeSessionInput,
-} from "@/models/practice"
+import type { ActiveSelection, PracticeData, PracticeSession } from "@/models/practice-workflow"
 import type { PracticeTrainingEntryResolution } from "@/models/training-entry"
 import {
   getPracticePage,
@@ -17,12 +9,6 @@ import {
   preparePracticeTrainingEntry,
   startPracticeSession,
 } from "@/services/practice"
-
-import {
-  type PracticeMutationInputFor,
-  type PracticeMutationKind,
-  synchronizePracticeMutationResponse,
-} from "../practice-cache"
 
 export const PRACTICE_QUERY_KEY = ["practice"] as const
 
@@ -41,26 +27,8 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
     queryKey: PRACTICE_QUERY_KEY,
     retry: false,
   })
-  const startMutation = useMutation({
-    mutationFn: startPracticeSession,
-    onSuccess: (response, input) =>
-      queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
-        synchronizePracticeMutationResponse(current, response, {
-          kind: "startSession",
-          input,
-        }),
-      ),
-  })
-  const prepareNextRoundMutation = useMutation({
-    mutationFn: prepareNextPracticeSession,
-    onSuccess: (response, input) =>
-      queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
-        synchronizePracticeMutationResponse(current, response, {
-          kind: "prepareNextSession",
-          input,
-        }),
-      ),
-  })
+  const startMutation = usePracticeMutation(startPracticeSession)
+  const prepareNextRoundMutation = usePracticeMutation(prepareNextPracticeSession)
   const prepareEntryMutation = useMutation({ mutationFn: preparePracticeTrainingEntry })
 
   useEffect(() => {
@@ -91,7 +59,7 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
     queryClient,
   ])
 
-  async function start(input: StartPracticeSessionInput) {
+  async function start(input: ActiveSelection) {
     await startMutation.mutateAsync(input)
   }
 
@@ -105,13 +73,9 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
       return "ignored" as const
     }
 
-    const input: PrepareNextPracticeSessionInput = {
-      sessionId: session.sessionId,
-      version: session.version,
-    }
     prepareNextRoundLock.current = true
     try {
-      await prepareNextRoundMutation.mutateAsync(input)
+      await prepareNextRoundMutation.mutateAsync()
       return "executed" as const
     } finally {
       prepareNextRoundLock.current = false
@@ -141,22 +105,16 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
   }
 }
 
-export function usePracticeMutation<
-  TKind extends PracticeMutationKind,
-  TInput extends PracticeMutationInputFor<TKind>,
->(kind: TKind, mutationFn: (input: TInput) => Promise<PracticeMutationResponse>) {
+export function usePracticeMutation<TInput = void>(
+  mutationFn: (input: TInput) => Promise<PracticeSession>,
+) {
   const queryClient = useQueryClient()
-
   return useMutation({
-    mutationFn,
-    onSuccess: (response, input) => {
-      queryClient.setQueryData<PracticePageResponse | undefined>(PRACTICE_QUERY_KEY, (current) =>
-        synchronizePracticeMutationResponse(current, response, { kind, input }),
+    mutationFn: (input: TInput) => mutationFn(input),
+    onSuccess: (response) => {
+      queryClient.setQueryData<PracticeData>(PRACTICE_QUERY_KEY, (current) =>
+        current ? { ...current, session: response } : current,
       )
-      if (response.session.status === "completed") {
-        void queryClient.invalidateQueries({ queryKey: trainingRecordQueryKeys.all })
-        void queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.all })
-      }
     },
   })
 }

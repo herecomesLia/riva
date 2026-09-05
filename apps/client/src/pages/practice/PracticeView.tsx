@@ -26,31 +26,15 @@ import {
 } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
 import type {
-  ActivePracticeSelection,
-  EndPracticeFollowUpsInput,
-  PracticeAnsweringFollowUpState,
-  PracticeAnsweringState,
-  PracticeEvaluatingState,
-  PracticePageResponse,
-  PracticeReviewState,
-  PracticeCompletedState,
-  RetryCurrentPracticeQuestionInput,
-  ContinueToNextPracticeQuestionInput,
-  EndPracticeSessionInput,
-  RequestAnswerFrameworkInput,
-  RequestEndPracticeSessionInput,
-  RequestPracticeHintInput,
-  RequestPracticeReferenceAnswerInput,
-  RequestPracticeFollowUpFrameworkInput,
-  RequestPracticeFollowUpHintInput,
-  RequestPracticeFollowUpReferenceAnswerInput,
-  SetPracticeQuestionSavedInput,
-  SetPracticeQuestionWeakInput,
-  SkipPracticeQuestionInput,
-  PracticeSetupSelection,
-  SubmitFollowUpAnswerInput,
-  SubmitPrimaryAnswerInput,
-} from "@/models/practice"
+  ActiveSelection,
+  AnsweringFollowUpSession,
+  AnsweringSession,
+  EvaluatingSession,
+  PracticeData,
+  ReviewSession,
+  CompletedSession,
+  PracticeSelection,
+} from "@/models/practice-workflow"
 import type { PracticeTrainingEntryResolution } from "@/models/training-entry"
 
 import {
@@ -81,32 +65,25 @@ import {
 import { PracticeRecommendationCard } from "./components/PracticeRecommendationCard"
 import { PracticeReviewActions } from "./components/PracticeReviewActions"
 import { PracticeReferenceAnswer } from "./components/PracticeReferenceAnswer"
-import { isCurrentPracticeAttemptRetry } from "./practice-attempt"
 import type { PracticeInteractionResult } from "./practice-interaction"
 
 export type PracticeAnsweringActions = {
-  onEnd: (input: RequestEndPracticeSessionInput) => Promise<PracticeInteractionResult>
-  onRequestFramework: (input: RequestAnswerFrameworkInput) => Promise<PracticeInteractionResult>
-  onRequestHint: (input: RequestPracticeHintInput) => Promise<PracticeInteractionResult>
-  onRequestReferenceAnswer: (
-    input: RequestPracticeReferenceAnswerInput,
-  ) => Promise<PracticeInteractionResult>
-  onSetSaved: (input: SetPracticeQuestionSavedInput) => Promise<PracticeInteractionResult>
-  onSetWeak: (input: SetPracticeQuestionWeakInput) => Promise<PracticeInteractionResult>
-  onSkip: (input: SkipPracticeQuestionInput) => Promise<PracticeInteractionResult>
-  onSubmitAnswer: (input: SubmitPrimaryAnswerInput) => Promise<PracticeInteractionResult>
+  onEnd: () => Promise<PracticeInteractionResult>
+  onRequestFramework: () => Promise<PracticeInteractionResult>
+  onRequestHint: () => Promise<PracticeInteractionResult>
+  onRequestReferenceAnswer: () => Promise<PracticeInteractionResult>
+  onSetSaved: (value: boolean) => Promise<PracticeInteractionResult>
+  onSetWeak: (value: boolean) => Promise<PracticeInteractionResult>
+  onSkip: () => Promise<PracticeInteractionResult>
+  onSubmitAnswer: (content: string) => Promise<PracticeInteractionResult>
 }
 
 export type PracticeFollowUpActions = {
-  onRequestHint: (input: RequestPracticeFollowUpHintInput) => Promise<PracticeInteractionResult>
-  onRequestFramework: (
-    input: RequestPracticeFollowUpFrameworkInput,
-  ) => Promise<PracticeInteractionResult>
-  onRequestReferenceAnswer: (
-    input: RequestPracticeFollowUpReferenceAnswerInput,
-  ) => Promise<PracticeInteractionResult>
-  onEndFollowUps: (input: EndPracticeFollowUpsInput) => Promise<PracticeInteractionResult>
-  onSubmitFollowUp: (input: SubmitFollowUpAnswerInput) => Promise<PracticeInteractionResult>
+  onRequestHint: () => Promise<PracticeInteractionResult>
+  onRequestFramework: () => Promise<PracticeInteractionResult>
+  onRequestReferenceAnswer: () => Promise<PracticeInteractionResult>
+  onEndFollowUps: () => Promise<PracticeInteractionResult>
+  onSubmitFollowUp: (content: string) => Promise<PracticeInteractionResult>
 }
 
 export type PracticeFollowUpPending = {
@@ -131,11 +108,11 @@ export type PracticeAnsweringPending = {
 }
 
 export type PracticeReviewActions = {
-  onEndSession: (input: EndPracticeSessionInput) => Promise<PracticeInteractionResult>
-  onNextQuestion: (input: ContinueToNextPracticeQuestionInput) => Promise<PracticeInteractionResult>
-  onRetryCurrent: (input: RetryCurrentPracticeQuestionInput) => Promise<PracticeInteractionResult>
-  onSetSaved: (input: SetPracticeQuestionSavedInput) => Promise<PracticeInteractionResult>
-  onSetWeak: (input: SetPracticeQuestionWeakInput) => Promise<PracticeInteractionResult>
+  onEndSession: () => Promise<PracticeInteractionResult>
+  onNextQuestion: () => Promise<PracticeInteractionResult>
+  onRetryCurrent: () => Promise<PracticeInteractionResult>
+  onSetSaved: (value: boolean) => Promise<PracticeInteractionResult>
+  onSetWeak: (value: boolean) => Promise<PracticeInteractionResult>
 }
 
 export type PracticeReviewPending = {
@@ -168,7 +145,7 @@ type PracticeViewProps =
     }
   | {
       variant: "default"
-      content: { status: "ready"; data: PracticePageResponse }
+      content: { status: "ready"; data: PracticeData }
       completedActions: PracticeCompletedActions
       completedPending: boolean
       answeringActions: PracticeAnsweringActions
@@ -184,7 +161,7 @@ type PracticeViewProps =
       isStarting: boolean
       onRetryGeneration: () => void
       onRetryEvaluation: () => void
-      onStart: (input: ActivePracticeSelection) => Promise<void>
+      onStart: (input: ActiveSelection) => Promise<void>
       historyEntryResolution?: PracticeTrainingEntryResolution
     }
 
@@ -367,9 +344,9 @@ function PracticeFollowUpView({
   session,
 }: {
   actions: PracticeFollowUpActions
-  context: PracticePageResponse["setupContext"]
+  context: PracticeData["setupContext"]
   pending: PracticeFollowUpPending
-  session: PracticeAnsweringFollowUpState
+  session: AnsweringFollowUpSession
 }) {
   const { t } = useTranslation()
   const [isDraftDirty, setIsDraftDirty] = useState(false)
@@ -379,39 +356,33 @@ function PracticeFollowUpView({
     shouldBlockFn: () => isDraftDirty,
     withResolver: true,
   })
-  const mutationInput = {
-    sessionId: session.sessionId,
-    version: session.version,
-    questionId: session.question.id,
-    followUpQuestionId: session.currentFollowUp.question.id,
-  }
 
   return (
     <div className="flex flex-col gap-5" data-testid="practice-answering-follow-up-state">
       <PracticeSessionHeader context={context} selection={session.selection} />
       <PracticeConversationTimeline
         currentFollowUp={session.currentFollowUp}
-        followUpExchanges={session.followUpExchanges}
+        followUps={session.followUps}
         mainAnswer={session.mainAnswer}
         question={session.question}
       />
       <PracticeFollowUpComposer
-        key={`${session.currentFollowUp.question.id}:composer`}
+        key={`composer:${session.followUps.length}`}
         interactionLocked={pending.interactionLocked}
         isEndPending={pending.end}
         isPending={pending.submit}
         onDraftChange={setIsDraftDirty}
-        onEnd={() => actions.onEndFollowUps(mutationInput)}
-        onSubmit={(content) => actions.onSubmitFollowUp({ ...mutationInput, content })}
+        onEnd={() => actions.onEndFollowUps()}
+        onSubmit={(content) => actions.onSubmitFollowUp(content)}
       />
       <PracticeFollowUpAssistance
-        key={`${session.currentFollowUp.question.id}:assistance`}
+        key={session.followUps.length}
         interactionLocked={pending.interactionLocked}
-        onRequestFramework={() => actions.onRequestFramework(mutationInput)}
-        onRequestHint={() => actions.onRequestHint(mutationInput)}
-        onRequestReferenceAnswer={() => actions.onRequestReferenceAnswer(mutationInput)}
+        onRequestFramework={() => actions.onRequestFramework()}
+        onRequestHint={() => actions.onRequestHint()}
+        onRequestReferenceAnswer={() => actions.onRequestReferenceAnswer()}
         pending={pending}
-        question={session.currentFollowUp.question}
+        question={session.currentFollowUp}
       />
 
       <AlertDialog open={blocker.status === "blocked"}>
@@ -443,18 +414,18 @@ function PracticeEvaluatingView({
   onRetryEvaluation,
   session,
 }: {
-  context: PracticePageResponse["setupContext"]
+  context: PracticeData["setupContext"]
   evaluationError: boolean
   isEvaluationRetrying: boolean
   onRetryEvaluation: () => void
-  session: PracticeEvaluatingState
+  session: EvaluatingSession
 }) {
   return (
     <div className="flex flex-col gap-5" data-testid="practice-evaluating-state">
       <PracticeSessionHeader context={context} selection={session.selection} />
       <PracticeConversationTimeline
         followUpCompletion={session.followUpCompletion}
-        followUpExchanges={session.followUpExchanges}
+        followUps={session.followUps}
         mainAnswer={session.mainAnswer}
         question={session.question}
       />
@@ -474,16 +445,11 @@ function PracticeReviewView({
   session,
 }: {
   actions: PracticeReviewActions
-  context: PracticePageResponse["setupContext"]
+  context: PracticeData["setupContext"]
   pending: PracticeReviewPending
-  session: PracticeReviewState
+  session: ReviewSession
 }) {
   const { t } = useTranslation()
-  const mutationInput = {
-    sessionId: session.sessionId,
-    version: session.version,
-    questionId: session.question.id,
-  }
 
   return (
     <div
@@ -500,13 +466,13 @@ function PracticeReviewView({
       />
       <PracticeConversationTimeline
         followUpCompletion={session.followUpCompletion}
-        followUpExchanges={session.followUpExchanges}
+        followUps={session.followUps}
         mainAnswer={session.mainAnswer}
         question={session.question}
       />
       <PracticeFollowUpReview
         completion={session.followUpCompletion}
-        exchanges={session.followUpExchanges}
+        exchanges={session.followUps}
       />
       <PracticeDimensionScores scores={session.evaluation.dimensionScores} />
       <PracticeReviewSummary review={session.review} />
@@ -516,20 +482,18 @@ function PracticeReviewView({
       <PracticeRecommendationCard recommendation={session.review.recommendation} />
       <PracticeReviewActions
         interactionLocked={pending.interactionLocked}
-        isMarkedWeak={session.question.isMarkedWeak}
+        isWeak={session.question.isWeak}
         isSaved={session.question.isSaved}
         isSavedPending={pending.saved}
         isWeakPending={pending.weak}
         isEndPending={pending.end}
         isNextPending={pending.next}
         isRetryPending={pending.retry}
-        onEndSession={() =>
-          actions.onEndSession({ sessionId: session.sessionId, version: session.version })
-        }
-        onNextQuestion={() => actions.onNextQuestion(mutationInput)}
-        onRetryCurrent={() => actions.onRetryCurrent(mutationInput)}
-        onSetSaved={(isSaved) => actions.onSetSaved({ ...mutationInput, isSaved })}
-        onSetWeak={(isMarkedWeak) => actions.onSetWeak({ ...mutationInput, isMarkedWeak })}
+        onEndSession={() => actions.onEndSession()}
+        onNextQuestion={() => actions.onNextQuestion()}
+        onRetryCurrent={() => actions.onRetryCurrent()}
+        onSetSaved={(isSaved) => actions.onSetSaved(isSaved)}
+        onSetWeak={(isWeak) => actions.onSetWeak(isWeak)}
       />
     </div>
   )
@@ -542,7 +506,7 @@ function PracticeCompletedView({
 }: {
   actions: PracticeCompletedActions
   isPreparingNextRound: boolean
-  session: PracticeCompletedState
+  session: CompletedSession
 }) {
   const { t } = useTranslation()
   const [error, setError] = useState(false)
@@ -567,7 +531,7 @@ function PracticeCompletedView({
         <p>{t("practice.completed.questions", { count: session.questionsCompleted })}</p>
         <p>{t("practice.completed.retries", { count: session.retryCount })}</p>
         <p>{t("practice.completed.saved", { count: session.savedQuestionCount })}</p>
-        <p>{t("practice.completed.markedWeak", { count: session.markedWeakQuestionCount })}</p>
+        <p>{t("practice.completed.markedWeak", { count: session.weakQuestionCount })}</p>
         <p>
           {t("practice.completed.finalAttemptAverage", {
             score: session.finalAttemptAverageScore,
@@ -608,9 +572,9 @@ function PracticeAnsweringView({
   session,
 }: {
   actions: PracticeAnsweringActions
-  context: PracticePageResponse["setupContext"]
+  context: PracticeData["setupContext"]
   pending: PracticeAnsweringPending
-  session: PracticeAnsweringState
+  session: AnsweringSession
 }) {
   const { t } = useTranslation()
   const [isDraftDirty, setIsDraftDirty] = useState(false)
@@ -620,11 +584,6 @@ function PracticeAnsweringView({
     shouldBlockFn: () => isDraftDirty,
     withResolver: true,
   })
-  const mutationInput = {
-    sessionId: session.sessionId,
-    version: session.version,
-    questionId: session.question.id,
-  }
 
   return (
     <>
@@ -638,42 +597,38 @@ function PracticeAnsweringView({
           interactionLocked={pending.interactionLocked}
           isPending={pending.submitAnswer}
           onDraftChange={setIsDraftDirty}
-          onSubmit={(content) => actions.onSubmitAnswer({ ...mutationInput, content })}
+          onSubmit={(content) => actions.onSubmitAnswer(content)}
         />
         <PracticeQuestionGuidance
-          answerFramework={session.question.answerFramework}
-          answerHints={session.question.answerHints}
+          framework={session.question.framework}
+          hints={session.question.hints}
           interactionLocked={pending.interactionLocked}
           isFrameworkPending={pending.framework}
           isHintPending={pending.hint}
-          onRequestFramework={() => actions.onRequestFramework(mutationInput)}
-          onRequestHint={() => actions.onRequestHint(mutationInput)}
+          onRequestFramework={() => actions.onRequestFramework()}
+          onRequestHint={() => actions.onRequestHint()}
         />
         <PracticeReferenceAnswer
-          assistedRetry={
-            isCurrentPracticeAttemptRetry(session) &&
-            session.question.referenceAnswer.status === "revealed" &&
-            session.question.referenceAnswer.viewedBeforeSubmission
-          }
+          assistedRetry={session.assistedRetry}
           interactionLocked={pending.interactionLocked}
           isPending={pending.referenceAnswer}
           mode="answering"
-          onRequest={() => actions.onRequestReferenceAnswer(mutationInput)}
+          onRequest={() => actions.onRequestReferenceAnswer()}
           state={session.question.referenceAnswer}
         />
       </div>
       <PracticeQuestionActions
         interactionLocked={pending.interactionLocked}
         isEndPending={pending.end}
-        isMarkedWeak={session.question.isMarkedWeak}
+        isWeak={session.question.isWeak}
         isSaved={session.question.isSaved}
         isSavedPending={pending.saved}
         isSkipPending={pending.skip}
         isWeakPending={pending.weak}
-        onEnd={() => actions.onEnd(mutationInput)}
-        onSetSaved={(isSaved) => actions.onSetSaved({ ...mutationInput, isSaved })}
-        onSetWeak={(isMarkedWeak) => actions.onSetWeak({ ...mutationInput, isMarkedWeak })}
-        onSkip={() => actions.onSkip(mutationInput)}
+        onEnd={() => actions.onEnd()}
+        onSetSaved={(isSaved) => actions.onSetSaved(isSaved)}
+        onSetWeak={(isWeak) => actions.onSetWeak(isWeak)}
+        onSkip={() => actions.onSkip()}
       />
 
       <AlertDialog open={blocker.status === "blocked"}>
@@ -697,9 +652,9 @@ function PracticeAnsweringView({
 }
 
 function resolveActiveSelection(
-  selection: PracticeSetupSelection,
-  context: PracticePageResponse["setupContext"],
-): ActivePracticeSelection | null {
+  selection: PracticeSelection,
+  context: PracticeData["setupContext"],
+): ActiveSelection | null {
   const targetRoleId = selection.targetRoleId
   if (!targetRoleId) return null
 

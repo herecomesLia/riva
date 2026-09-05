@@ -14,7 +14,7 @@ const meta = preview.meta({
 const defaultArgs = {
   interactionLocked: false,
   isEndPending: false,
-  isMarkedWeak: false,
+  isWeak: false,
   isSaved: false,
   isSavedPending: false,
   isSkipPending: false,
@@ -39,7 +39,7 @@ export const Saved = meta.story({
 })
 
 export const MarkedWeak = meta.story({
-  args: { ...defaultArgs, isMarkedWeak: true },
+  args: { ...defaultArgs, isWeak: true },
   play: async ({ canvas }) => {
     await expect(
       canvas

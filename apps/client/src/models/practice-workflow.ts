@@ -105,6 +105,7 @@ export type GeneratingSession = {
 
 export type AnsweringSession = {
   status: "answering"
+  assistedRetry: boolean
   selection: ActiveSelection
   question: PracticeQuestion
 }
@@ -212,3 +213,21 @@ export type PracticeSession =
   | EvaluatingSession
   | ReviewSession
   | CompletedSession
+
+export type PracticeRoleOption = {
+  id: string
+  title: string
+  company: string | null
+  supportedQuestionTypes: QuestionType[]
+}
+
+export type PracticeSetupContext = {
+  targetRoles: PracticeRoleOption[]
+  availableDifficulties: Difficulty[]
+  eligibleQuestionCounts: { saved: number; history: number }
+}
+
+export type PracticeData = {
+  setupContext: PracticeSetupContext
+  session: PracticeSession
+}

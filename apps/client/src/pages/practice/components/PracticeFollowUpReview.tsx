@@ -7,19 +7,19 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import type {
-  AnsweredPracticeFollowUpExchange,
-  PracticeFollowUpCompletion,
-  PracticeFollowUpQuestion,
-} from "@/models/practice"
+  EvaluatingSession,
+  FollowUpCompletion,
+  PracticeFollowUp,
+} from "@/models/practice-workflow"
 
 type Props = {
-  exchanges: AnsweredPracticeFollowUpExchange[]
-  completion: PracticeFollowUpCompletion
+  exchanges: EvaluatingSession["followUps"]
+  completion: FollowUpCompletion
 }
 
 export function PracticeFollowUpReview({ exchanges, completion }: Props) {
   const { t } = useTranslation()
-  const unanswered = completion.status === "endedEarly" ? completion.unansweredQuestion : undefined
+  const unanswered = completion.status === "endedEarly" ? completion.unanswered : undefined
   if (exchanges.length === 0 && !unanswered) return null
 
   return (
@@ -31,14 +31,17 @@ export function PracticeFollowUpReview({ exchanges, completion }: Props) {
         <CardDescription>{t("practice.followUpReview.description")}</CardDescription>
       </CardHeader>
       <CardContent className="flex min-w-0 flex-col gap-5">
-        {exchanges.map((exchange) => (
+        {exchanges.map((exchange, index) => (
           <FollowUpReviewItem
             answer={exchange.answer.content}
-            key={exchange.question.id}
+            key={index}
             question={exchange.question}
+            order={index + 1}
           />
         ))}
-        {unanswered ? <FollowUpReviewItem question={unanswered} /> : null}
+        {unanswered ? (
+          <FollowUpReviewItem question={unanswered} order={exchanges.length + 1} />
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -47,9 +50,11 @@ export function PracticeFollowUpReview({ exchanges, completion }: Props) {
 function FollowUpReviewItem({
   answer,
   question,
+  order,
 }: {
+  order: number
   answer?: string
-  question: PracticeFollowUpQuestion
+  question: PracticeFollowUp
 }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
@@ -59,7 +64,7 @@ function FollowUpReviewItem({
     <article className="flex min-w-0 flex-col gap-4 rounded-lg border p-4">
       <div className="flex min-w-0 flex-col gap-2">
         <h3 className="font-heading font-medium">
-          {t("practice.followUpReview.followUpNumber", { count: question.order })}
+          {t("practice.followUpReview.followUpNumber", { count: order })}
         </h3>
         <p className="break-words text-sm leading-6 [overflow-wrap:anywhere]">{question.prompt}</p>
       </div>

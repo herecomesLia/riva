@@ -20,7 +20,7 @@ import { PracticeFlagActions } from "./PracticeFlagActions"
 
 export function PracticeReviewActions({
   interactionLocked,
-  isMarkedWeak,
+  isWeak,
   isEndPending,
   isNextPending,
   isRetryPending,
@@ -37,7 +37,7 @@ export function PracticeReviewActions({
   isEndPending: boolean
   isNextPending: boolean
   isRetryPending: boolean
-  isMarkedWeak: boolean
+  isWeak: boolean
   isSaved: boolean
   isSavedPending: boolean
   isWeakPending: boolean
@@ -77,7 +77,7 @@ export function PracticeReviewActions({
   async function updateWeak() {
     setError(null)
     try {
-      await onSetWeak(!isMarkedWeak)
+      await onSetWeak(!isWeak)
     } catch {
       setError("weak")
     }
@@ -128,7 +128,7 @@ export function PracticeReviewActions({
         </Button>
         <PracticeFlagActions
           disabled={interactionLocked}
-          isMarkedWeak={isMarkedWeak}
+          isWeak={isWeak}
           isSaved={isSaved}
           isSavedPending={isSavedPending}
           isWeakPending={isWeakPending}

@@ -26,6 +26,7 @@ describe("practiceFaker", () => {
     const answering = await faker.pollQuestion()
     expect(answering).toMatchObject({
       status: "answering",
+      assistedRetry: false,
       selection,
       question: practiceFixture.question,
     })
@@ -123,6 +124,7 @@ describe("practiceFaker", () => {
     })
     expect(await faker.retryQuestion()).toMatchObject({
       status: "answering",
+      assistedRetry: true,
       question: {
         referenceAnswer: { status: "revealed", viewedBeforeSubmission: true },
       },

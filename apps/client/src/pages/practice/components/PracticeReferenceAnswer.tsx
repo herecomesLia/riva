@@ -18,14 +18,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Spinner } from "@/components/ui/spinner"
-import type { PracticeReferenceAnswerState } from "@/models/practice"
+import type { ReferenceAnswerState } from "@/models/practice-workflow"
 
 import type { PracticeInteractionResult } from "../practice-interaction"
 
 type Props =
   | {
       mode: "answering"
-      state: PracticeReferenceAnswerState
+      state: ReferenceAnswerState
       isPending: boolean
       interactionLocked: boolean
       assistedRetry: boolean
@@ -33,7 +33,7 @@ type Props =
     }
   | {
       mode: "review" | "readonly"
-      state: PracticeReferenceAnswerState
+      state: ReferenceAnswerState
       assistedRetry?: boolean
       isPending?: never
       interactionLocked?: never

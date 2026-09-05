@@ -1,11 +1,11 @@
 import preview from "#storybook/preview"
 import { expect, fn } from "storybook/test"
 
-import { createPracticeMockResponse } from "@/mocks/data/practice"
+import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
 
 import { PracticeSetupForm } from "./PracticeSetupForm"
 
-const response = createPracticeMockResponse("setupReady")
+const response = createPracticeScenario("setupReady")
 if (response.session.selection.targetRoleId === null) {
   throw new Error("The setup fixture must select a target role.")
 }

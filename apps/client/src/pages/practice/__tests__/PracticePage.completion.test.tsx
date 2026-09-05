@@ -2,8 +2,6 @@ import * as testing from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 
-import { trainingRecordQueryKeys } from "@/app/training-record-query"
-import { dashboardQueryKeys } from "@/app/dashboard-query"
 import { i18n } from "@/i18n/i18n"
 
 import "./practice-page-service-mock"
@@ -15,8 +13,8 @@ describe("PracticePage: completion", () => {
   it.each(["answeringQuestion", "completedSession"] as const)(
     "prepares a fresh history setup from an existing %s session",
     async (scenario) => {
-      const current = api.createPracticeMockResponse(scenario)
-      const prepared = api.createPracticeMockResponse("setupReady")
+      const current = api.createPracticeScenario(scenario)
+      const prepared = api.createPracticeScenario("setupReady")
       if (prepared.session.status !== "setup") throw new Error("Expected setup state.")
       const productRole = prepared.setupContext.targetRoles.find(
         ({ id }) => id === "role_product_manager_meituan",
@@ -75,8 +73,8 @@ describe("PracticePage: completion", () => {
 
   it("requires confirmation when a historical question type is adjusted", async () => {
     const user = userEvent.setup()
-    const current = api.createPracticeMockResponse("answeringQuestion")
-    const prepared = api.createPracticeMockResponse("setupReady")
+    const current = api.createPracticeScenario("answeringQuestion")
+    const prepared = api.createPracticeScenario("setupReady")
     if (prepared.session.status !== "setup") throw new Error("Expected setup state.")
     const productRole = prepared.setupContext.targetRoles.find(
       ({ id }) => id === "role_product_manager_meituan",
@@ -87,7 +85,7 @@ describe("PracticePage: completion", () => {
       questionType: productRole.supportedQuestionTypes[0],
       source: "history",
     }
-    const generating = api.createPracticeMockResponse("generatingQuestion")
+    const generating = api.createPracticeScenario("generatingQuestion")
     if (generating.session.status !== "generatingQuestion") {
       throw new Error("Expected generating state.")
     }
@@ -104,7 +102,7 @@ describe("PracticePage: completion", () => {
         adjustments: ["practiceQuestionTypeUnsupported"],
       },
     })
-    vi.mocked(api.startPracticeSession).mockResolvedValue(generating)
+    vi.mocked(api.startPracticeSession).mockResolvedValue(generating.session)
 
     context.renderPracticePage(
       "/practice?entry=history&targetRoleId=role_product_manager_meituan&questionType=technicalFoundation&difficulty=basic&source=history",
@@ -127,15 +125,15 @@ describe("PracticePage: completion", () => {
 
   it("keeps an unavailable historical role unselected until the user chooses one", async () => {
     const user = userEvent.setup()
-    const current = api.createPracticeMockResponse("answeringQuestion")
-    const prepared = api.createPracticeMockResponse("setupReady")
+    const current = api.createPracticeScenario("answeringQuestion")
+    const prepared = api.createPracticeScenario("setupReady")
     if (prepared.session.status !== "setup") throw new Error("Expected setup state.")
     prepared.session.selection = {
       ...prepared.session.selection,
       targetRoleId: null,
       source: "history",
     }
-    const generating = api.createPracticeMockResponse("generatingQuestion")
+    const generating = api.createPracticeScenario("generatingQuestion")
     vi.mocked(api.getPracticePage).mockResolvedValue(current)
     vi.mocked(api.preparePracticeTrainingEntry).mockResolvedValue({
       page: prepared,
@@ -145,7 +143,7 @@ describe("PracticePage: completion", () => {
         configuration: prepared.session.selection,
       },
     })
-    vi.mocked(api.startPracticeSession).mockResolvedValue(generating)
+    vi.mocked(api.startPracticeSession).mockResolvedValue(generating.session)
 
     context.renderPracticePage(
       "/practice?entry=history&targetRoleId=role_deleted&questionType=projectDeepDive&difficulty=basic&source=history",
@@ -171,8 +169,8 @@ describe("PracticePage: completion", () => {
 
   it("shows a dedicated preparation failure and retries the entry", async () => {
     const user = userEvent.setup()
-    const current = api.createPracticeMockResponse("completedSession")
-    const prepared = api.createPracticeMockResponse("setupReady")
+    const current = api.createPracticeScenario("completedSession")
+    const prepared = api.createPracticeScenario("setupReady")
     if (prepared.session.status !== "setup") throw new Error("Expected setup state.")
     vi.mocked(api.getPracticePage).mockResolvedValue(current)
     vi.mocked(api.preparePracticeTrainingEntry)
@@ -199,7 +197,7 @@ describe("PracticePage: completion", () => {
   })
 
   it("does not prepare a historical entry during ordinary practice access", async () => {
-    const prepared = api.createPracticeMockResponse("setupReady")
+    const prepared = api.createPracticeScenario("setupReady")
     vi.mocked(api.getPracticePage).mockResolvedValue(prepared)
     context.renderPracticePage("/practice")
     expect(await testing.screen.findByTestId("practice-setup-state")).toBeInTheDocument()
@@ -207,12 +205,11 @@ describe("PracticePage: completion", () => {
   })
 
   it("synchronously locks duplicate retry-current clicks", async () => {
-    const review = api.createPracticeMockResponse("reviewBalanced")
-    const retrying = api.createPracticeMockResponse("retryingCurrentQuestion")
+    const review = api.createPracticeScenario("reviewBalanced")
+    const retrying = api.createPracticeScenario("retryingCurrentQuestion")
     if (review.session.status !== "review" || retrying.session.status !== "answering") return
-    retrying.session.sessionId = review.session.sessionId
-    retrying.session.version = review.session.version + 1
-    const deferred = context.createDeferred<import("@/models/practice").PracticePageResponse>()
+
+    const deferred = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
     vi.mocked(api.getPracticePage).mockResolvedValue(review)
     vi.mocked(api.retryCurrentPracticeQuestion).mockReturnValue(deferred.promise)
     context.renderPracticePage()
@@ -224,22 +221,21 @@ describe("PracticePage: completion", () => {
     await testing.waitFor(() => expect(api.retryCurrentPracticeQuestion).toHaveBeenCalledTimes(1))
     expect(testing.screen.queryByRole("alert")).not.toBeInTheDocument()
     await testing.act(async () => {
-      deferred.resolve(retrying)
+      deferred.resolve(retrying.session)
       await deferred.promise
     })
     expect(await testing.screen.findByTestId("practice-answering-state")).toBeInTheDocument()
   })
 
   it("synchronously locks duplicate next-question clicks", async () => {
-    const review = api.createPracticeMockResponse("reviewBalanced")
-    const generating = api.createPracticeMockResponse("generatingNextQuestion")
+    const review = api.createPracticeScenario("reviewBalanced")
+    const generating = api.createPracticeScenario("generatingNextQuestion")
     if (review.session.status !== "review" || generating.session.status !== "generatingQuestion")
       return
-    generating.session.sessionId = review.session.sessionId
-    generating.session.version = review.session.version + 1
-    const deferred = context.createDeferred<import("@/models/practice").PracticePageResponse>()
+
+    const deferred = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
     vi.mocked(api.getPracticePage).mockResolvedValue(review)
-    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(generating)
+    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(generating.session)
     vi.mocked(api.continueToNextPracticeQuestion).mockReturnValue(deferred.promise)
     context.renderPracticePage()
     const nextButton = await testing.screen.findByRole("button", { name: /继续下一题/i })
@@ -250,7 +246,7 @@ describe("PracticePage: completion", () => {
     await testing.waitFor(() => expect(api.continueToNextPracticeQuestion).toHaveBeenCalledTimes(1))
     expect(testing.screen.queryByRole("alert")).not.toBeInTheDocument()
     await testing.act(async () => {
-      deferred.resolve(generating)
+      deferred.resolve(generating.session)
       await deferred.promise
     })
     expect(await testing.screen.findByTestId("practice-generating-state")).toBeInTheDocument()
@@ -258,17 +254,14 @@ describe("PracticePage: completion", () => {
 
   it("synchronously locks duplicate end confirmations", async () => {
     const user = userEvent.setup()
-    const review = api.createPracticeMockResponse("reviewBalanced")
-    const completed = api.createPracticeMockResponse("completedSession")
+    const review = api.createPracticeScenario("reviewBalanced")
+    const completed = api.createPracticeScenario("completedSession")
     if (review.session.status !== "review" || completed.session.status !== "completed") return
-    completed.session.sessionId = review.session.sessionId
-    completed.session.version = review.session.version + 1
-    const deferred = context.createDeferred<import("@/models/practice").PracticePageResponse>()
+
+    const deferred = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
     vi.mocked(api.getPracticePage).mockResolvedValue(review)
     vi.mocked(api.endPracticeSession).mockReturnValue(deferred.promise)
-    const result = context.renderPracticePage()
-    result.queryClient.setQueryData(trainingRecordQueryKeys.overview(), { stale: true })
-    result.queryClient.setQueryData(dashboardQueryKeys.all, { stale: true })
+    context.renderPracticePage()
     await user.click(await testing.screen.findByRole("button", { name: /结束本轮练习/i }))
     const confirm = testing.screen.getAllByRole("button", { name: /结束本轮练习/i }).at(-1)!
     testing.act(() => {
@@ -277,20 +270,16 @@ describe("PracticePage: completion", () => {
     })
     await testing.waitFor(() => expect(api.endPracticeSession).toHaveBeenCalledTimes(1))
     await testing.act(async () => {
-      deferred.resolve(completed)
+      deferred.resolve(completed.session)
       await deferred.promise
     })
     expect(await testing.screen.findByTestId("practice-completed-state")).toBeInTheDocument()
-    expect(
-      result.queryClient.getQueryState(trainingRecordQueryKeys.overview())?.isInvalidated,
-    ).toBe(true)
-    expect(result.queryClient.getQueryState(dashboardQueryKeys.all)?.isInvalidated).toBe(true)
   })
 
   it("prepares the next round from the completed snapshot and restores the saved setup", async () => {
     const user = userEvent.setup()
-    const completed = api.createPracticeMockResponse("completedSession")
-    const prepared = api.createPracticeMockResponse("setupReady")
+    const completed = api.createPracticeScenario("completedSession")
+    const prepared = api.createPracticeScenario("setupReady")
     if (completed.session.status !== "completed" || prepared.session.status !== "setup") return
     completed.session.selection = {
       ...completed.session.selection,
@@ -302,7 +291,7 @@ describe("PracticePage: completion", () => {
     prepared.setupContext = structuredClone(completed.setupContext)
     prepared.session.selection = structuredClone(completed.session.selection)
     vi.mocked(api.getPracticePage).mockResolvedValue(completed)
-    vi.mocked(api.prepareNextPracticeSession).mockResolvedValue(prepared)
+    vi.mocked(api.prepareNextPracticeSession).mockResolvedValue(prepared.session)
     const result = context.renderPracticePage()
 
     await user.click(
@@ -311,10 +300,6 @@ describe("PracticePage: completion", () => {
       }),
     )
 
-    expect(vi.mocked(api.prepareNextPracticeSession).mock.calls[0]?.[0]).toEqual({
-      sessionId: completed.session.sessionId,
-      version: completed.session.version,
-    })
     expect(result.queryClient.getQueryData(PRACTICE_QUERY_KEY)).toEqual(prepared)
     expect(await testing.screen.findByTestId("practice-setup-state")).toBeInTheDocument()
     expect(testing.screen.getByTestId("practice-target-role-trigger")).toHaveTextContent(
@@ -346,10 +331,10 @@ describe("PracticePage: completion", () => {
   })
 
   it("synchronously prevents duplicate prepare-next-round requests", async () => {
-    const completed = api.createPracticeMockResponse("completedSession")
-    const prepared = api.createPracticeMockResponse("setupReady")
+    const completed = api.createPracticeScenario("completedSession")
+    const prepared = api.createPracticeScenario("setupReady")
     if (completed.session.status !== "completed") return
-    const deferred = context.createDeferred<import("@/models/practice").PracticePageResponse>()
+    const deferred = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
     vi.mocked(api.getPracticePage).mockResolvedValue(completed)
     vi.mocked(api.prepareNextPracticeSession).mockReturnValue(deferred.promise)
     context.renderPracticePage()
@@ -365,15 +350,15 @@ describe("PracticePage: completion", () => {
     await testing.waitFor(() => expect(api.prepareNextPracticeSession).toHaveBeenCalledTimes(1))
     expect(testing.screen.queryByRole("alert")).not.toBeInTheDocument()
     await testing.act(async () => {
-      deferred.resolve(prepared)
+      deferred.resolve(prepared.session)
       await deferred.promise
     })
     expect(await testing.screen.findByTestId("practice-setup-state")).toBeInTheDocument()
   })
 
   it("shows a pending next-round action and disables both completed actions", async () => {
-    const completed = api.createPracticeMockResponse("completedSession")
-    const deferred = context.createDeferred<import("@/models/practice").PracticePageResponse>()
+    const completed = api.createPracticeScenario("completedSession")
+    const deferred = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
     vi.mocked(api.getPracticePage).mockResolvedValue(completed)
     vi.mocked(api.prepareNextPracticeSession).mockReturnValue(deferred.promise)
     context.renderPracticePage()
@@ -400,13 +385,13 @@ describe("PracticePage: completion", () => {
 
   it("shows a safe error and allows retrying the next-round preparation", async () => {
     const user = userEvent.setup()
-    const completed = api.createPracticeMockResponse("completedSession")
-    const prepared = api.createPracticeMockResponse("setupReady")
-    const internalError = "internal session practice_session_01 version 99 stack"
+    const completed = api.createPracticeScenario("completedSession")
+    const prepared = api.createPracticeScenario("setupReady")
+    const internalError = "internal request detail stack"
     vi.mocked(api.getPracticePage).mockResolvedValue(completed)
     vi.mocked(api.prepareNextPracticeSession)
       .mockRejectedValueOnce(new Error(internalError))
-      .mockResolvedValueOnce(prepared)
+      .mockResolvedValueOnce(prepared.session)
     context.renderPracticePage()
 
     const startNextRound = await testing.screen.findByRole("button", {
@@ -431,15 +416,14 @@ describe("PracticePage: completion", () => {
   })
 
   it("locks every review action while next-question is pending", async () => {
-    const review = api.createPracticeMockResponse("reviewBalanced")
-    const generating = api.createPracticeMockResponse("generatingNextQuestion")
-    const deferred = context.createDeferred<import("@/models/practice").PracticePageResponse>()
+    const review = api.createPracticeScenario("reviewBalanced")
+    const generating = api.createPracticeScenario("generatingNextQuestion")
+    const deferred = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
     if (review.session.status !== "review" || generating.session.status !== "generatingQuestion")
       return
-    generating.session.sessionId = review.session.sessionId
-    generating.session.version = review.session.version + 1
+
     vi.mocked(api.getPracticePage).mockResolvedValue(review)
-    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(generating)
+    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(generating.session)
     vi.mocked(api.continueToNextPracticeQuestion).mockReturnValue(deferred.promise)
     context.renderPracticePage()
     const nextButton = await testing.screen.findByRole("button", { name: /继续下一题/i })
@@ -465,19 +449,18 @@ describe("PracticePage: completion", () => {
     expect(api.setQuestionSaved).not.toHaveBeenCalled()
     expect(api.setQuestionWeak).not.toHaveBeenCalled()
     await testing.act(async () => {
-      deferred.resolve(generating)
+      deferred.resolve(generating.session)
       await deferred.promise
     })
     expect(await testing.screen.findByTestId("practice-generating-state")).toBeInTheDocument()
   })
 
   it("locks every review action while retry-current is pending", async () => {
-    const review = api.createPracticeMockResponse("reviewBalanced")
-    const retrying = api.createPracticeMockResponse("retryingCurrentQuestion")
-    const deferred = context.createDeferred<import("@/models/practice").PracticePageResponse>()
+    const review = api.createPracticeScenario("reviewBalanced")
+    const retrying = api.createPracticeScenario("retryingCurrentQuestion")
+    const deferred = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
     if (review.session.status !== "review" || retrying.session.status !== "answering") return
-    retrying.session.sessionId = review.session.sessionId
-    retrying.session.version = review.session.version + 1
+
     vi.mocked(api.getPracticePage).mockResolvedValue(review)
     vi.mocked(api.retryCurrentPracticeQuestion).mockReturnValue(deferred.promise)
     context.renderPracticePage()
@@ -504,39 +487,9 @@ describe("PracticePage: completion", () => {
     expect(api.setQuestionSaved).not.toHaveBeenCalled()
     expect(api.setQuestionWeak).not.toHaveBeenCalled()
     await testing.act(async () => {
-      deferred.resolve(retrying)
+      deferred.resolve(retrying.session)
       await deferred.promise
     })
     expect(await testing.screen.findByTestId("practice-answering-state")).toBeInTheDocument()
-  })
-
-  it("does not let a stale completed response overwrite a newer cache state", async () => {
-    const user = userEvent.setup()
-    const review = api.createPracticeMockResponse("reviewBalanced")
-    const completed = api.createPracticeMockResponse("completedSession")
-    const newer = api.createPracticeMockResponse("reviewBalanced")
-    if (
-      review.session.status !== "review" ||
-      completed.session.status !== "completed" ||
-      newer.session.status !== "review"
-    )
-      return
-    completed.session.sessionId = review.session.sessionId
-    completed.session.version = review.session.version + 1
-    newer.session.sessionId = review.session.sessionId
-    newer.session.version = review.session.version + 2
-    const deferred = context.createDeferred<import("@/models/practice").PracticePageResponse>()
-    vi.mocked(api.getPracticePage).mockResolvedValue(review)
-    vi.mocked(api.endPracticeSession).mockReturnValue(deferred.promise)
-    const result = context.renderPracticePage()
-    await user.click(await testing.screen.findByRole("button", { name: /结束本轮练习/i }))
-    await user.click(testing.screen.getAllByRole("button", { name: /结束本轮练习/i }).at(-1)!)
-    testing.act(() => result.queryClient.setQueryData(PRACTICE_QUERY_KEY, newer))
-    await testing.act(async () => {
-      deferred.resolve(completed)
-      await deferred.promise
-    })
-    expect(result.queryClient.getQueryData(PRACTICE_QUERY_KEY)).toEqual(newer)
-    expect(testing.screen.queryByTestId("practice-completed-state")).not.toBeInTheDocument()
   })
 })

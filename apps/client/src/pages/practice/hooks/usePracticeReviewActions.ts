@@ -14,19 +14,19 @@ export function usePracticeReviewActions(runAction: RunPracticeAction): {
   actions: PracticeReviewActions
   pending: PracticeReviewPending
 } {
-  const savedMutation = usePracticeMutation("questionFlagUpdate", setQuestionSaved)
-  const weakMutation = usePracticeMutation("questionFlagUpdate", setQuestionWeak)
-  const retryMutation = usePracticeMutation("retryCurrentQuestion", retryCurrentPracticeQuestion)
-  const nextMutation = usePracticeMutation("continueToNextQuestion", continueToNextPracticeQuestion)
-  const endMutation = usePracticeMutation("endReviewSession", endPracticeSession)
+  const savedMutation = usePracticeMutation(setQuestionSaved)
+  const weakMutation = usePracticeMutation(setQuestionWeak)
+  const retryMutation = usePracticeMutation(retryCurrentPracticeQuestion)
+  const nextMutation = usePracticeMutation(continueToNextPracticeQuestion)
+  const endMutation = usePracticeMutation(endPracticeSession)
 
   return {
     actions: {
       onSetSaved: (input) => runAction(() => savedMutation.mutateAsync(input)),
       onSetWeak: (input) => runAction(() => weakMutation.mutateAsync(input)),
-      onRetryCurrent: (input) => runAction(() => retryMutation.mutateAsync(input)),
-      onNextQuestion: (input) => runAction(() => nextMutation.mutateAsync(input)),
-      onEndSession: (input) => runAction(() => endMutation.mutateAsync(input)),
+      onRetryCurrent: () => runAction(() => retryMutation.mutateAsync()),
+      onNextQuestion: () => runAction(() => nextMutation.mutateAsync()),
+      onEndSession: () => runAction(() => endMutation.mutateAsync()),
     },
     pending: {
       interactionLocked:

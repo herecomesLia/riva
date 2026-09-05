@@ -27,7 +27,7 @@ describe("PracticePage: loading", () => {
     const user = userEvent.setup()
     vi.mocked(api.getPracticePage)
       .mockRejectedValueOnce(new Error("unsafe load details"))
-      .mockResolvedValueOnce(api.createPracticeMockResponse("setupReady"))
+      .mockResolvedValueOnce(api.createPracticeScenario("setupReady"))
 
     context.renderPracticePage()
 
