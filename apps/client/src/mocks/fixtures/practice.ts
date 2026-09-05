@@ -1,4 +1,5 @@
 import type {
+  CompletedSession,
   FollowUpReferenceAnswer,
   PracticeEvaluation,
   PracticeFollowUp,
@@ -6,345 +7,95 @@ import type {
   PracticeReferenceAnswer,
   PracticeReview,
   PracticeSelection,
-  PracticeSession,
-  QuestionType,
 } from "@/models/practice-workflow"
 
-export const practiceSelectionFixture = {
-  targetRoleId: null,
-  questionType: "projectDeepDive",
-  difficulty: "basic",
-  source: "personalized",
-  prioritizeWeaknesses: false,
-} satisfies PracticeSelection
-
-export const practiceSetupFixture = {
-  status: "setup",
-  selection: practiceSelectionFixture,
-} satisfies PracticeSession
-
-export const practiceQuestions = {
-  projectDeepDive: {
-    id: "practice-question-project-deep-dive",
-    prompt: "请介绍一次你主导前端性能优化的经历，并说明你如何定位问题、推动落地和验证结果。",
+export const practiceFixture = {
+  sessionId: "practice-session",
+  attemptNumber: 1,
+  // UI samples, intentionally independent of actions taken in the faker.
+  completion: {
+    reviewCompleted: {
+      completionReason: "reviewCompleted",
+      questionsCompleted: 2,
+      retryCount: 1,
+      savedQuestionCount: 1,
+      weakQuestionCount: 1,
+      finalAttemptAverageScore: 78,
+      nextStepSuggestion: "继续练习，并优先补强复盘中暴露的薄弱能力。",
+    },
+    userEndedEarly: {
+      completionReason: "userEndedEarly",
+      questionsCompleted: 0,
+      retryCount: 0,
+      savedQuestionCount: 0,
+      weakQuestionCount: 0,
+      finalAttemptAverageScore: 0,
+      nextStepSuggestion: "开始下一轮练习，完成一道题后查看复盘。",
+    },
+  } satisfies Record<
+    CompletedSession["completionReason"],
+    Omit<CompletedSession, "status" | "sessionId" | "selection">
+  >,
+  selection: {
+    targetRoleId: null,
     questionType: "projectDeepDive",
     difficulty: "basic",
-    assessedCapabilities: ["问题分析", "技术决策", "结果量化"],
-    recommendedMaterials: ["前端性能优化项目"],
+    source: "personalized",
+    prioritizeWeaknesses: false,
+  } satisfies PracticeSelection,
+  question: {
+    id: "practice-question",
+    prompt: "请结合一个真实经历，说明你如何分析问题、做出关键判断、推动行动并验证最终结果。",
+    assessedCapabilities: ["问题分析", "结果验证"],
+    recommendedMaterials: ["一个由你推动解决问题的经历"],
     hints: { status: "notRequested", content: null },
     framework: { status: "notRequested", content: null },
-    referenceAnswer: {
-      status: "notRequested",
-      content: null,
-      viewedBeforeSubmission: false,
-    },
+    referenceAnswer: { status: "notRequested", content: null, viewedBeforeSubmission: false },
     isSaved: false,
     isWeak: false,
-  },
-  behavioral: {
-    id: "practice-question-behavioral",
-    prompt: "请介绍一次你与关键协作方存在明显分歧的经历，你如何推动团队形成共识并完成目标？",
-    questionType: "behavioral",
-    difficulty: "basic",
-    assessedCapabilities: ["协作沟通", "冲突处理", "复盘意识"],
-    recommendedMaterials: ["跨团队协作经历"],
-    hints: { status: "notRequested", content: null },
-    framework: { status: "notRequested", content: null },
-    referenceAnswer: {
-      status: "notRequested",
-      content: null,
-      viewedBeforeSubmission: false,
-    },
-    isSaved: false,
-    isWeak: false,
-  },
-  businessUnderstanding: {
-    id: "practice-question-business-understanding",
-    prompt: "请介绍一次你基于业务目标调整产品或技术优先级的经历，并说明你的判断依据和结果。",
-    questionType: "businessUnderstanding",
-    difficulty: "basic",
-    assessedCapabilities: ["业务判断", "优先级管理", "数据分析"],
-    recommendedMaterials: ["优先级调整经历"],
-    hints: { status: "notRequested", content: null },
-    framework: { status: "notRequested", content: null },
-    referenceAnswer: {
-      status: "notRequested",
-      content: null,
-      viewedBeforeSubmission: false,
-    },
-    isSaved: false,
-    isWeak: false,
-  },
-  motivation: {
-    id: "practice-question-motivation",
-    prompt: "为什么你希望应聘当前目标岗位？请结合过往经历说明你的匹配点和下一阶段目标。",
-    questionType: "motivation",
-    difficulty: "basic",
-    assessedCapabilities: ["求职动机", "岗位认知", "职业规划"],
-    recommendedMaterials: ["岗位相关成长经历"],
-    hints: { status: "notRequested", content: null },
-    framework: { status: "notRequested", content: null },
-    referenceAnswer: {
-      status: "notRequested",
-      content: null,
-      viewedBeforeSubmission: false,
-    },
-    isSaved: false,
-    isWeak: false,
-  },
-  technicalFoundation: {
-    id: "practice-question-technical-foundation",
-    prompt: "请解释 React 页面出现重复渲染的常见原因，并说明你会如何定位和验证优化效果。",
-    questionType: "technicalFoundation",
-    difficulty: "basic",
-    assessedCapabilities: ["技术原理", "问题定位", "风险意识"],
-    recommendedMaterials: ["React 性能排查经历"],
-    hints: { status: "notRequested", content: null },
-    framework: { status: "notRequested", content: null },
-    referenceAnswer: {
-      status: "notRequested",
-      content: null,
-      viewedBeforeSubmission: false,
-    },
-    isSaved: false,
-    isWeak: false,
-  },
-} satisfies Record<QuestionType, PracticeQuestion>
-
-export const practiceQuestionAlternates = {
-  projectDeepDive: {
-    id: "practice-question-project-deep-dive-alternate",
-    prompt: "请介绍一次前端性能优化中多个方案的取舍，并说明你如何推动关键决策和验证最终效果。",
-    assessedCapabilities: ["问题分析", "技术决策", "结果量化"],
-    recommendedMaterials: ["前端性能优化方案取舍经历"],
-  },
-  behavioral: {
-    id: "practice-question-behavioral-alternate",
-    prompt: "请回顾一次你与关键协作方长期无法达成共识的经历，你如何识别核心诉求并推动目标完成？",
-    assessedCapabilities: ["协作沟通", "冲突处理", "复盘意识"],
-    recommendedMaterials: ["跨团队分歧处理经历"],
-  },
-  businessUnderstanding: {
-    id: "practice-question-business-understanding-alternate",
-    prompt:
-      "请介绍一次业务目标发生变化后你重新调整工作优先级的经历，并说明如何验证判断和及时纠偏。",
-    assessedCapabilities: ["业务判断", "优先级管理", "数据分析"],
-    recommendedMaterials: ["业务目标变化后的优先级调整经历"],
-  },
-  motivation: {
-    id: "practice-question-motivation-alternate",
-    prompt: "请说明你选择这个职业方向的关键原因，以及当前岗位如何连接你的长期发展计划。",
-    assessedCapabilities: ["求职动机", "自我认知", "职业规划"],
-    recommendedMaterials: ["职业选择关键节点"],
-  },
-  technicalFoundation: {
-    id: "practice-question-technical-foundation-alternate",
-    prompt: "排查 React 性能问题时，你会如何确定首要的重复渲染假设，并验证它是真实瓶颈？",
-    assessedCapabilities: ["技术原理", "问题定位", "风险意识"],
-    recommendedMaterials: ["React 重复渲染排查经历"],
-  },
-} satisfies Record<
-  QuestionType,
-  Pick<PracticeQuestion, "id" | "prompt" | "assessedCapabilities" | "recommendedMaterials">
->
-
-export const practiceQuestionHelp = {
-  projectDeepDive: {
-    hints: ["说明项目目标和你的职责。", "用指标说明优化效果。"],
-    framework: ["背景与目标", "关键决策与行动", "结果与复盘"],
+  } satisfies PracticeQuestion,
+  questionHelp: {
+    hints: ["说明你的关键判断和验证依据。"],
+    framework: ["背景与目标", "行动与结果"],
     reference: {
       kind: "personalizedExample",
-      answer: "我先用监控定位性能瓶颈，再分阶段落地优化，并用上线前后的核心指标验证结果。",
-      keyPoints: ["明确个人决策", "提供量化验证"],
-      commonMistakes: ["只罗列技术动作", "把团队成果全部归为个人贡献"],
-    },
+      answer: "我先明确目标和约束，再用小范围验证选择方案，推动落地后对比结果并复盘。",
+      keyPoints: ["明确个人行动", "提供结果证据"],
+      commonMistakes: ["只描述团队成果"],
+    } satisfies PracticeReferenceAnswer,
   },
-  behavioral: {
-    hints: ["说明双方分歧和共同目标。", "聚焦你采取的具体行动。"],
-    framework: ["情境与任务", "沟通与推动", "结果与复盘"],
-    reference: {
-      kind: "personalizedExample",
-      answer: "我先确认共同目标和各方约束，再用小范围验证把争论转为可比较的证据。",
-      keyPoints: ["识别分歧根因", "说明个人推动"],
-      commonMistakes: ["泛泛地说加强沟通", "把协作方描述成阻碍者"],
-    },
-  },
-  businessUnderstanding: {
-    hints: ["先明确业务目标和核心指标。", "说明不同方案的收益与成本。"],
-    framework: ["业务目标", "判断依据", "取舍与验证"],
-    reference: {
-      kind: "personalizedExample",
-      answer: "我根据目标指标、用户影响和交付成本重新排序事项，并约定验证窗口和纠偏条件。",
-      keyPoints: ["连接业务目标", "解释优先级取舍"],
-      commonMistakes: ["只描述执行过程", "没有验证指标"],
-    },
-  },
-  motivation: {
-    hints: ["说明岗位吸引你的具体原因。", "连接相关经历和下一阶段目标。"],
-    framework: ["岗位理解", "经历匹配", "贡献与发展目标"],
-    reference: {
-      kind: "personalizedExample",
-      answer: "这个岗位与我的核心经验相匹配，也能让我继续承担更复杂的问题并创造可衡量的业务价值。",
-      keyPoints: ["体现岗位理解", "连接个人经历"],
-      commonMistakes: ["只表达泛泛兴趣", "没有说明可贡献的价值"],
-    },
-  },
-  technicalFoundation: {
-    hints: ["先区分 render、commit 和浏览器绘制。", "用工具验证首要假设。"],
-    framework: ["原因假设", "定位步骤", "优化与验证"],
-    reference: {
-      kind: "technicalReference",
-      answer: "我会先用 React Profiler 确认更新来源和真实耗时，再针对首要假设做单变量验证。",
-      keyPoints: ["基于证据定位", "验证性能与正确性"],
-      commonMistakes: ["先加 memo 再找原因", "把开发环境现象当作生产问题"],
-    },
-  },
-} satisfies Record<
-  QuestionType,
-  {
-    hints: string[]
-    framework: string[]
-    reference: PracticeReferenceAnswer
-  }
->
-
-export const practiceFollowUps: Partial<
-  Record<
-    QuestionType,
-    {
-      question: PracticeFollowUp
-      hints: string[]
-      framework: string[]
-      reference: FollowUpReferenceAnswer
-    }
-  >
-> = {
-  projectDeepDive: {
+  followUp: {
     question: {
-      id: "practice-follow-up-project-deep-dive",
-      prompt: "你如何验证结果主要来自你的关键决策，而不是同期的其他变化？",
+      id: "practice-follow-up",
+      prompt: "你如何验证结果来自你的关键行动，还有哪些因素可能影响结论？",
       hints: { status: "notRequested", content: null },
       framework: { status: "notRequested", content: null },
-      referenceAnswer: {
-        status: "notRequested",
-        content: null,
-        viewedBeforeSubmission: false,
-      },
-    },
-    hints: ["说明同期发生的其他变化。", "给出对照或分层证据。"],
-    framework: ["归因结论", "对照证据", "结论边界"],
+      referenceAnswer: { status: "notRequested", content: null, viewedBeforeSubmission: false },
+    } satisfies PracticeFollowUp,
+    hints: ["说明对照证据和结论边界。"],
+    framework: ["验证方法", "证据与局限"],
     reference: {
       kind: "personalizedSupplement",
       addressedGap: "结果归因证据不足。",
-      answer: "我会列出同期变化，再通过灰度、分层或时间窗口对比来界定关键决策的影响。",
-      keyPoints: ["排除干扰因素", "说明证据边界"],
-      commonMistakes: ["只重复最终指标", "把相关性当作因果"],
-    },
+      answer: "我会对比行动前后的结果，排查同期变化，并说明证据能支持的结论范围。",
+      keyPoints: ["排除干扰因素"],
+      commonMistakes: ["把相关性当作因果"],
+    } satisfies FollowUpReferenceAnswer,
   },
-  behavioral: {
-    question: {
-      id: "practice-follow-up-behavioral",
-      prompt: "如果重新处理这次分歧，你会调整哪一个具体行动，为什么？",
-      hints: { status: "notRequested", content: null },
-      framework: { status: "notRequested", content: null },
-      referenceAnswer: {
-        status: "notRequested",
-        content: null,
-        viewedBeforeSubmission: false,
-      },
-    },
-    hints: ["选择一个真实不足。", "说明下次的具体调整。"],
-    framework: ["复盘结论", "调整行动", "预期验证"],
-    reference: {
-      kind: "personalizedSupplement",
-      addressedGap: "缺少具体复盘和可执行改进。",
-      answer: "如果重来，我会更早确认共同目标，并用阶段性反馈验证沟通是否有效。",
-      keyPoints: ["承认具体不足", "形成可验证行动"],
-      commonMistakes: ["只说加强沟通", "再次证明自己正确"],
-    },
-  },
-  businessUnderstanding: {
-    question: {
-      id: "practice-follow-up-business-understanding",
-      prompt: "优先级调整后，你会如何用指标验证判断并及时纠偏？",
-      hints: { status: "notRequested", content: null },
-      framework: { status: "notRequested", content: null },
-      referenceAnswer: {
-        status: "notRequested",
-        content: null,
-        viewedBeforeSubmission: false,
-      },
-    },
-    hints: ["区分领先指标和结果指标。", "说明纠偏条件。"],
-    framework: ["判断目标", "验证指标", "继续或纠偏"],
-    reference: {
-      kind: "personalizedSupplement",
-      addressedGap: "缺少分阶段验证和纠偏机制。",
-      answer: "我会用领先指标判断方向，再用结果指标验证影响，并提前约定缩小范围或回退的条件。",
-      keyPoints: ["分阶段验证", "预设纠偏条件"],
-      commonMistakes: ["只看单一指标", "没有调整机制"],
-    },
-  },
-  technicalFoundation: {
-    question: {
-      id: "practice-follow-up-technical-foundation",
-      prompt: "你会先验证哪个重复渲染假设，如何证明它是真实瓶颈而不是开发环境现象？",
-      hints: { status: "notRequested", content: null },
-      framework: { status: "notRequested", content: null },
-      referenceAnswer: {
-        status: "notRequested",
-        content: null,
-        viewedBeforeSubmission: false,
-      },
-    },
-    hints: ["说明首个假设的依据。", "在生产构建中复测。"],
-    framework: ["首个假设", "验证实验", "结论边界"],
-    reference: {
-      kind: "technicalReference",
-      addressedGap: "缺少对首要假设的可证伪验证。",
-      answer:
-        "我会用 Profiler 找到更新来源，只改变一个因素复测，并在生产构建中排除 Strict Mode 干扰。",
-      keyPoints: ["单变量验证", "排除开发环境干扰"],
-      commonMistakes: ["先优化再定位", "只看函数执行次数"],
-    },
-  },
+  evaluation: {
+    overallScore: 78,
+    dimensionScores: [
+      { dimension: "relevance", score: 82, explanation: "回答基本围绕问题展开。" },
+      { dimension: "specificity", score: 74, explanation: "关键行动较明确，量化证据仍可加强。" },
+    ],
+  } satisfies PracticeEvaluation,
+  review: {
+    overallPerformance: "回答清楚地呈现了行动过程，可以进一步补充结果证据。",
+    highlights: ["能够说明个人采取的关键行动。"],
+    mainIssues: ["结果的验证依据不够具体。"],
+    improvementSuggestions: ["补充一个可比较的结果指标。"],
+    reusableAnswerStructure: ["目标与关键行动", "结果证据与复盘"],
+    exposedWeaknesses: ["量化证据"],
+    recommendation: { action: "retryCurrent", reason: "结合复盘补充证据，再尝试一次。" },
+  } satisfies PracticeReview,
 }
-
-export const practiceEvaluationFixture = {
-  overallScore: 78,
-  dimensionScores: [
-    {
-      dimension: "relevance",
-      score: 82,
-      explanation: "回答基本围绕问题展开，但部分证据还可以更具体。",
-    },
-    {
-      dimension: "structure",
-      score: 80,
-      explanation: "整体结构清楚，可以进一步强化结论与证据的连接。",
-    },
-    {
-      dimension: "specificity",
-      score: 74,
-      explanation: "关键行动较明确，但量化证据仍然不足。",
-    },
-    {
-      dimension: "roleAlignment",
-      score: 77,
-      explanation: "能够连接目标岗位，但还可以突出更直接的岗位价值。",
-    },
-  ],
-} satisfies PracticeEvaluation
-
-export const practiceReviewFixture = {
-  overallPerformance: "回答结构基本清楚，能够说明关键行动，但证据和决策边界仍可加强。",
-  highlights: ["围绕问题组织回答", "能够说明个人行动"],
-  mainIssues: ["量化证据不足", "部分决策边界不够明确"],
-  improvementSuggestions: ["补充可验证的结果指标", "明确个人贡献与团队成果的边界"],
-  reusableAnswerStructure: ["说明背景与目标", "展开关键行动与取舍", "用证据总结结果与复盘"],
-  exposedWeaknesses: ["量化证据", "决策边界"],
-  recommendation: {
-    action: "retryCurrent",
-    reason: "建议保留当前结构，并补充更具体的证据后重新回答。",
-  },
-} satisfies PracticeReview

@@ -49,8 +49,6 @@ export type ReferenceAnswerState =
 export type PracticeQuestion = {
   id: string
   prompt: string
-  questionType: QuestionType
-  difficulty: Difficulty
   assessedCapabilities: string[]
   recommendedMaterials: string[]
   hints: Guidance<string[]>
@@ -106,7 +104,6 @@ export type GeneratingSession = {
   status: "generatingQuestion"
   sessionId: string
   selection: ActiveSelection
-  pendingQuestion: PracticeQuestion
 }
 
 export type AnsweringSession = {
