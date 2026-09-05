@@ -60,6 +60,43 @@ export type PracticeQuestion = {
   isWeak: boolean
 }
 
+export type PracticeAnswer = {
+  content: string
+}
+
+export type FollowUpReferenceAnswer = {
+  kind: "personalizedSupplement" | "technicalReference"
+  addressedGap: string
+  answer: string
+  keyPoints: string[]
+  commonMistakes: string[]
+}
+
+export type FollowUpReferenceState =
+  | {
+      status: "notRequested"
+      content: null
+      viewedBeforeSubmission: false
+    }
+  | {
+      status: "revealed"
+      content: FollowUpReferenceAnswer
+      viewedBeforeSubmission: boolean
+    }
+  | {
+      status: "unavailable"
+      content: null
+      viewedBeforeSubmission: false
+    }
+
+export type PracticeFollowUp = {
+  id: string
+  prompt: string
+  hints: Guidance<string[]>
+  framework: Guidance<string[]>
+  referenceAnswer: FollowUpReferenceState
+}
+
 export type SetupSession = {
   status: "setup"
   selection: PracticeSelection
@@ -78,4 +115,38 @@ export type AnsweringSession = {
   question: PracticeQuestion
 }
 
-export type PracticeSession = SetupSession | GeneratingSession | AnsweringSession
+export type AnsweringFollowUpSession = {
+  status: "answeringFollowUp"
+  sessionId: string
+  selection: ActiveSelection
+  question: PracticeQuestion
+  mainAnswer: PracticeAnswer
+  followUps: {
+    question: PracticeFollowUp
+    answer: PracticeAnswer
+  }[]
+  currentFollowUp: PracticeFollowUp
+}
+
+export type FollowUpCompletion =
+  | { status: "completed" }
+  | {
+      status: "endedEarly"
+      unanswered: PracticeFollowUp
+    }
+
+export type EvaluatingSession = {
+  status: "evaluating"
+  sessionId: string
+  selection: ActiveSelection
+  question: PracticeQuestion
+  mainAnswer: PracticeAnswer
+  followUps: {
+    question: PracticeFollowUp
+    answer: PracticeAnswer
+  }[]
+  followUpCompletion: FollowUpCompletion
+}
+
+export type PracticeSession =
+  SetupSession | GeneratingSession | AnsweringSession | AnsweringFollowUpSession | EvaluatingSession
