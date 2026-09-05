@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { createInterviewMockResponse } from "@/mocks/data/interview"
-import { createPracticeMockResponse } from "@/mocks/data/practice"
+import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
 import {
   resolveInterviewTrainingEntry,
   resolvePracticeTrainingEntry,
@@ -18,7 +18,7 @@ describe("training entry search application", () => {
   })
 
   it("does not replace a deleted practice role with the current role", () => {
-    const response = createPracticeMockResponse("setupReady")
+    const response = createPracticeScenario("setupReady")
 
     expect(
       resolvePracticeTrainingEntry(
@@ -73,7 +73,7 @@ describe("training entry search application", () => {
   })
 
   it("reports unsupported practice question types and difficulties with stable reasons", () => {
-    const response = createPracticeMockResponse("setupReady")
+    const response = createPracticeScenario("setupReady")
     const role = response.setupContext.targetRoles[0]
     const context = structuredClone(response.setupContext)
     context.targetRoles[0]!.supportedQuestionTypes = ["behavioral"]

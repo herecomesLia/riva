@@ -36,6 +36,24 @@ export function createPracticeReviewStoryFixture(
   if (response.session.status !== "review") throw new Error("Review fixture required.")
   const session = response.session
 
+  // Dimension layout scenes intentionally expand the one-dimension runtime sample.
+  if (variant === "balanced" || variant === "fewDimensions" || variant === "longDimensions") {
+    session.evaluation.dimensionScores = (
+      [
+        "relevance",
+        "structure",
+        "specificity",
+        "personalContribution",
+        "resultsAndEvidence",
+        "roleAlignment",
+        "communication",
+        "riskControl",
+      ] as const
+    ).map((dimension) => ({
+      ...practiceFixture.evaluation.dimensionScores[0],
+      dimension,
+    }))
+  }
   if (variant === "boundaryScore") session.evaluation.overallScore = 60
   if (variant === "fewDimensions") {
     session.evaluation.dimensionScores = session.evaluation.dimensionScores.slice(0, 3)

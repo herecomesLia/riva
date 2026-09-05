@@ -1595,8 +1595,21 @@ describe("PracticeView", () => {
 
   it("renders all eight score dimensions with response explanations", async () => {
     const data = createPracticeScenario("reviewBalanced")
+    if (data.session.status !== "review") throw new Error("Expected review fixture.")
+    const score = data.session.evaluation.dimensionScores[0]!
+    data.session.evaluation.dimensionScores = (
+      [
+        "relevance",
+        "structure",
+        "specificity",
+        "personalContribution",
+        "resultsAndEvidence",
+        "roleAlignment",
+        "communication",
+        "riskControl",
+      ] as const
+    ).map((dimension) => ({ ...score, dimension }))
     renderReadyView(data)
-    if (data.session.status !== "review") return
 
     const dimensions = await screen.findByTestId("practice-dimension-scores")
     for (const item of data.session.evaluation.dimensionScores) {
