@@ -7,6 +7,7 @@ import procrastinate
 from riva.core.config import Settings
 from riva.db import Database
 from riva.llm import LLMClient
+from riva.tasks.errors import TaskError
 
 
 @dataclass(slots=True)
@@ -28,7 +29,5 @@ def get_task_resources(context: procrastinate.JobContext) -> TaskResources:
     resources = context.additional_context.get("resources")
     if not isinstance(resources, TaskResources):
         # Missing worker setup is a runtime error, not an invalid task argument.
-        raise RuntimeError(  # noqa: TRY004
-            "Riva task resources are missing or invalid in JobContext."
-        )
+        raise TaskError("Riva task resources are missing or invalid in JobContext.")
     return resources

@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.tasks.core.app import TASK_SCHEMA, app
+from riva.tasks.errors import TaskError
 from riva.tasks.registry import Task
 
 
@@ -55,7 +56,7 @@ async def _task_connection(
     raw_connection = await connection.get_raw_connection()
     driver_connection = raw_connection.driver_connection
     if not isinstance(driver_connection, psycopg.AsyncConnection):
-        raise TypeError("Transactional task dispatch requires psycopg.")
+        raise TaskError("Transactional task dispatch requires psycopg.")
     try:
         yield driver_connection
     finally:

@@ -1,9 +1,11 @@
 from riva.tasks.core.context import TaskResources, get_task_resources
 from riva.tasks.core.dispatch import cancel_job, defer_job
+from riva.tasks.errors import TaskError
 from riva.tasks.registry import Task
 
 __all__ = [
     "Task",
+    "TaskError",
     "TaskResources",
     "cancel_job",
     "defer_job",

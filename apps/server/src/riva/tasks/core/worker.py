@@ -1,6 +1,7 @@
 from riva.core.config import Settings
 from riva.tasks.core.app import app, create_task_connector
 from riva.tasks.core.context import task_resources
+from riva.tasks.errors import TaskError
 from riva.tasks.registry import configure_task_registry
 
 
@@ -15,7 +16,7 @@ async def run_worker(
     with app.replace_connector(connector):
         async with app.open_async():
             if not await app.check_connection_async():
-                raise RuntimeError(
+                raise TaskError(
                     "Background task schema is not initialized. Run `riva db setup`."
                 )
             async with task_resources(settings) as resources:
