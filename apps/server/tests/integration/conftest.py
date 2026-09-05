@@ -2,6 +2,7 @@ import asyncio
 from collections.abc import AsyncIterator, Iterator
 
 import pytest
+import structlog
 from asgi_lifespan import LifespanManager
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
@@ -16,6 +17,29 @@ from tests.support.clock import Clock
 from tests.support.settings import TEST_ORIGIN, make_test_settings
 
 POSTGRES_IMAGE = "postgres:18-alpine"
+
+
+class _NoopLogger:
+    def info(self, *_args: object, **_kwargs: object) -> None:
+        pass
+
+    def error(self, *_args: object, **_kwargs: object) -> None:
+        pass
+
+
+@pytest.fixture(autouse=True)
+def disable_request_logging() -> Iterator[None]:
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        original_get_logger = structlog.get_logger
+        noop_logger = _NoopLogger()
+
+        def get_logger(*args: object, **kwargs: object) -> object:
+            if args and args[0] == "riva.request":
+                return noop_logger
+            return original_get_logger(*args, **kwargs)
+
+        monkeypatch.setattr(structlog, "get_logger", get_logger)
+        yield
 
 
 @pytest.fixture(scope="session")
