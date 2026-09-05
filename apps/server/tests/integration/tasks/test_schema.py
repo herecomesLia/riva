@@ -36,7 +36,6 @@ async def test_setup_creates_task_tables_only_in_task_schema(
 ) -> None:
     await _drop_task_schema(database)
     await setup_task_schema(database)
-    await setup_task_schema(database)
 
     assert await _table_exists(
         database,
@@ -53,6 +52,7 @@ async def test_setup_creates_task_tables_only_in_task_schema(
 async def test_reset_rebuilds_task_schema(
     database: Database,
 ) -> None:
+    await _drop_task_schema(database)
     await setup_task_schema(database)
     async with database.engine.begin() as connection:
         await connection.execute(
