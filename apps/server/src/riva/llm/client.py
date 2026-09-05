@@ -1,3 +1,5 @@
+from typing import Self
+
 from async_lru import alru_cache
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
@@ -15,6 +17,12 @@ class LLMClient:
         self._cached_check_health = alru_cache(
             maxsize=1, ttl=settings.health_ttl_seconds
         )(self._check_health)
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        await self.close()
 
     @property
     def chat_model(self) -> BaseChatModel:

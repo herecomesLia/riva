@@ -227,7 +227,7 @@ async def test_check_health_respects_cache_policy(
     await client.close()
 
 
-async def test_close_releases_initialized_clients() -> None:
+async def test_context_manager_releases_initialized_clients() -> None:
     client = _configured_client()
     health_close = AsyncMock()
     root_close = MagicMock()
@@ -238,7 +238,8 @@ async def test_close_releases_initialized_clients() -> None:
         root_async_client=SimpleNamespace(close=root_async_close),
     )
 
-    await client.close()
+    async with client:
+        pass
 
     health_close.assert_awaited_once_with()
     root_close.assert_called_once_with()

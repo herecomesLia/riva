@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from asgi_lifespan import LifespanManager
@@ -21,10 +21,9 @@ def _event(
     )
 
 
-def _llm_double(*, available: bool | None = None) -> Mock:
-    llm = Mock()
+def _llm_double(*, available: bool | None = None) -> MagicMock:
+    llm = MagicMock()
     llm.check_health = AsyncMock(return_value=available)
-    llm.close = AsyncMock()
     return llm
 
 

@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     shutdown_started_at: float | None = None
 
     try:
-        async with database:
+        async with database, llm:
             await database.ping()
             startup_succeeded = True
 
@@ -72,7 +72,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
                     status="in_progress",
                     **lifecycle_fields,
                 )
-                await llm.close()
     except Exception:
         if startup_succeeded:
             if shutdown_started_at is not None:
