@@ -1,13 +1,31 @@
 import { describe, expect, it } from "vitest"
 
 import { createInterviewMockResponse } from "@/mocks/data/interview"
-import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
+import { practiceFixture } from "@/mocks/fixtures/practice"
+import type { ActiveSelection, PracticeSetupContext } from "@/models/practice-workflow"
 import {
   resolveInterviewTrainingEntry,
   resolvePracticeTrainingEntry,
   resolveTrainingEntryRoleAvailability,
   toPracticeQuestionType,
 } from "@/models/training-entry"
+
+const selection: ActiveSelection = {
+  ...practiceFixture.selection,
+  targetRoleId: "role_active",
+}
+const setupContext: PracticeSetupContext = {
+  targetRoles: [
+    {
+      id: selection.targetRoleId,
+      title: "Frontend Engineer",
+      company: null,
+      supportedQuestionTypes: ["behavioral"],
+    },
+  ],
+  availableDifficulties: ["basic"],
+  eligibleQuestionCounts: { saved: 1, history: 1 },
+}
 
 describe("training entry search application", () => {
   it("centralizes cross-mode history question-type mapping", () => {
@@ -18,12 +36,10 @@ describe("training entry search application", () => {
   })
 
   it("does not replace a deleted practice role with the current role", () => {
-    const response = createPracticeScenario("setupReady")
-
     expect(
       resolvePracticeTrainingEntry(
-        response.setupContext,
-        response.session.selection,
+        setupContext,
+        selection,
         {
           targetRoleId: "role_missing",
           questionType: "businessUnderstanding",
@@ -34,7 +50,7 @@ describe("training entry search application", () => {
       status: "roleUnavailable",
       reason: "targetRoleDeleted",
       configuration: {
-        ...response.session.selection,
+        ...selection,
         targetRoleId: null,
         questionType: "businessUnderstanding",
       },
@@ -73,18 +89,12 @@ describe("training entry search application", () => {
   })
 
   it("reports unsupported practice question types and difficulties with stable reasons", () => {
-    const response = createPracticeScenario("setupReady")
-    const role = response.setupContext.targetRoles[0]
-    const context = structuredClone(response.setupContext)
-    context.targetRoles[0]!.supportedQuestionTypes = ["behavioral"]
-    context.availableDifficulties = ["basic"]
-
     expect(
       resolvePracticeTrainingEntry(
-        context,
-        response.session.selection,
+        setupContext,
+        selection,
         {
-          targetRoleId: role.id,
+          targetRoleId: selection.targetRoleId,
           questionType: "technicalFoundation",
           difficulty: "pressure",
         },
@@ -94,8 +104,7 @@ describe("training entry search application", () => {
       status: "adjusted",
       adjustments: ["practiceQuestionTypeUnsupported", "difficultyUnavailable"],
       configuration: {
-        ...response.session.selection,
-        targetRoleId: role.id,
+        ...selection,
         questionType: "behavioral",
         difficulty: "basic",
       },
