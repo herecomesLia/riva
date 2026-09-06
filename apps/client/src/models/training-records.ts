@@ -118,29 +118,6 @@ export type TrainingRecordReferenceAnswerTarget =
       followUpId: string
     })
 
-export type TrainingRecordReferenceAnswerGenerationResponse = {
-  target: TrainingRecordReferenceAnswerTarget
-  referenceAnswer: TrainingRecordReferenceAnswer
-}
-
-export type TrainingRecordReferenceAnswerGenerationErrorCode =
-  | "recordNotFound"
-  | "questionNotFound"
-  | "followUpNotFound"
-  | "alreadyGenerating"
-  | "alreadyReady"
-  | "insufficientContext"
-
-export class TrainingRecordReferenceAnswerGenerationError extends Error {
-  readonly code: TrainingRecordReferenceAnswerGenerationErrorCode
-
-  constructor(code: TrainingRecordReferenceAnswerGenerationErrorCode, message: string) {
-    super(message)
-    this.code = code
-    this.name = "TrainingRecordReferenceAnswerGenerationError"
-  }
-}
-
 export type TrainingRecordFollowUp = {
   id: string
   prompt: string

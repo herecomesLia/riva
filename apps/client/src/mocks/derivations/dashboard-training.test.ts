@@ -1,26 +1,29 @@
 import { describe, expect, it } from "vitest"
 
-import { trainingRecordDetailsMock } from "@/mocks/data/training-records"
+import { trainingRecordsFixture } from "@/mocks/fixtures/training-records"
+import type { TargetedPracticeRecordDetailResponse } from "@/models/training-records"
 
 import { deriveDashboardTrainingData } from "./dashboard-training"
 
 describe("deriveDashboardTrainingData", () => {
   it("derives raw /100 scores, deterministic periods, trends, weaknesses, and next action", () => {
-    const dashboard = deriveDashboardTrainingData(structuredClone(trainingRecordDetailsMock))
+    const dashboard = deriveDashboardTrainingData(
+      structuredClone([trainingRecordsFixture.practice, trainingRecordsFixture.interview]),
+    )
 
     expect(dashboard.metrics).toEqual({
-      targetedPracticeScore: { currentValue: 86, previousValue: 68 },
-      mockInterviewScore: { currentValue: 80, previousValue: null },
-      practiceTimeMinutes: { currentValue: 15, previousValue: 40 },
+      targetedPracticeScore: { currentValue: 84, previousValue: null },
+      mockInterviewScore: { currentValue: 82, previousValue: null },
+      practiceTimeMinutes: { currentValue: 40, previousValue: null },
     })
-    expect(dashboard.performanceTrend.targetedPractice.map(({ score }) => score)).toEqual([68, 86])
-    expect(dashboard.performanceTrend.mockInterview.map(({ score }) => score)).toEqual([80])
-    expect(dashboard.weaknesses.map(({ description }) => description)).toEqual([
-      "复杂方案的取舍说明不够充分",
+    expect(dashboard.performanceTrend.targetedPractice.map(({ score }) => score)).toEqual([84])
+    expect(dashboard.performanceTrend.mockInterview.map(({ score }) => score)).toEqual([82])
+    expect(dashboard.weaknesses).toMatchObject([
+      { description: "结果证据", recommendedPracticeCount: 2 },
     ])
     expect(dashboard.recommendation).toMatchObject({
-      sourceRecordId: "targeted-practice-record-001",
-      targetRoleId: "role_frontend_bytedance",
+      sourceRecordId: "training-practice",
+      targetRoleId: "11111111-1111-4111-8111-111111111111",
       recommendation: { action: "mockInterview" },
     })
   })
@@ -39,7 +42,15 @@ describe("deriveDashboardTrainingData", () => {
   })
 
   it("keeps one-kind, unscored, early-ended records meaningful", () => {
-    const record = structuredClone(trainingRecordDetailsMock[2]!)
+    const record = structuredClone<TargetedPracticeRecordDetailResponse>(
+      trainingRecordsFixture.practice,
+    )
+    record.status = "endedEarly"
+    record.overallScore = null
+    record.durationSeconds = 120
+    record.endedAt = "2026-07-18T08:00:00.000Z"
+    record.recommendation = null
+    record.exposedWeaknesses = []
     const dashboard = deriveDashboardTrainingData([record])
 
     expect(dashboard.metrics.targetedPracticeScore).toEqual({

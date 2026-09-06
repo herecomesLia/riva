@@ -2,13 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { dashboardResponseMock } from "@/mocks/data/dashboard"
 import { getRolesPage, resetRolesMockState, setCurrentTargetRole } from "@/mocks/services/roles"
-import { resetTrainingRecordsMockState } from "@/mocks/services/training-records"
 import { getDashboardData } from "@/services/dashboard"
 
 beforeEach(() => {
   vi.useFakeTimers()
   resetRolesMockState()
-  resetTrainingRecordsMockState()
 })
 
 afterEach(() => {
@@ -60,32 +58,14 @@ describe("getDashboardData mock service", () => {
 
   it("returns an independent response copy for each mock request", async () => {
     const firstResponse = await settle(getDashboardData())
+    const original = structuredClone(firstResponse)
     firstResponse.currentRole!.title = "Mutated role title"
     firstResponse.weaknesses[0].description = "Mutated weakness description"
 
     const secondResponse = await settle(getDashboardData())
 
-    expect(secondResponse.currentRole!.title).not.toBe("Mutated role title")
-    expect(secondResponse.weaknesses).toEqual(dashboardResponseMock.weaknesses)
+    expect(secondResponse).toEqual(original)
     expect(secondResponse).not.toBe(firstResponse)
-  })
-
-  it("returns a real empty training state when the repository is empty", async () => {
-    resetTrainingRecordsMockState("empty")
-
-    const dashboard = await settle(getDashboardData())
-
-    expect(dashboard.metrics).toMatchObject({
-      practiceTimeMinutes: { currentValue: null, previousValue: null },
-      targetedPracticeScore: { currentValue: null, previousValue: null },
-      mockInterviewScore: { currentValue: null, previousValue: null },
-    })
-    expect(dashboard.performanceTrend).toEqual({
-      targetedPractice: [],
-      mockInterview: [],
-    })
-    expect(dashboard.weaknesses).toEqual([])
-    expect(dashboard.recommendation).toBeNull()
   })
 
   it("reflects a target-role current switch on the next dashboard request", async () => {

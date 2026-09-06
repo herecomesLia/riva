@@ -1,5 +1,10 @@
 import type { DashboardResponse, DashboardWeaknessCategory } from "@/models/dashboard"
-import type { TrainingRecordDetail } from "@/mocks/repositories/training-records"
+import type {
+  TargetedPracticeRecordDetailResponse,
+  MockInterviewRecordDetailResponse,
+} from "@/models/training-records"
+
+type TrainingRecordDetail = TargetedPracticeRecordDetailResponse | MockInterviewRecordDetailResponse
 
 export const DASHBOARD_REPORTING_PERIOD = {
   current: {

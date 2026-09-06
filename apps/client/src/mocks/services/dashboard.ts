@@ -1,5 +1,5 @@
 import { deriveDashboardTrainingData } from "@/mocks/derivations/dashboard-training"
-import { listTrainingRecordSnapshots } from "@/mocks/repositories/training-records"
+import { trainingRecordsFixture } from "@/mocks/fixtures/training-records"
 import { getRolesPage } from "@/mocks/services/roles"
 import type { DashboardResponse } from "@/models/dashboard"
 import type { TargetRole } from "@/models/roles"
@@ -37,7 +37,9 @@ export async function getDashboardData(): Promise<DashboardResponse> {
     : null
   const profileCompleted =
     rolesResponse.profileContext.exists && rolesResponse.profileContext.completed
-  const training = deriveDashboardTrainingData(listTrainingRecordSnapshots())
+  const training = deriveDashboardTrainingData(
+    structuredClone([trainingRecordsFixture.practice, trainingRecordsFixture.interview]),
+  )
 
   return {
     currentRole: toCurrentRoleSummary(currentRole, profileCompleted),
