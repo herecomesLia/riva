@@ -29,7 +29,6 @@ export function TargetedPracticeHistoryPage() {
   const referenceAnswerGeneration = useHistoryReferenceAnswerGeneration({
     detailQueryKey,
     kind: "targetedPractice",
-    record: query.data,
     recordId,
   })
 

@@ -8,8 +8,7 @@ import { TargetedPracticeHistoryPage } from "@/pages/history"
 import { completedTargetedPracticeHistoryStoryFixture } from "@/pages/history/stories/targeted-practice-history-story-fixtures"
 import {
   getTargetedPracticeRecord,
-  getTrainingRecordReferenceAnswerGenerationStatus,
-  requestTrainingRecordReferenceAnswer,
+  generateTrainingRecordReferenceAnswer,
 } from "@/services/training-records"
 import { renderWithProviders } from "@/test/render"
 
@@ -23,18 +22,13 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
 vi.mock("@/services/training-records", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/training-records")>()),
   getTargetedPracticeRecord: vi.fn(),
-  getTrainingRecordReferenceAnswerGenerationStatus: vi.fn(),
-  requestTrainingRecordReferenceAnswer: vi.fn(),
+  generateTrainingRecordReferenceAnswer: vi.fn(),
 }))
 
 describe("TargetedPracticeHistoryPage", () => {
   beforeEach(() => {
     vi.mocked(getTargetedPracticeRecord).mockReset()
-    vi.mocked(getTrainingRecordReferenceAnswerGenerationStatus).mockReset()
-    vi.mocked(requestTrainingRecordReferenceAnswer).mockReset()
-    vi.mocked(getTrainingRecordReferenceAnswerGenerationStatus).mockImplementation(
-      () => new Promise(() => {}),
-    )
+    vi.mocked(generateTrainingRecordReferenceAnswer).mockReset()
   })
 
   it("queries the record independently by the route ID and maps ready data", async () => {
@@ -89,11 +83,7 @@ describe("TargetedPracticeHistoryPage", () => {
       questionId: question.id,
     } as const
     vi.mocked(getTargetedPracticeRecord).mockResolvedValue(record)
-    vi.mocked(requestTrainingRecordReferenceAnswer).mockResolvedValue({
-      target,
-      referenceAnswer: { status: "generating", content: null },
-    })
-    vi.mocked(getTrainingRecordReferenceAnswerGenerationStatus).mockResolvedValue({
+    vi.mocked(generateTrainingRecordReferenceAnswer).mockResolvedValue({
       target,
       referenceAnswer: {
         status: "ready",
@@ -121,8 +111,7 @@ describe("TargetedPracticeHistoryPage", () => {
     )
 
     expect(await screen.findByText("Generated history answer")).toBeInTheDocument()
-    expect(vi.mocked(requestTrainingRecordReferenceAnswer).mock.calls[0]?.[0]).toEqual(target)
-    expect(getTrainingRecordReferenceAnswerGenerationStatus).toHaveBeenCalledWith(target)
+    expect(vi.mocked(generateTrainingRecordReferenceAnswer).mock.calls[0]?.[0]).toEqual(target)
     expect(getTargetedPracticeRecord).toHaveBeenCalledTimes(1)
   })
 })

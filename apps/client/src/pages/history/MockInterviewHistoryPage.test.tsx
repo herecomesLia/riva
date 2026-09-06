@@ -8,8 +8,7 @@ import { MockInterviewHistoryPage } from "@/pages/history"
 import { completeMockInterviewHistoryStoryFixture } from "@/pages/history/stories/mock-interview-history-story-fixtures"
 import {
   getMockInterviewRecord,
-  getTrainingRecordReferenceAnswerGenerationStatus,
-  requestTrainingRecordReferenceAnswer,
+  generateTrainingRecordReferenceAnswer,
 } from "@/services/training-records"
 import { renderWithProviders } from "@/test/render"
 
@@ -23,18 +22,13 @@ vi.mock("@tanstack/react-router", async (importOriginal) => ({
 vi.mock("@/services/training-records", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/training-records")>()),
   getMockInterviewRecord: vi.fn(),
-  getTrainingRecordReferenceAnswerGenerationStatus: vi.fn(),
-  requestTrainingRecordReferenceAnswer: vi.fn(),
+  generateTrainingRecordReferenceAnswer: vi.fn(),
 }))
 
 describe("MockInterviewHistoryPage", () => {
   beforeEach(() => {
     vi.mocked(getMockInterviewRecord).mockReset()
-    vi.mocked(getTrainingRecordReferenceAnswerGenerationStatus).mockReset()
-    vi.mocked(requestTrainingRecordReferenceAnswer).mockReset()
-    vi.mocked(getTrainingRecordReferenceAnswerGenerationStatus).mockImplementation(
-      () => new Promise(() => {}),
-    )
+    vi.mocked(generateTrainingRecordReferenceAnswer).mockReset()
   })
 
   it("queries independently by the route record ID and maps ready data", async () => {
@@ -88,28 +82,19 @@ describe("MockInterviewHistoryPage", () => {
       followUpId: followUp.id,
     } as const
     vi.mocked(getMockInterviewRecord).mockResolvedValue(record)
-    vi.mocked(requestTrainingRecordReferenceAnswer).mockResolvedValue({
+    vi.mocked(generateTrainingRecordReferenceAnswer).mockResolvedValue({
       target,
-      referenceAnswer: { status: "generating", content: null },
+      referenceAnswer: {
+        status: "ready",
+        content: {
+          recommendedStructure: ["结论", "证据"],
+          keyPoints: ["回应追问"],
+          exampleAnswer: "Generated follow-up history answer",
+          usageGuidance: "Adapt this answer.",
+          generatedAt: "2026-07-25T08:01:00.000Z",
+        },
+      },
     })
-    vi.mocked(getTrainingRecordReferenceAnswerGenerationStatus).mockImplementation(
-      async (candidate) =>
-        candidate.subject === "followUp" && candidate.followUpId === followUp.id
-          ? {
-              target,
-              referenceAnswer: {
-                status: "ready",
-                content: {
-                  recommendedStructure: ["结论", "证据"],
-                  keyPoints: ["回应追问"],
-                  exampleAnswer: "Generated follow-up history answer",
-                  usageGuidance: "Adapt this answer.",
-                  generatedAt: "2026-07-25T08:01:00.000Z",
-                },
-              },
-            }
-          : new Promise(() => {}),
-    )
 
     renderWithProviders(<MockInterviewHistoryPage />)
 
@@ -119,7 +104,7 @@ describe("MockInterviewHistoryPage", () => {
     await user.click(generateButtons.at(-1)!)
 
     expect(await screen.findByText("Generated follow-up history answer")).toBeInTheDocument()
-    expect(vi.mocked(requestTrainingRecordReferenceAnswer).mock.calls[0]?.[0]).toEqual(target)
+    expect(vi.mocked(generateTrainingRecordReferenceAnswer).mock.calls[0]?.[0]).toEqual(target)
     expect(getMockInterviewRecord).toHaveBeenCalledTimes(1)
   })
 })

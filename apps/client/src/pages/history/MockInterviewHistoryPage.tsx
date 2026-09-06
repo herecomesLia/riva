@@ -29,7 +29,6 @@ export function MockInterviewHistoryPage() {
   const referenceAnswerGeneration = useHistoryReferenceAnswerGeneration({
     detailQueryKey,
     kind: "mockInterview",
-    record: query.data,
     recordId,
   })
 

@@ -1,57 +1,42 @@
-import { env } from "@/app/env"
-import * as trainingRecordsMockService from "@/mocks/services/training-records"
-import type {
-  ListTrainingRecordsInput,
-  MockInterviewRecordDetailResponse,
-  TargetedPracticeRecordDetailResponse,
-  TrainingRecordsOverviewResponse,
-  TrainingRecordsPageResponse,
-  TrainingRecordReferenceAnswerGenerationResponse,
-  TrainingRecordReferenceAnswerTarget,
+import { trainingRecordsFaker } from "@/mocks/fakers/training-records"
+import {
+  TrainingRecordNotFoundError,
+  type ListTrainingRecordsInput,
+  type MockInterviewRecordDetailResponse,
+  type TargetedPracticeRecordDetailResponse,
+  type TrainingRecordReferenceAnswerTarget,
 } from "@/models/training-records"
 
-async function realApiUnavailable(): Promise<never> {
-  throw new Error("Real training records API is not implemented.")
+export async function getTrainingRecordsOverview() {
+  return trainingRecordsFaker.overview()
 }
 
-export async function getTrainingRecordsOverview(): Promise<TrainingRecordsOverviewResponse> {
-  return env.mock ? trainingRecordsMockService.getTrainingRecordsOverview() : realApiUnavailable()
-}
-
-export async function listTrainingRecords(
-  input: ListTrainingRecordsInput,
-): Promise<TrainingRecordsPageResponse> {
-  return env.mock ? trainingRecordsMockService.listTrainingRecords(input) : realApiUnavailable()
+export async function listTrainingRecords(input: ListTrainingRecordsInput) {
+  return trainingRecordsFaker.list(input)
 }
 
 export async function getTargetedPracticeRecord(
   recordId: string,
 ): Promise<TargetedPracticeRecordDetailResponse> {
-  return env.mock
-    ? trainingRecordsMockService.getTargetedPracticeRecord(recordId)
-    : realApiUnavailable()
+  const record = trainingRecordsFaker.practice(recordId)
+  if (record === null) throw new TrainingRecordNotFoundError("targetedPractice", recordId)
+  return record
 }
 
 export async function getMockInterviewRecord(
   recordId: string,
 ): Promise<MockInterviewRecordDetailResponse> {
-  return env.mock
-    ? trainingRecordsMockService.getMockInterviewRecord(recordId)
-    : realApiUnavailable()
+  const record = trainingRecordsFaker.interview(recordId)
+  if (record === null) throw new TrainingRecordNotFoundError("mockInterview", recordId)
+  return record
 }
 
-export async function requestTrainingRecordReferenceAnswer(
+export async function generateTrainingRecordReferenceAnswer(
   target: TrainingRecordReferenceAnswerTarget,
-): Promise<TrainingRecordReferenceAnswerGenerationResponse> {
-  return env.mock
-    ? trainingRecordsMockService.requestTrainingRecordReferenceAnswer(target)
-    : realApiUnavailable()
-}
-
-export async function getTrainingRecordReferenceAnswerGenerationStatus(
-  target: TrainingRecordReferenceAnswerTarget,
-): Promise<TrainingRecordReferenceAnswerGenerationResponse> {
-  return env.mock
-    ? trainingRecordsMockService.getTrainingRecordReferenceAnswerGenerationStatus(target)
-    : realApiUnavailable()
+) {
+  const referenceAnswer = trainingRecordsFaker.reference(target)
+  if (referenceAnswer === null) {
+    throw new Error("Training record reference answer target was not found.")
+  }
+  return { target: structuredClone(target), referenceAnswer }
 }
