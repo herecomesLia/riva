@@ -6,7 +6,6 @@ import type { ActiveSelection, PracticeSetupContext } from "@/models/practice-wo
 import {
   resolveInterviewTrainingEntry,
   resolvePracticeTrainingEntry,
-  resolveTrainingEntryRoleAvailability,
   toPracticeQuestionType,
 } from "@/models/training-entry"
 
@@ -120,26 +119,6 @@ describe("training entry search application", () => {
         questionType: "behavioral",
         difficulty: "basic",
       },
-    })
-  })
-
-  it("distinguishes deleted, archived, and prerequisite-unavailable roles", () => {
-    const roles = [
-      { id: "active", status: "active" as const },
-      { id: "archived", status: "archived" as const },
-    ]
-
-    expect(resolveTrainingEntryRoleAvailability(roles, ["active"], "missing")).toEqual({
-      status: "unavailable",
-      reason: "targetRoleDeleted",
-    })
-    expect(resolveTrainingEntryRoleAvailability(roles, ["active"], "archived")).toEqual({
-      status: "unavailable",
-      reason: "targetRoleArchived",
-    })
-    expect(resolveTrainingEntryRoleAvailability(roles, [], "active")).toEqual({
-      status: "unavailable",
-      reason: "targetRolePrerequisiteUnavailable",
     })
   })
 })

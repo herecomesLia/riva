@@ -12,7 +12,6 @@ import type {
   PracticeSelection,
 } from "./practice-workflow"
 import type { TrainingRecordQuestionType } from "./training-records"
-import type { TargetRoleStatus } from "./roles"
 
 export type TrainingEntryOrigin = "history"
 
@@ -101,23 +100,6 @@ export function tryToPracticeQuestionType(questionType: unknown): QuestionType |
 
 export function toPracticeQuestionType(questionType: TrainingRecordQuestionType): QuestionType {
   return practiceTypeByTrainingRecordType[questionType]
-}
-
-export function resolveTrainingEntryRoleAvailability(
-  roles: Array<{ id: string; status: TargetRoleStatus }>,
-  trainableRoleIds: readonly string[],
-  requestedRoleId: string | undefined,
-  prerequisitesAvailable = true,
-): TrainingEntryRoleAvailability {
-  const role = roles.find(({ id }) => id === requestedRoleId)
-  if (!role) return { status: "unavailable", reason: "targetRoleDeleted" }
-  if (role.status === "archived") {
-    return { status: "unavailable", reason: "targetRoleArchived" }
-  }
-  if (!prerequisitesAvailable || !trainableRoleIds.includes(role.id)) {
-    return { status: "unavailable", reason: "targetRolePrerequisiteUnavailable" }
-  }
-  return { status: "available" }
 }
 
 export function resolvePracticeTrainingEntry(

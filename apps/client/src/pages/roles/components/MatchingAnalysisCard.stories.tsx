@@ -4,7 +4,6 @@ import preview from "#storybook/preview"
 import { expect, fn, screen } from "storybook/test"
 
 import { withRouter } from "#storybook/decorators/with-router"
-import type { RolesMockScenario } from "@/mocks/data/roles"
 
 import {
   createLongMatchingAnalysisResponse,
@@ -100,7 +99,11 @@ export const LongMatchingAnalysis = meta.story({
   },
 })
 
-function AnalysisFlowHarness({ initialScenario }: { initialScenario: RolesMockScenario }) {
+function AnalysisFlowHarness({
+  initialScenario,
+}: {
+  initialScenario: Parameters<typeof createRoleStoryResponse>[0]
+}) {
   const [response, setResponse] = useState(() => createRoleStoryResponse(initialScenario))
   const completed = createRoleStoryResponse("matchingAnalysisCurrent")
   const role = response.roles[0]!
