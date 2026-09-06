@@ -66,55 +66,10 @@ export default defineConfig({
     projects: [
       {
         extends: true,
-        resolve: {
-          alias: [
-            {
-              find: "@/app/env",
-              replacement: path.resolve(dirname, "src/test/env/unit.ts"),
-            },
-          ],
-        },
         test: {
           name: "unit",
           testTimeout: 10_000,
           include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
-          exclude: [
-            "src/**/*.api.test.ts",
-            "src/**/*.api.test.tsx",
-            "src/**/*.mock.test.ts",
-            "src/**/*.mock.test.tsx",
-            "src/**/*.stories.*",
-          ],
-        },
-      },
-      {
-        extends: true,
-        resolve: {
-          alias: [
-            {
-              find: "@/app/env",
-              replacement: path.resolve(dirname, "src/test/env/api.ts"),
-            },
-          ],
-        },
-        test: {
-          name: "api",
-          include: ["src/**/*.api.test.ts", "src/**/*.api.test.tsx"],
-        },
-      },
-      {
-        extends: true,
-        resolve: {
-          alias: [
-            {
-              find: "@/app/env",
-              replacement: path.resolve(dirname, "src/test/env/mock.ts"),
-            },
-          ],
-        },
-        test: {
-          name: "mock",
-          include: ["src/**/*.mock.test.ts", "src/**/*.mock.test.tsx"],
         },
       },
       {
