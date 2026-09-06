@@ -1,4 +1,8 @@
-import { trainingRecordDetailsMock } from "@/mocks/data/training-records"
+import {
+  completedTargetedPracticeHistoryStoryFixture,
+  partialTargetedPracticeHistoryStoryFixture,
+} from "./targeted-practice-history-story-fixtures"
+import { completeMockInterviewHistoryStoryFixture } from "./mock-interview-history-story-fixtures"
 import type {
   MockInterviewRecordDetailResponse,
   TargetedPracticeRecordDetailResponse,
@@ -47,11 +51,10 @@ export const historyOverviewStoryFixture: TrainingRecordsOverviewResponse = {
   totalDurationSeconds: 4110,
   answeredQuestionCount: 6,
   averageScore: 78,
-  targetRoles: [
-    ...new Map(
-      trainingRecordDetailsMock.map((record) => [record.targetRole.id, record.targetRole]),
-    ).values(),
-  ].toSorted((left, right) => left.id.localeCompare(right.id)),
+  targetRoles: structuredClone([
+    completedTargetedPracticeHistoryStoryFixture.targetRole,
+    completeMockInterviewHistoryStoryFixture.targetRole,
+  ]),
   byKind: {
     targetedPractice: {
       recordCount: 3,
@@ -67,10 +70,11 @@ export const historyOverviewStoryFixture: TrainingRecordsOverviewResponse = {
 }
 
 export const historyRecordsStoryFixture: TrainingRecordsPageResponse = {
-  items: trainingRecordDetailsMock
-    .toSorted((left, right) => right.startedAt.localeCompare(left.startedAt))
-    .slice(0, 3)
-    .map(toSummary),
+  items: [
+    completedTargetedPracticeHistoryStoryFixture,
+    partialTargetedPracticeHistoryStoryFixture,
+    completeMockInterviewHistoryStoryFixture,
+  ].map(toSummary),
   pagination: {
     page: 1,
     pageSize: 3,

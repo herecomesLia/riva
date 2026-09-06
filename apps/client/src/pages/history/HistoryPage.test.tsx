@@ -133,7 +133,7 @@ describe("HistoryPage", () => {
     await waitFor(() =>
       expect(listTrainingRecords).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          targetRoleId: "role_product_manager_meituan",
+          targetRoleId: "22222222-2222-4222-8222-222222222222",
           page: 1,
         }),
       ),
@@ -149,7 +149,7 @@ describe("HistoryPage", () => {
     await waitFor(() =>
       expect(listTrainingRecords).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          targetRoleId: "role_product_manager_meituan",
+          targetRoleId: "22222222-2222-4222-8222-222222222222",
           startedAtFrom: expect.any(String),
           page: 1,
         }),
