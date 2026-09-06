@@ -1,6 +1,6 @@
 import preview from "#storybook/preview"
 
-import { dashboardResponseMock } from "@/mocks/data/dashboard"
+import { dashboardStoryFixture } from "../stories/dashboard-story-fixtures"
 import type { DashboardResponse } from "@/models/dashboard"
 
 import { PerformanceTrendCard } from "./PerformanceTrendCard"
@@ -12,7 +12,7 @@ const emptyPerformanceTrend = {
 
 const singleRecordTrend = {
   mockInterview: [],
-  targetedPractice: [dashboardResponseMock.performanceTrend.targetedPractice[0]],
+  targetedPractice: [dashboardStoryFixture.performanceTrend.targetedPractice[0]],
 } satisfies DashboardResponse["performanceTrend"]
 
 const meta = preview.meta({
@@ -22,7 +22,7 @@ const meta = preview.meta({
 
 export const Default = meta.story({
   args: {
-    state: { data: dashboardResponseMock.performanceTrend, status: "ready" },
+    state: { data: dashboardStoryFixture.performanceTrend, status: "ready" },
   },
 })
 

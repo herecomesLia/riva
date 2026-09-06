@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
-import { dashboardResponseMock } from "@/mocks/data/dashboard"
+import { dashboardStoryFixture } from "../stories/dashboard-story-fixtures"
 import type { DashboardResponse } from "@/models/dashboard"
 import { renderWithProviders } from "@/test/render"
 
@@ -13,7 +13,7 @@ type CurrentRole = NonNullable<DashboardResponse["currentRole"]>
 
 function createRole(overrides: Partial<CurrentRole>): CurrentRole {
   return {
-    ...dashboardResponseMock.currentRole!,
+    ...dashboardStoryFixture.currentRole!,
     ...overrides,
   }
 }

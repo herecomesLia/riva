@@ -2,7 +2,7 @@ import { fireEvent, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
-import { dashboardResponseMock } from "@/mocks/data/dashboard"
+import { dashboardStoryFixture } from "./stories/dashboard-story-fixtures"
 import type { DashboardResponse } from "@/models/dashboard"
 import type { Loadable } from "@/types"
 
@@ -12,7 +12,7 @@ import { DashboardView } from "./DashboardView"
 const emptyMetric = { currentValue: null, previousValue: null } as const
 
 const emptyDashboardResponse = {
-  ...structuredClone(dashboardResponseMock),
+  ...structuredClone(dashboardStoryFixture),
   currentRole: null,
   recommendation: null,
   metrics: {
@@ -29,7 +29,7 @@ const emptyDashboardResponse = {
 } satisfies DashboardResponse
 
 const partialDashboardResponse = {
-  ...structuredClone(dashboardResponseMock),
+  ...structuredClone(dashboardStoryFixture),
   currentRole: {
     id: "role_product_manager_partial",
     title: "Product Manager",
@@ -91,22 +91,22 @@ describe("DashboardView", () => {
   })
 
   it("renders complete business data in the ready layout", async () => {
-    renderDashboardView({ status: "ready", data: structuredClone(dashboardResponseMock) })
+    renderDashboardView({ status: "ready", data: structuredClone(dashboardStoryFixture) })
 
-    expect(await screen.findByText(dashboardResponseMock.currentRole!.title)).toBeInTheDocument()
+    expect(await screen.findByText(dashboardStoryFixture.currentRole!.title)).toBeInTheDocument()
     expect(
-      screen.getByText(dashboardResponseMock.recommendation!.recommendation.reason),
+      screen.getByText(dashboardStoryFixture.recommendation!.recommendation.reason),
     ).toBeInTheDocument()
     expect(screen.getByText("76%")).toBeInTheDocument()
     expect(screen.getAllByText("8.6 / 10").length).toBeGreaterThan(0)
-    expect(screen.getByText(dashboardResponseMock.weaknesses[0].description)).toBeInTheDocument()
+    expect(screen.getByText(dashboardStoryFixture.weaknesses[0].description)).toBeInTheDocument()
     expect(screen.getByText(i18n.t("dashboard.weaknesses.description"))).toBeInTheDocument()
     const recommendationLink = screen.getByRole("link", {
       name: i18n.t("history.detail.recommendationActions.mockInterview"),
     })
     expect(recommendationLink).toHaveAttribute("href", expect.stringContaining("/interview?"))
     expect(recommendationLink.getAttribute("href")).toContain(
-      `targetRoleId=${dashboardResponseMock.recommendation!.targetRoleId}`,
+      `targetRoleId=${dashboardStoryFixture.recommendation!.targetRoleId}`,
     )
 
     const chart = screen.getByRole("img", { name: "最近 10 次专项练习评分表现" })
@@ -128,7 +128,7 @@ describe("DashboardView", () => {
   })
 
   it("renders an unchanged metric comparison", async () => {
-    const data = structuredClone(dashboardResponseMock)
+    const data = structuredClone(dashboardStoryFixture)
     data.metrics.roleFit = { currentValue: 76, previousValue: 76 }
 
     renderDashboardView({ status: "ready", data })

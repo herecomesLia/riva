@@ -1,6 +1,6 @@
 import preview from "#storybook/preview"
 
-import { dashboardResponseMock } from "@/mocks/data/dashboard"
+import { dashboardStoryFixture } from "../stories/dashboard-story-fixtures"
 import type { DashboardResponse } from "@/models/dashboard"
 
 import { DashboardMetrics } from "./DashboardMetrics"
@@ -13,7 +13,7 @@ const emptyMetrics = {
 } satisfies DashboardResponse["metrics"]
 
 const mixedMetrics = {
-  ...dashboardResponseMock.metrics,
+  ...dashboardStoryFixture.metrics,
   mockInterviewScore: { currentValue: 74, previousValue: null },
   practiceTimeMinutes: { currentValue: 45, previousValue: 49 },
   roleFit: { currentValue: 76, previousValue: 65.8 },
@@ -27,7 +27,7 @@ const meta = preview.meta({
 
 export const Default = meta.story({
   args: {
-    state: { data: dashboardResponseMock.metrics, status: "ready" },
+    state: { data: dashboardStoryFixture.metrics, status: "ready" },
   },
 })
 

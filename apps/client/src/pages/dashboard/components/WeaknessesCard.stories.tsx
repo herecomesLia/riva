@@ -1,6 +1,6 @@
 import preview from "#storybook/preview"
 
-import { dashboardResponseMock } from "@/mocks/data/dashboard"
+import { dashboardStoryFixture } from "../stories/dashboard-story-fixtures"
 
 import { withRouter } from "#storybook/decorators/with-router"
 import { WeaknessesCard } from "./WeaknessesCard"
@@ -18,7 +18,7 @@ const meta = preview.meta({
 
 export const Default = meta.story({
   args: {
-    state: { data: dashboardResponseMock.weaknesses, status: "ready" },
+    state: { data: dashboardStoryFixture.weaknesses, status: "ready" },
   },
 })
 

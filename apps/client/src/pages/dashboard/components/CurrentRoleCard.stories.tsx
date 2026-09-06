@@ -1,6 +1,6 @@
 import preview from "#storybook/preview"
 
-import { dashboardResponseMock } from "@/mocks/data/dashboard"
+import { dashboardStoryFixture } from "../stories/dashboard-story-fixtures"
 import type { DashboardResponse } from "@/models/dashboard"
 
 import { withRouter } from "#storybook/decorators/with-router"
@@ -10,7 +10,7 @@ type CurrentRole = NonNullable<DashboardResponse["currentRole"]>
 
 function createRole(overrides: Partial<CurrentRole>): CurrentRole {
   return {
-    ...dashboardResponseMock.currentRole!,
+    ...dashboardStoryFixture.currentRole!,
     ...overrides,
   }
 }

@@ -1,7 +1,7 @@
 import preview from "#storybook/preview"
 import { expect, fn } from "storybook/test"
 
-import { dashboardResponseMock } from "@/mocks/data/dashboard"
+import { dashboardStoryFixture } from "./stories/dashboard-story-fixtures"
 
 import { withRouter } from "#storybook/decorators/with-router"
 import { DashboardView } from "./DashboardView"
@@ -20,7 +20,7 @@ const meta = preview.meta({
 export const Default = meta.story({
   args: {
     content: {
-      data: dashboardResponseMock,
+      data: dashboardStoryFixture,
       status: "ready",
     },
     displayName: "测试用户",
