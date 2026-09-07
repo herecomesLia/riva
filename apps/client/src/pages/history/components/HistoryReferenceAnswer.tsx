@@ -40,7 +40,7 @@ export function HistoryReferenceAnswer({
               <h4 className="font-heading text-sm font-medium">
                 {t("history.detail.reference.example")}
               </h4>
-              <p className="max-w-prose whitespace-pre-wrap text-sm leading-7">
+              <p className="whitespace-pre-wrap break-words text-sm leading-7">
                 {referenceAnswer.content.exampleAnswer}
               </p>
             </section>
