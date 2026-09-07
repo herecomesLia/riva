@@ -93,8 +93,6 @@ class LLMSettings(BaseModel):
     base_url: AnyHttpUrl | None = None
     timeout_seconds: float = Field(default=60, gt=0)
     max_retries: int = Field(default=2, ge=0)
-    health_timeout_seconds: float = Field(default=5, gt=0)
-    health_ttl_seconds: float = Field(default=30, ge=0)
 
     @field_validator("base_url", mode="before")
     @classmethod
@@ -133,8 +131,27 @@ class LLMSettings(BaseModel):
         )
         os.environ["RIVA_LLM_TIMEOUT_SECONDS"] = str(self.timeout_seconds)
         os.environ["RIVA_LLM_MAX_RETRIES"] = str(self.max_retries)
-        os.environ["RIVA_LLM_HEALTH_TIMEOUT_SECONDS"] = str(self.health_timeout_seconds)
-        os.environ["RIVA_LLM_HEALTH_TTL_SECONDS"] = str(self.health_ttl_seconds)
+
+
+class HealthProbeSettings(BaseModel):
+    timeout_seconds: float = Field(gt=0)
+    ttl_seconds: float = Field(ge=0)
+
+
+class HealthSettings(BaseModel):
+    database: HealthProbeSettings = Field(
+        default_factory=lambda: HealthProbeSettings(timeout_seconds=2, ttl_seconds=5)
+    )
+    llm: HealthProbeSettings = Field(
+        default_factory=lambda: HealthProbeSettings(timeout_seconds=5, ttl_seconds=30)
+    )
+
+    def write_environ(self) -> None:
+        for dependency, probe in (("DATABASE", self.database), ("LLM", self.llm)):
+            os.environ[f"RIVA_HEALTH_{dependency}_TIMEOUT_SECONDS"] = str(
+                probe.timeout_seconds
+            )
+            os.environ[f"RIVA_HEALTH_{dependency}_TTL_SECONDS"] = str(probe.ttl_seconds)
 
 
 class TaskSettings(BaseModel):
@@ -157,6 +174,7 @@ class Settings(BaseModel):
     cors: CORSSettings = Field(default_factory=CORSSettings)
     session: SessionSettings
     llm: LLMSettings = Field(default_factory=LLMSettings)
+    health: HealthSettings = Field(default_factory=HealthSettings)
     tasks: TaskSettings = Field(default_factory=TaskSettings)
 
     def write_environ(self) -> None:
@@ -168,6 +186,7 @@ class Settings(BaseModel):
         self.cors.write_environ()
         self.session.write_environ()
         self.llm.write_environ()
+        self.health.write_environ()
         self.tasks.write_environ()
 
 
@@ -181,7 +200,8 @@ def load_settings(
     # Let Pydantic validate URLs after the existing empty-string validator.
     converter.register_structure_hook(AnyHttpUrl | None, lambda value, _: value)
 
-    loaders: list[Loader] = []
+    # typed-settings reads leaf defaults, not nested Pydantic default factories.
+    loaders: list[Loader] = [DictLoader({"health": HealthSettings().model_dump()})]
     if env_file is not None:
         loaders.append(DotEnvLoader(prefix="RIVA_", dotenv_path=env_file))
     loaders.append(EnvLoader(prefix="RIVA_"))

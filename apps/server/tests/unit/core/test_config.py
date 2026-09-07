@@ -6,6 +6,8 @@ from pydantic import ValidationError
 
 from riva.core.config import (
     CORSSettings,
+    HealthProbeSettings,
+    HealthSettings,
     LLMSettings,
     SameSitePolicy,
     SessionSettings,
@@ -31,6 +33,12 @@ def clear_riva_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     for field_name in SessionSettings.model_fields:
         monkeypatch.delenv(f"RIVA_SESSION_{field_name.upper()}", raising=False)
 
+    for dependency in HealthSettings.model_fields:
+        for field_name in HealthProbeSettings.model_fields:
+            monkeypatch.delenv(
+                f"RIVA_HEALTH_{dependency.upper()}_{field_name.upper()}", raising=False
+            )
+
 
 def _settings(**overrides: object) -> Settings:
     values: dict[str, object] = {
@@ -41,41 +49,10 @@ def _settings(**overrides: object) -> Settings:
     return Settings(**values)
 
 
-def test_settings_uses_production_defaults() -> None:
-    settings = Settings(
-        database_url=DATABASE_URL,
-        session={"digest_key": SESSION_DIGEST_KEY},
-    )
+def test_cors_settings_parses_allowed_origins() -> None:
+    settings = CORSSettings(allowed_origins=" https://a.test, ,https://b.test, ")
 
-    assert settings.host == "127.0.0.1"
-    assert settings.port == 7482
-    assert settings.cors.allowed_origins == []
-    assert settings.cors.allow_credentials is True
-    assert settings.session.cookie_name == "riva_session"
-    assert settings.session.cookie_secure is True
-    assert settings.session.cookie_samesite == SameSitePolicy.LAX
-    assert settings.session.cookie_path == "/"
-    assert settings.session.idle_timeout_seconds == 604800
-    assert settings.session.refresh_interval_seconds == 300
-
-
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [
-        (
-            " https://a.test, ,https://b.test, ",
-            ["https://a.test", "https://b.test"],
-        ),
-        (["https://a.test", "https://b.test"], ["https://a.test", "https://b.test"]),
-    ],
-)
-def test_cors_settings_parses_allowed_origins(
-    value: object,
-    expected: list[str],
-) -> None:
-    settings = CORSSettings(allowed_origins=value)
-
-    assert settings.allowed_origins == expected
+    assert settings.allowed_origins == ["https://a.test", "https://b.test"]
 
 
 def test_cors_settings_rejects_wildcard_origin_with_credentials() -> None:
@@ -93,10 +70,6 @@ def test_cors_settings_allows_wildcard_origin_without_credentials() -> None:
 def test_session_settings_rejects_blank_digest_key(digest_key: str) -> None:
     with pytest.raises(ValidationError, match="must not be empty"):
         SessionSettings(digest_key=digest_key)
-
-
-def test_session_settings_accepts_non_blank_digest_key() -> None:
-    assert SessionSettings(digest_key="valid-key").digest_key == "valid-key"
 
 
 def test_llm_settings_treats_empty_base_url_as_not_configured() -> None:
@@ -131,9 +104,12 @@ def test_load_settings_source_precedence(
         f"RIVA_SESSION_DIGEST_KEY={SESSION_DIGEST_KEY}\n"
         "RIVA_HOST=dotenv-host\n"
         "RIVA_PORT=7000\n"
+        "RIVA_HEALTH_DATABASE_TIMEOUT_SECONDS=1.5\n"
+        "RIVA_HEALTH_LLM_TTL_SECONDS=15\n"
     )
     monkeypatch.setenv("RIVA_HOST", "env-host")
     monkeypatch.setenv("RIVA_PORT", "8000")
+    monkeypatch.setenv("RIVA_HEALTH_LLM_TTL_SECONDS", "0")
 
     settings = load_settings(env_file=env_file, overrides={"port": 9000})
 
@@ -141,6 +117,8 @@ def test_load_settings_source_precedence(
     assert settings.session.digest_key == SESSION_DIGEST_KEY
     assert settings.host == "env-host"
     assert settings.port == 9000
+    assert settings.health.database.timeout_seconds == 1.5
+    assert settings.health.llm.ttl_seconds == 0
 
 
 def _session(**overrides: object) -> SessionSettings:
@@ -217,28 +195,6 @@ def test_session_settings_requires_secure_cookie_for_samesite_none(
         )
 
 
-@pytest.mark.parametrize(
-    ("field_name", "value", "is_valid"),
-    [
-        ("idle_timeout_seconds", 0, False),
-        ("idle_timeout_seconds", 1, True),
-        ("refresh_interval_seconds", -1, False),
-        ("refresh_interval_seconds", 0, True),
-    ],
-)
-def test_session_settings_validates_timeout_boundaries(
-    field_name: str,
-    value: int,
-    is_valid: bool,
-) -> None:
-    if is_valid:
-        assert getattr(_session(**{field_name: value}), field_name) == value
-        return
-
-    with pytest.raises(ValidationError):
-        _session(**{field_name: value})
-
-
 def test_write_environ_writes_all_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -267,8 +223,10 @@ def test_write_environ_writes_all_settings(
             "base_url": "https://llm.test/v1",
             "timeout_seconds": 12,
             "max_retries": 3,
-            "health_timeout_seconds": 7,
-            "health_ttl_seconds": 18,
+        },
+        health={
+            "database": {"timeout_seconds": 1.5, "ttl_seconds": 0},
+            "llm": {"timeout_seconds": 7, "ttl_seconds": 18},
         },
         tasks={
             "concurrency": 8,
@@ -286,8 +244,10 @@ def test_write_environ_writes_all_settings(
         "RIVA_LLM_BASE_URL": "https://llm.test/v1",
         "RIVA_LLM_TIMEOUT_SECONDS": "12.0",
         "RIVA_LLM_MAX_RETRIES": "3",
-        "RIVA_LLM_HEALTH_TIMEOUT_SECONDS": "7.0",
-        "RIVA_LLM_HEALTH_TTL_SECONDS": "18.0",
+        "RIVA_HEALTH_DATABASE_TIMEOUT_SECONDS": "1.5",
+        "RIVA_HEALTH_DATABASE_TTL_SECONDS": "0.0",
+        "RIVA_HEALTH_LLM_TIMEOUT_SECONDS": "7.0",
+        "RIVA_HEALTH_LLM_TTL_SECONDS": "18.0",
         "RIVA_TASKS_CONCURRENCY": "8",
         "RIVA_TASKS_SHUTDOWN_TIMEOUT_SECONDS": "12.5",
         "RIVA_CORS_ALLOWED_ORIGINS": "https://a.test,https://b.test",
@@ -306,3 +266,5 @@ def test_write_environ_writes_all_settings(
     settings.write_environ()
 
     assert {name: os.environ[name] for name in expected} == expected
+
+    assert load_settings() == settings

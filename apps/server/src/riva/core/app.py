@@ -12,6 +12,7 @@ from starlette.types import ASGIApp
 from riva.api.errors.handlers import register_exception_handlers
 from riva.api.routes import router
 from riva.core.config import Settings, load_settings
+from riva.core.health import HealthChecker
 from riva.core.logging import RequestLoggingMiddleware
 from riva.db import Database
 from riva.llm import LLMClient
@@ -35,6 +36,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         llm = LLMClient(settings.llm)
         app.state.llm = llm
 
+    health = HealthChecker(settings.health, database, llm)
+    app.state.health = health
+
     logger = structlog.get_logger("riva.app")
     lifecycle_fields = {
         "log_level": settings.log_level.value,
@@ -45,13 +49,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     shutdown_started_at: float | None = None
 
     try:
-        async with database, llm:
+        async with database, llm, health:
             await database.ping()
             startup_succeeded = True
 
             if not settings.llm.configured:
                 logger.warning("llm.not_configured")
-            elif await llm.check_health():
+            elif await health.llm.check():
                 logger.info("llm.available", model=settings.llm.model)
             else:
                 logger.warning("llm.unavailable", model=settings.llm.model)

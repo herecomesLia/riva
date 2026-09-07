@@ -7,6 +7,7 @@ from structlog.testing import capture_logs
 
 from riva.core.config import LLMSettings, Settings
 from riva.db import Database
+from riva.llm.errors import LLMError
 
 
 def _event(
@@ -23,7 +24,9 @@ def _event(
 
 def _llm_double(*, available: bool | None = None) -> MagicMock:
     llm = MagicMock()
-    llm.check_health = AsyncMock(return_value=available)
+    llm.ping = AsyncMock(
+        side_effect=LLMError("unavailable") if available is False else None
+    )
     return llm
 
 
@@ -47,7 +50,7 @@ async def test_lifespan_starts_with_llm_not_configured(app: FastAPI) -> None:
             pass
 
     assert sum(event["event"] == "llm.not_configured" for event in events) == 1
-    llm.check_health.assert_not_awaited()
+    llm.ping.assert_not_awaited()
 
 
 @pytest.mark.parametrize(
@@ -78,7 +81,7 @@ async def test_lifespan_reports_initial_llm_readiness(
 
     readiness = next(event for event in events if event["event"] == event_name)
     assert readiness["model"] == "test-model"
-    llm.check_health.assert_awaited_once_with()
+    llm.ping.assert_awaited_once_with()
 
 
 async def test_lifespan_propagates_startup_database_failure(

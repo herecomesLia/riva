@@ -1,6 +1,5 @@
 from typing import Self
 
-from async_lru import alru_cache
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from openai import APIStatusError, AsyncOpenAI
@@ -13,10 +12,7 @@ class LLMClient:
     def __init__(self, settings: LLMSettings) -> None:
         self._settings = settings
         self._chat_model: BaseChatModel | None = None
-        self._health_client: AsyncOpenAI | None = None
-        self._cached_check_health = alru_cache(
-            maxsize=1, ttl=settings.health_ttl_seconds
-        )(self._check_health)
+        self._probe_client: AsyncOpenAI | None = None
 
     async def __aenter__(self) -> Self:
         return self
@@ -40,29 +36,15 @@ class LLMClient:
                 raise LLMError("Failed to initialize LLM chat model.") from exc
         return self._chat_model
 
-    async def check_health(self) -> bool:
-        if self._settings.health_ttl_seconds == 0:
-            return await self._check_health()
-        return await self._cached_check_health()
-
-    async def _check_health(self) -> bool:
-        try:
-            await self.ping()
-        except LLMError:
-            return False
-        return True
-
     async def close(self) -> None:
-        await self._cached_check_health.cache_close()
-
-        health_client = self._health_client
+        probe_client = self._probe_client
         chat_model = self._chat_model
-        self._health_client = None
+        self._probe_client = None
         self._chat_model = None
 
         try:
-            if health_client is not None:
-                await health_client.close()
+            if probe_client is not None:
+                await probe_client.close()
         finally:
             if chat_model is not None:
                 root_client = getattr(chat_model, "root_client", None)
@@ -98,7 +80,7 @@ class LLMClient:
 
     async def _ping_remote(self) -> None:
         model, _, _ = self._require_configured()
-        client = self._get_health_client()
+        client = self._get_probe_client()
 
         try:
             await client.models.retrieve(model)
@@ -114,16 +96,16 @@ class LLMClient:
 
         raise LLMError(f"Configured model is unavailable: {model}")
 
-    def _get_health_client(self) -> AsyncOpenAI:
-        if self._health_client is None:
+    def _get_probe_client(self) -> AsyncOpenAI:
+        if self._probe_client is None:
             _, api_key, base_url = self._require_configured()
             try:
-                self._health_client = AsyncOpenAI(
+                self._probe_client = AsyncOpenAI(
                     api_key=api_key,
                     base_url=base_url,
-                    timeout=self._settings.health_timeout_seconds,
+                    timeout=None,  # The health coordinator bounds the entire probe.
                     max_retries=0,
                 )
             except Exception as exc:
-                raise LLMError("Failed to initialize LLM health client.") from exc
-        return self._health_client
+                raise LLMError("Failed to initialize LLM probe client.") from exc
+        return self._probe_client

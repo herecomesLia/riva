@@ -22,8 +22,8 @@ router = APIRouter(tags=["health"])
 )
 async def health(request: Request) -> HealthResponse | JSONResponse:
     database_available, llm_available = await asyncio.gather(
-        request.app.state.database.check_health(),
-        request.app.state.llm.check_health(),
+        request.app.state.health.database.check(),
+        request.app.state.health.llm.check(),
     )
 
     if not database_available:

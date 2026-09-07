@@ -57,13 +57,13 @@ async def test_health_reports_dependency_state(
     expected_body: dict[str, str],
 ) -> None:
     monkeypatch.setattr(
-        app.state.database,
-        "check_health",
+        app.state.health.database,
+        "check",
         AsyncMock(return_value=database_available),
     )
     monkeypatch.setattr(
-        app.state.llm,
-        "check_health",
+        app.state.health.llm,
+        "check",
         AsyncMock(return_value=llm_available),
     )
 

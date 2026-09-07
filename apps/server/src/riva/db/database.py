@@ -44,13 +44,6 @@ class Database:
         except Exception as exc:
             raise DatabaseUnavailableError("Database ping failed.") from exc
 
-    async def check_health(self) -> bool:
-        try:
-            await self.ping()
-        except DatabaseUnavailableError:
-            return False
-        return True
-
     async def create_tables(self) -> None:
         load_models()
         async with self.engine.begin() as connection:
