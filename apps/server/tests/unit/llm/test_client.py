@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncIterator
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -6,19 +7,16 @@ import httpx
 import pytest
 from openai import APIStatusError
 
-from riva.core.config import DatabaseSettings, HealthCheckSettings, LLMSettings
-from riva.db import Database
-from riva.db.errors import DatabaseUnavailableError
+from riva.core.config import HealthCheckSettings, LLMSettings
 from riva.llm.client import LLMClient
 from riva.llm.errors import LLMError, LLMNotConfiguredError
 from riva.schemas.health import HealthStatus
-from tests.support.settings import PLACEHOLDER_DATABASE_URL
 
 
 def _configured_client(**overrides: object) -> LLMClient:
     values: dict[str, object] = {
         "base_url": "https://llm.test/v1",
-        "model": "test-model",
+        "models": {"default": {"id": "test-model"}},
         "api_key": "test-key",
     }
     values.update(overrides)
@@ -56,12 +54,14 @@ def test_chat_model_uses_runtime_configuration_and_is_reused(
     chat_openai = MagicMock(return_value=chat_model)
     monkeypatch.setattr("riva.llm.client.ChatOpenAI", chat_openai)
 
-    first = client.chat_model
-    second = client.chat_model
+    first = client.chat_model()
+    second = client.chat_model()
 
     assert first is second
+    assert client.chat_model("reasoning") is first
     chat_openai.assert_called_once_with(
         model="test-model",
+        use_responses_api=False,
         api_key="test-key",
         base_url="https://llm.test/v1",
         timeout=12,
@@ -77,7 +77,7 @@ def test_chat_model_requires_llm_configuration(
     monkeypatch.setattr("riva.llm.client.ChatOpenAI", chat_openai)
 
     with pytest.raises(LLMNotConfiguredError):
-        _ = client.chat_model
+        _ = client.chat_model()
 
     chat_openai.assert_not_called()
 
@@ -91,7 +91,7 @@ def test_chat_model_wraps_initialization_failure(
     monkeypatch.setattr("riva.llm.client.ChatOpenAI", chat_openai)
 
     with pytest.raises(LLMError) as raised:
-        _ = client.chat_model
+        _ = client.chat_model()
 
     assert raised.value.__cause__ is failure
 
@@ -106,6 +106,150 @@ async def test_ping_retrieves_configured_model_without_fallback() -> None:
     retrieve.assert_awaited_once_with("test-model")
     list_models.assert_not_called()
     await client.close()
+
+
+@pytest.mark.parametrize(
+    ("reasoning_id", "responses"), [("reasoning-model", False), ("test-model", True)]
+)
+async def test_chat_slots_select_and_close_distinct_model_definitions(
+    monkeypatch: pytest.MonkeyPatch, reasoning_id: str, responses: bool
+) -> None:
+    client = _configured_client(
+        models={
+            "default": {"id": "test-model"},
+            "reasoning": {"id": reasoning_id, "use_responses_api": responses},
+        }
+    )
+    models = [
+        SimpleNamespace(
+            root_client=SimpleNamespace(close=MagicMock()),
+            root_async_client=SimpleNamespace(close=AsyncMock()),
+        )
+        for _ in range(2)
+    ]
+    constructor = MagicMock(side_effect=models)
+    monkeypatch.setattr("riva.llm.client.ChatOpenAI", constructor)
+    probe, _, _ = _probe_client()
+    client._probe_client = probe
+    async with client:
+        assert client.chat_model() is models[0]
+        assert client.chat_model("default") is models[0]
+        assert client.chat_model("reasoning") is models[1]
+        assert client.chat_model("reasoning") is models[1]
+    assert constructor.call_args_list[1].kwargs["model"] == reasoning_id
+    assert constructor.call_args_list[1].kwargs["use_responses_api"] is responses
+    await client.close()
+    probe.close.assert_awaited_once_with()
+    for model in models:
+        model.root_client.close.assert_called_once_with()
+        model.root_async_client.close.assert_awaited_once_with()
+
+
+@pytest.mark.parametrize("slot", [None, "default", "reasoning"])
+async def test_ping_selects_slots_and_finishes_all_probes(slot: str | None) -> None:
+    client = _configured_client(
+        models={
+            "default": {"id": "test-model"},
+            "reasoning": {"id": "reasoning-model"},
+        }
+    )
+    failure = _api_status_error(500)
+    probe, retrieve, _ = _probe_client()
+
+    async def retrieve_model(model_id: str) -> None:
+        if model_id == "test-model":
+            raise failure
+        await asyncio.sleep(0)
+
+    retrieve.side_effect = retrieve_model
+    client._probe_client = probe
+    async with client:
+        if slot == "reasoning":
+            await client.ping(slot)
+        else:
+            with pytest.raises(LLMError) as raised:
+                await client.ping(slot)
+            assert raised.value.__cause__ is failure
+            assert "provider failure" not in str(raised.value)
+    expected = (
+        ["test-model", "reasoning-model"]
+        if slot is None
+        else ["test-model" if slot == "default" else "reasoning-model"]
+    )
+    assert [call.args[0] for call in retrieve.await_args_list] == expected
+
+
+@pytest.mark.parametrize("ttl", [0, 30])
+@pytest.mark.parametrize(
+    ("reasoning_id", "failed_ids", "expected"),
+    [
+        (None, (), HealthStatus.ok),
+        (None, ("test-model",), HealthStatus.unavailable),
+        ("test-model", (), HealthStatus.ok),
+        ("reasoning-model", (), HealthStatus.ok),
+        ("reasoning-model", ("test-model",), HealthStatus.degraded),
+        (
+            "reasoning-model",
+            ("test-model", "reasoning-model"),
+            HealthStatus.unavailable,
+        ),
+    ],
+)
+async def test_health_aggregates_unique_ids_and_caches_each_probe(
+    ttl: int,
+    reasoning_id: str | None,
+    failed_ids: tuple[str, ...],
+    expected: HealthStatus,
+) -> None:
+    client = _configured_client(
+        models={
+            "default": {"id": "test-model"},
+            "reasoning": {"id": reasoning_id, "use_responses_api": True},
+        },
+        health=HealthCheckSettings(timeout_seconds=1, ttl_seconds=ttl),
+    )
+    probe, retrieve, _ = _probe_client()
+
+    async def retrieve_model(model_id: str) -> None:
+        if model_id in failed_ids:
+            raise _api_status_error(500)
+
+    retrieve.side_effect = retrieve_model
+    client._probe_client = probe
+    ids = {"test-model", reasoning_id or "test-model"}
+    async with client:
+        for _ in range(2):
+            assert await client.check_health() == expected
+        assert retrieve.await_count == len(ids) * (1 if ttl else 2)
+        retrieve.reset_mock()
+        if failed_ids:
+            with pytest.raises(LLMError):
+                await client.ping()
+        else:
+            await client.ping()
+        assert {call.args[0] for call in retrieve.await_args_list} == ids
+        assert retrieve.await_count == len(ids)
+
+
+async def test_health_bounds_each_probe_and_expires_cached_results() -> None:
+    client = _configured_client(
+        models={"default": {"id": "test-model"}, "reasoning": {"id": "slow-model"}},
+        health=HealthCheckSettings(timeout_seconds=0.01, ttl_seconds=0.02),
+    )
+    probe, retrieve, _ = _probe_client()
+
+    async def retrieve_model(model_id: str) -> None:
+        if model_id == "slow-model":
+            await asyncio.Event().wait()
+
+    retrieve.side_effect = retrieve_model
+    client._probe_client = probe
+    async with client:
+        assert await client.check_health() == HealthStatus.degraded
+        retrieve.side_effect = None
+        await asyncio.sleep(0.04)
+        assert await client.check_health() == HealthStatus.ok
+        assert retrieve.await_count == 4
 
 
 @pytest.mark.parametrize("status_code", [404, 405, 501])
@@ -138,8 +282,7 @@ async def test_ping_does_not_fallback_for_provider_failure() -> None:
         await client.ping()
 
     assert raised.value.__cause__ is failure
-    assert await client.check_health() == HealthStatus.unavailable
-    assert retrieve.await_count == 2
+    assert retrieve.await_count == 1
     retrieve.assert_awaited_with("test-model")
     list_models.assert_not_called()
     await client.close()
@@ -174,59 +317,3 @@ async def test_ping_reports_not_configured_without_remote_probe(
     assert await client.check_health() == HealthStatus.unavailable
     async_openai.assert_not_called()
     await client.close()
-
-
-async def test_context_manager_releases_initialized_clients() -> None:
-    client = _configured_client()
-    probe_close = AsyncMock()
-    root_close = MagicMock()
-    root_async_close = AsyncMock()
-    client._probe_client = SimpleNamespace(close=probe_close)
-    client._chat_model = SimpleNamespace(
-        root_client=SimpleNamespace(close=root_close),
-        root_async_client=SimpleNamespace(close=root_async_close),
-    )
-
-    async with client:
-        pass
-
-    probe_close.assert_awaited_once_with()
-    root_close.assert_called_once_with()
-    root_async_close.assert_awaited_once_with()
-
-
-@pytest.mark.parametrize(
-    ("database_ttl", "llm_ttl", "database_calls", "llm_calls"),
-    [(5, 0, 1, 2), (0, 30, 2, 1)],
-)
-@pytest.mark.parametrize("available", [True, False])
-async def test_health_respects_independent_cache_policies(
-    database_ttl: int,
-    llm_ttl: int,
-    database_calls: int,
-    llm_calls: int,
-    available: bool,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    database = Database(
-        DatabaseSettings(
-            url=PLACEHOLDER_DATABASE_URL,
-            health=HealthCheckSettings(timeout_seconds=2, ttl_seconds=database_ttl),
-        )
-    )
-    llm = _configured_client(
-        health=HealthCheckSettings(timeout_seconds=5, ttl_seconds=llm_ttl),
-    )
-    database_ping = AsyncMock(
-        side_effect=None if available else DatabaseUnavailableError("unavailable")
-    )
-    llm_ping = AsyncMock(side_effect=None if available else LLMError("unavailable"))
-    monkeypatch.setattr(database, "ping", database_ping)
-    monkeypatch.setattr(llm, "ping", llm_ping)
-    expected = HealthStatus.ok if available else HealthStatus.unavailable
-    async with database, llm:
-        for _ in range(2):
-            assert await database.check_health() == expected
-            assert await llm.check_health() == expected
-        assert database_ping.await_count == database_calls
-        assert llm_ping.await_count == llm_calls

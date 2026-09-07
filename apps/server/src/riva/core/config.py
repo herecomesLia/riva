@@ -106,8 +106,31 @@ class DatabaseSettings(BaseModel):
         os.environ["RIVA_DATABASE_HEALTH_TTL_SECONDS"] = str(self.health.ttl_seconds)
 
 
+class LLMModelSettings(BaseModel):
+    id: str | None = None
+    use_responses_api: bool = False
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def parse_empty_id(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+
+class LLMModelsSettings(BaseModel):
+    default: LLMModelSettings = Field(default_factory=LLMModelSettings)
+    reasoning: LLMModelSettings = Field(default_factory=LLMModelSettings)
+
+    @model_validator(mode="after")
+    def resolve_reasoning(self) -> Self:
+        if self.reasoning.id is None:
+            self.reasoning = self.default
+        return self
+
+
 class LLMSettings(BaseModel):
-    model: str | None = None
+    models: LLMModelsSettings = Field(default_factory=LLMModelsSettings)
     api_key: SecretStr | None = None
     base_url: AnyHttpUrl | None = None
     timeout_seconds: float = Field(default=60, gt=0)
@@ -127,9 +150,9 @@ class LLMSettings(BaseModel):
     def validate_configured_fields(self) -> Self:
         if not self.configured:
             return self
-        if self.model is None or not self.model.strip():
+        if self.models.default.id is None:
             raise ValueError(
-                "RIVA_LLM_MODEL must be set when RIVA_LLM_BASE_URL is configured."
+                "RIVA_LLM_MODELS_DEFAULT_ID must be set when RIVA_LLM_BASE_URL is configured."
             )
         if self.api_key is None or not self.api_key.get_secret_value().strip():
             raise ValueError(
@@ -142,7 +165,13 @@ class LLMSettings(BaseModel):
         return self.base_url is not None
 
     def write_environ(self) -> None:
-        _write_optional_environ("RIVA_LLM_MODEL", self.model)
+        for slot in ("default", "reasoning"):
+            model = getattr(self.models, slot)
+            prefix = f"RIVA_LLM_MODELS_{slot.upper()}"
+            _write_optional_environ(f"{prefix}_ID", model.id)
+            os.environ[f"{prefix}_USE_RESPONSES_API"] = str(
+                model.use_responses_api
+            ).lower()
         _write_optional_environ(
             "RIVA_LLM_API_KEY",
             self.api_key.get_secret_value() if self.api_key else None,

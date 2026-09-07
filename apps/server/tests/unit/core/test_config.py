@@ -7,12 +7,10 @@ from pydantic import ValidationError
 from riva.core.config import (
     CORSSettings,
     DatabaseSettings,
-    HealthCheckSettings,
     LLMSettings,
     SameSitePolicy,
     SessionSettings,
     Settings,
-    TaskSettings,
     load_settings,
 )
 
@@ -22,24 +20,9 @@ SESSION_DIGEST_KEY = "valid-session-digest-key"
 
 @pytest.fixture(autouse=True)
 def clear_riva_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    for field_name in Settings.model_fields:
-        monkeypatch.delenv(f"RIVA_{field_name.upper()}", raising=False)
-    for field_name in LLMSettings.model_fields:
-        monkeypatch.delenv(f"RIVA_LLM_{field_name.upper()}", raising=False)
-    for field_name in TaskSettings.model_fields:
-        monkeypatch.delenv(f"RIVA_TASKS_{field_name.upper()}", raising=False)
-    for field_name in CORSSettings.model_fields:
-        monkeypatch.delenv(f"RIVA_CORS_{field_name.upper()}", raising=False)
-    for field_name in SessionSettings.model_fields:
-        monkeypatch.delenv(f"RIVA_SESSION_{field_name.upper()}", raising=False)
-
-    for field_name in DatabaseSettings.model_fields:
-        monkeypatch.delenv(f"RIVA_DATABASE_{field_name.upper()}", raising=False)
-    for dependency in ("DATABASE", "LLM"):
-        for field_name in HealthCheckSettings.model_fields:
-            monkeypatch.delenv(
-                f"RIVA_{dependency}_HEALTH_{field_name.upper()}", raising=False
-            )
+    for name in os.environ:
+        if name.startswith("RIVA_"):
+            monkeypatch.delenv(name)
 
 
 def _settings(**overrides: object) -> Settings:
@@ -75,7 +58,7 @@ def test_session_settings_rejects_blank_digest_key(digest_key: str) -> None:
 
 
 def test_llm_settings_treats_empty_base_url_as_not_configured() -> None:
-    settings = LLMSettings(base_url="", model="", api_key="")
+    settings = LLMSettings(base_url="", models={"default": {"id": ""}}, api_key="")
 
     assert settings.configured is False
 
@@ -84,9 +67,21 @@ def test_llm_settings_treats_empty_base_url_as_not_configured() -> None:
     "llm",
     [
         {"base_url": "https://llm.test/v1"},
-        {"base_url": "https://llm.test/v1", "model": "   "},
-        {"base_url": "https://llm.test/v1", "api_key": None},
-        {"base_url": "https://llm.test/v1", "api_key": "   "},
+        {
+            "base_url": "https://llm.test/v1",
+            "models": {"default": {"id": "   "}},
+            "api_key": "key",
+        },
+        {
+            "base_url": "https://llm.test/v1",
+            "models": {"default": {"id": "model"}},
+            "api_key": None,
+        },
+        {
+            "base_url": "https://llm.test/v1",
+            "models": {"default": {"id": "model"}},
+            "api_key": "   ",
+        },
     ],
 )
 def test_llm_settings_requires_model_and_api_key_when_configured(
@@ -108,10 +103,15 @@ def test_load_settings_source_precedence(
         "RIVA_PORT=7000\n"
         "RIVA_DATABASE_HEALTH_TIMEOUT_SECONDS=1.5\n"
         "RIVA_LLM_HEALTH_TTL_SECONDS=15\n"
+        "RIVA_LLM_MODELS_DEFAULT_ID=dotenv-model\n"
+        "RIVA_LLM_MODELS_DEFAULT_USE_RESPONSES_API=true\n"
+        "RIVA_LLM_MODELS_REASONING_ID=\n"
+        "RIVA_LLM_MODELS_REASONING_USE_RESPONSES_API=false\n"
     )
     monkeypatch.setenv("RIVA_HOST", "env-host")
     monkeypatch.setenv("RIVA_PORT", "8000")
     monkeypatch.setenv("RIVA_LLM_HEALTH_TTL_SECONDS", "0")
+    monkeypatch.setenv("RIVA_LLM_MODELS_DEFAULT_ID", "env-model")
 
     settings = load_settings(env_file=env_file, overrides={"port": 9000})
 
@@ -121,6 +121,28 @@ def test_load_settings_source_precedence(
     assert settings.port == 9000
     assert settings.database.health.timeout_seconds == 1.5
     assert settings.llm.health.ttl_seconds == 0
+    assert settings.llm.models.default.id == "env-model"
+    assert settings.llm.models.reasoning == settings.llm.models.default
+    assert settings.llm.models.reasoning.use_responses_api is True
+
+    settings = load_settings(
+        env_file=env_file,
+        overrides={"llm": {"models": {"default": {"id": "override-model"}}}},
+    )
+    assert settings.llm.models.reasoning.id == "override-model"
+
+
+@pytest.mark.parametrize("reasoning_id", [None, "", "   "])
+def test_llm_reasoning_inherits_complete_default_model(
+    reasoning_id: str | None,
+) -> None:
+    settings = LLMSettings(
+        models={
+            "default": {"id": "model", "use_responses_api": True},
+            "reasoning": {"id": reasoning_id, "use_responses_api": False},
+        }
+    )
+    assert settings.models.reasoning == settings.models.default
 
 
 def _session(**overrides: object) -> SessionSettings:
@@ -223,7 +245,7 @@ def test_write_environ_writes_all_settings(
             "refresh_interval_seconds": 0,
         },
         llm={
-            "model": "test-model",
+            "models": {"default": {"id": "test-model", "use_responses_api": True}},
             "api_key": "test-key",
             "base_url": "https://llm.test/v1",
             "timeout_seconds": 12,
@@ -241,7 +263,10 @@ def test_write_environ_writes_all_settings(
         "RIVA_LOG_LEVEL": "debug",
         "RIVA_LOG_FORMAT": "json",
         "RIVA_DATABASE_URL": "postgresql+psycopg://riva:riva@db/riva",
-        "RIVA_LLM_MODEL": "test-model",
+        "RIVA_LLM_MODELS_DEFAULT_ID": "test-model",
+        "RIVA_LLM_MODELS_DEFAULT_USE_RESPONSES_API": "true",
+        "RIVA_LLM_MODELS_REASONING_ID": "test-model",
+        "RIVA_LLM_MODELS_REASONING_USE_RESPONSES_API": "true",
         "RIVA_LLM_API_KEY": "test-key",
         "RIVA_LLM_BASE_URL": "https://llm.test/v1",
         "RIVA_LLM_TIMEOUT_SECONDS": "12.0",

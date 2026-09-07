@@ -22,11 +22,9 @@ def _event(
     )
 
 
-def _llm_double(*, available: bool | None = None) -> MagicMock:
+def _llm_double(*, status: HealthStatus = HealthStatus.unavailable) -> MagicMock:
     llm = MagicMock()
-    llm.check_health = AsyncMock(
-        return_value=HealthStatus.ok if available else HealthStatus.unavailable
-    )
+    llm.check_health = AsyncMock(return_value=status)
     return llm
 
 
@@ -54,25 +52,29 @@ async def test_lifespan_starts_with_llm_not_configured(app: FastAPI) -> None:
 
 
 @pytest.mark.parametrize(
-    ("available", "event_name"),
-    [(True, "llm.available"), (False, "llm.unavailable")],
+    ("status", "event_name"),
+    [
+        (HealthStatus.ok, "llm.available"),
+        (HealthStatus.degraded, "llm.degraded"),
+        (HealthStatus.unavailable, "llm.unavailable"),
+    ],
 )
 async def test_lifespan_reports_initial_llm_readiness(
     app: FastAPI,
     settings: Settings,
-    available: bool,
+    status: HealthStatus,
     event_name: str,
 ) -> None:
     app.state.settings = settings.model_copy(
         update={
             "llm": LLMSettings(
                 base_url="https://llm.test/v1",
-                model="test-model",
+                models={"default": {"id": "test-model"}},
                 api_key="test-key",
             )
         }
     )
-    llm = _llm_double(available=available)
+    llm = _llm_double(status=status)
     app.state.llm = llm
 
     with capture_logs() as events:
@@ -80,7 +82,7 @@ async def test_lifespan_reports_initial_llm_readiness(
             pass
 
     readiness = next(event for event in events if event["event"] == event_name)
-    assert readiness["model"] == "test-model"
+    assert readiness["models"] == {"default": "test-model", "reasoning": "test-model"}
     llm.check_health.assert_awaited_once_with()
 
 

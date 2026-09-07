@@ -1,25 +1,28 @@
 import asyncio
-from typing import Self
+from contextlib import AsyncExitStack
+from typing import Literal, Self
 
 from async_lru import alru_cache
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from openai import APIStatusError, AsyncOpenAI
 
-from riva.core.config import LLMSettings
+from riva.core.config import LLMModelSettings, LLMSettings
 from riva.llm.errors import LLMError, LLMNotConfiguredError
 from riva.schemas.health import HealthStatus
 
 
 class LLMClient:
     def __init__(self, settings: LLMSettings) -> None:
-        self._settings = settings
+        self.settings = settings
         self._cached_health = (
-            alru_cache(maxsize=1, ttl=settings.health.ttl_seconds)(self._check_health)
+            alru_cache(maxsize=2, ttl=settings.health.ttl_seconds)(
+                self._check_model_health
+            )
             if settings.health.ttl_seconds > 0
             else None
         )
-        self._chat_model: BaseChatModel | None = None
+        self._chat_models: dict[tuple[str | None, bool], BaseChatModel] = {}
         self._probe_client: AsyncOpenAI | None = None
 
     async def __aenter__(self) -> Self:
@@ -28,21 +31,42 @@ class LLMClient:
     async def __aexit__(self, *args: object) -> None:
         await self.close()
 
-    @property
-    def chat_model(self) -> BaseChatModel:
-        if self._chat_model is None:
-            model, api_key, base_url = self._require_configured()
+    def chat_model(
+        self, slot: Literal["default", "reasoning"] = "default"
+    ) -> BaseChatModel:
+        api_key, base_url = self._require_configured()
+        model = self._resolve_model(slot)
+        key = (model.id, model.use_responses_api)
+        if key not in self._chat_models:
             try:
-                self._chat_model = ChatOpenAI(
-                    model=model,
+                self._chat_models[key] = ChatOpenAI(
+                    model=model.id,
+                    use_responses_api=model.use_responses_api,
                     api_key=api_key,
                     base_url=base_url,
-                    timeout=self._settings.timeout_seconds,
-                    max_retries=self._settings.max_retries,
+                    timeout=self.settings.timeout_seconds,
+                    max_retries=self.settings.max_retries,
                 )
             except Exception as exc:
                 raise LLMError("Failed to initialize LLM chat model.") from exc
-        return self._chat_model
+        return self._chat_models[key]
+
+    def _resolve_model(self, slot: Literal["default", "reasoning"]) -> LLMModelSettings:
+        if slot not in ("default", "reasoning"):
+            raise ValueError(f"Unknown LLM model slot: {slot}")
+        return getattr(self.settings.models, slot)
+
+    def _model_ids(self) -> list[str]:
+        return list(
+            dict.fromkeys(
+                model.id
+                for model in (
+                    self.settings.models.default,
+                    self.settings.models.reasoning,
+                )
+                if model.id is not None
+            )
+        )
 
     async def close(self) -> None:
         try:
@@ -55,66 +79,85 @@ class LLMClient:
             await self._close_clients()
 
     async def check_health(self) -> HealthStatus:
-        if self._cached_health is not None:
-            return await self._cached_health()
-        return await self._check_health()
-
-    async def _check_health(self) -> HealthStatus:
-        try:
-            async with asyncio.timeout(self._settings.health.timeout_seconds):
-                await self.ping()
-        except TimeoutError, LLMError:
+        if not self.settings.configured:
             return HealthStatus.unavailable
-        return HealthStatus.ok
+        check = self._cached_health or self._check_model_health
+        results = await asyncio.gather(
+            *(check(model_id) for model_id in self._model_ids())
+        )
+        if all(results):
+            return HealthStatus.ok
+        if any(results):
+            return HealthStatus.degraded
+        return HealthStatus.unavailable
+
+    async def _check_model_health(self, model_id: str) -> bool:
+        try:
+            async with asyncio.timeout(self.settings.health.timeout_seconds):
+                await self._probe_model(model_id)
+        except TimeoutError, LLMError:
+            return False
+        return True
 
     async def _close_clients(self) -> None:
         probe_client = self._probe_client
-        chat_model = self._chat_model
+        chat_models = self._chat_models
         self._probe_client = None
-        self._chat_model = None
+        self._chat_models = {}
 
-        try:
+        async with AsyncExitStack() as stack:
             if probe_client is not None:
-                await probe_client.close()
-        finally:
-            if chat_model is not None:
+                stack.push_async_callback(probe_client.close)
+            for chat_model in {
+                id(model): model for model in chat_models.values()
+            }.values():
                 root_client = getattr(chat_model, "root_client", None)
                 root_async_client = getattr(chat_model, "root_async_client", None)
-                try:
-                    if root_client is not None:
-                        root_client.close()
-                finally:
-                    if root_async_client is not None:
-                        await root_async_client.close()
+                if root_client is not None:
+                    stack.callback(root_client.close)
+                if root_async_client is not None:
+                    stack.push_async_callback(root_async_client.close)
 
-    def _require_configured(self) -> tuple[str, str, str]:
-        if not self._settings.configured:
+    def _require_configured(self) -> tuple[str, str]:
+        if not self.settings.configured:
             raise LLMNotConfiguredError("LLM is not configured.")
 
-        model = self._settings.model
-        api_key = self._settings.api_key
-        base_url = self._settings.base_url
-        if model is None or api_key is None or base_url is None:
+        api_key = self.settings.api_key
+        base_url = self.settings.base_url
+        if (
+            self.settings.models.default.id is None
+            or api_key is None
+            or base_url is None
+        ):
             raise LLMNotConfiguredError("LLM configuration is incomplete.")
-        return model, api_key.get_secret_value(), str(base_url)
+        return api_key.get_secret_value(), str(base_url)
 
-    async def ping(self) -> None:
-        if not self._settings.configured:
-            raise LLMNotConfiguredError("LLM is not configured.")
+    async def ping(self, slot: Literal["default", "reasoning"] | None = None) -> None:
+        self._require_configured()
+        model_ids = (
+            self._model_ids() if slot is None else [self._resolve_model(slot).id]
+        )
+        results = await asyncio.gather(
+            *(self._probe_model(model_id) for model_id in model_ids),
+            return_exceptions=True,
+        )
+        for result in results:
+            if isinstance(result, BaseException):
+                raise result
 
+    async def _probe_model(self, model_id: str) -> None:
         try:
-            await self._ping_remote()
+            await self._ping_remote(model_id)
         except LLMError:
             raise
         except Exception as exc:
             raise LLMError("LLM ping failed.") from exc
 
-    async def _ping_remote(self) -> None:
-        model, _, _ = self._require_configured()
+    async def _ping_remote(self, model_id: str) -> None:
         client = self._get_probe_client()
 
         try:
-            await client.models.retrieve(model)
+            await client.models.retrieve(model_id)
             return
         except APIStatusError as exc:
             if exc.status_code not in {404, 405, 501}:
@@ -122,14 +165,14 @@ class LLMClient:
 
         # Compatibility fallback for providers that expose /models but not /models/{model}.
         async for available_model in client.models.list():
-            if available_model.id == model:
+            if available_model.id == model_id:
                 return
 
-        raise LLMError(f"Configured model is unavailable: {model}")
+        raise LLMError(f"Configured model is unavailable: {model_id}")
 
     def _get_probe_client(self) -> AsyncOpenAI:
         if self._probe_client is None:
-            _, api_key, base_url = self._require_configured()
+            api_key, base_url = self._require_configured()
             try:
                 self._probe_client = AsyncOpenAI(
                     api_key=api_key,

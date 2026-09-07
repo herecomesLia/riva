@@ -10,20 +10,20 @@ from riva.schemas.health import HealthStatus
 @pytest.mark.parametrize(
     (
         "database_available",
-        "llm_available",
+        "llm_status",
         "expected_status_code",
         "expected_body",
     ),
     [
         (
             True,
-            True,
+            HealthStatus.ok,
             200,
             {"status": "ok", "database": "ok", "llm": "ok"},
         ),
         (
             False,
-            True,
+            HealthStatus.ok,
             503,
             {
                 "status": "unavailable",
@@ -33,19 +33,25 @@ from riva.schemas.health import HealthStatus
         ),
         (
             True,
-            False,
+            HealthStatus.unavailable,
             200,
             {"status": "degraded", "database": "ok", "llm": "unavailable"},
         ),
         (
             False,
-            False,
+            HealthStatus.unavailable,
             503,
             {
                 "status": "unavailable",
                 "database": "unavailable",
                 "llm": "unavailable",
             },
+        ),
+        (
+            True,
+            HealthStatus.degraded,
+            200,
+            {"status": "degraded", "database": "ok", "llm": "degraded"},
         ),
     ],
 )
@@ -54,7 +60,7 @@ async def test_health_reports_dependency_state(
     app: FastAPI,
     monkeypatch: pytest.MonkeyPatch,
     database_available: bool,
-    llm_available: bool,
+    llm_status: HealthStatus,
     expected_status_code: int,
     expected_body: dict[str, str],
 ) -> None:
@@ -70,9 +76,7 @@ async def test_health_reports_dependency_state(
     monkeypatch.setattr(
         app.state.llm,
         "check_health",
-        AsyncMock(
-            return_value=HealthStatus.ok if llm_available else HealthStatus.unavailable
-        ),
+        AsyncMock(return_value=llm_status),
     )
 
     response = await client.get("/api/health")

@@ -52,10 +52,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
             if not settings.llm.configured:
                 logger.warning("llm.not_configured")
-            elif await llm.check_health() == HealthStatus.ok:
-                logger.info("llm.available", model=settings.llm.model)
             else:
-                logger.warning("llm.unavailable", model=settings.llm.model)
+                llm_status = await llm.check_health()
+                models = {
+                    "default": settings.llm.models.default.id,
+                    "reasoning": settings.llm.models.reasoning.id,
+                }
+                if llm_status == HealthStatus.ok:
+                    logger.info("llm.available", models=models)
+                else:
+                    logger.warning(f"llm.{llm_status.value}", models=models)
 
             logger.info(
                 "app.start",
