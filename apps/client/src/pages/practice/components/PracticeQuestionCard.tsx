@@ -20,7 +20,7 @@ export function PracticeQuestionCard({ question }: PracticeQuestionCardProps) {
         </CardTitle>
         {question.isSaved || question.isWeak ? (
           <CardAction
-            className="flex flex-wrap items-center justify-end gap-2"
+            className="row-span-1 flex flex-wrap items-center justify-end gap-2"
             data-testid="practice-question-statuses"
           >
             {question.isSaved ? (
