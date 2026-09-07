@@ -178,7 +178,7 @@ export function PracticeView(props: PracticeViewProps) {
   }, [stateKey])
 
   return (
-    <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-6 px-4 sm:px-0">
+    <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6">
       <PracticeHeader />
       <div
         className="min-w-0 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"

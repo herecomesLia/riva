@@ -65,7 +65,7 @@ export type InterviewViewProps =
 
 export function InterviewView(props: InterviewViewProps) {
   return (
-    <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-6 px-4 sm:px-0">
+    <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6">
       <InterviewHeader />
       <div className="w-full">
         <InterviewViewContent {...props} />

@@ -26,7 +26,7 @@ describe("PracticeBottomActionBar", () => {
       "md:group-has-data-[collapsible=icon]/sidebar-wrapper:left-(--sidebar-width-icon)",
     )
     expect(actionBar.firstElementChild).toHaveClass("pb-[max(0.75rem,env(safe-area-inset-bottom))]")
-    expect(actionBar.querySelector(".max-w-5xl")).toBeInTheDocument()
+    expect(actionBar.querySelector(".max-w-7xl")).toBeInTheDocument()
     expect(screen.getByTestId("actions")).toHaveClass(
       "grid-cols-1",
       "min-[360px]:grid-cols-2",

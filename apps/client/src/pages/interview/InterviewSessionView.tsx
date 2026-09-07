@@ -126,7 +126,7 @@ export function InterviewSessionView(props: InterviewSessionViewProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-6 px-4 sm:px-0">
+    <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6">
       {props.status === "candidateQuestions" ? (
         <SessionSummaryHeader summary={props.summary} />
       ) : (
@@ -311,7 +311,7 @@ function OpeningContent({
   const { t } = useTranslation()
 
   return (
-    <main className="w-full max-w-4xl">
+    <main className="w-full">
       <Card>
         <CardHeader>
           <div className="mb-2 flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -388,7 +388,7 @@ function InterviewSessionLoading() {
   const { t } = useTranslation()
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 sm:px-0">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <header className="space-y-3 border-b pb-5">
         <Badge variant="secondary">{t("interview.session.badge")}</Badge>
         <h1 className="font-heading text-2xl font-semibold sm:text-3xl">
@@ -480,7 +480,7 @@ function SessionStateCard({
   title: string
 }) {
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 sm:px-0">
+    <div className="mx-auto w-full max-w-7xl">
       <Card>
         <CardContent>
           <Empty>
