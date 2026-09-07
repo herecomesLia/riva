@@ -2,7 +2,7 @@ import {
   AlertCircleIcon,
   ArrowLeftIcon,
   BotIcon,
-  CircleStopIcon,
+  PauseIcon,
   PlayIcon,
   RotateCcwIcon,
 } from "lucide-react"
@@ -234,7 +234,7 @@ function SessionHeader({
           {isEnding ? (
             <Spinner aria-hidden="true" data-icon="inline-start" />
           ) : (
-            <CircleStopIcon aria-hidden="true" data-icon="inline-start" />
+            <PauseIcon aria-hidden="true" data-icon="inline-start" />
           )}
           {t("interview.session.actions.end")}
         </Button>
