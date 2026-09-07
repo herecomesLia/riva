@@ -3,7 +3,6 @@ import type {
   ListTrainingRecordsInput,
   MockInterviewRecordDetailResponse,
   TargetedPracticeRecordDetailResponse,
-  TrainingRecordKind,
   TrainingRecordReferenceAnswer,
   TrainingRecordReferenceAnswerTarget,
   TrainingRecordsOverviewResponse,
@@ -45,26 +44,6 @@ function toSummary(record: TrainingRecordDetail): TrainingRecordSummary {
       }
 }
 
-function averageScore(items: TrainingRecordDetail[]): number | null {
-  const scores = items.flatMap((record) =>
-    record.overallScore === null ? [] : [record.overallScore],
-  )
-  if (scores.length === 0) return null
-  return Math.round((scores.reduce((total, score) => total + score, 0) / scores.length) * 10) / 10
-}
-
-function kindOverview(
-  records: TrainingRecordDetail[],
-  kind: TrainingRecordKind,
-): TrainingRecordsOverviewResponse["byKind"][TrainingRecordKind] {
-  const matching = records.filter((record) => record.kind === kind)
-  return {
-    recordCount: matching.length,
-    completedRecordCount: matching.filter((record) => record.status === "completed").length,
-    averageScore: averageScore(matching),
-  }
-}
-
 export function createTrainingRecordsFaker() {
   const records: TrainingRecordDetail[] = structuredClone([
     trainingRecordsFixture.practice,
@@ -73,24 +52,7 @@ export function createTrainingRecordsFaker() {
 
   return {
     overview(): TrainingRecordsOverviewResponse {
-      return structuredClone({
-        totalRecordCount: records.length,
-        completedRecordCount: records.filter((record) => record.status === "completed").length,
-        totalDurationSeconds: records.reduce((total, record) => total + record.durationSeconds, 0),
-        answeredQuestionCount: records.reduce(
-          (total, record) => total + record.answeredQuestionCount,
-          0,
-        ),
-        averageScore: averageScore(records),
-        targetRoles: records
-          .map((record) => record.targetRole)
-          .filter((role, index, roles) => roles.findIndex((item) => item.id === role.id) === index)
-          .toSorted((a, b) => a.id.localeCompare(b.id)),
-        byKind: {
-          targetedPractice: kindOverview(records, "targetedPractice"),
-          mockInterview: kindOverview(records, "mockInterview"),
-        },
-      })
+      return structuredClone(trainingRecordsFixture.overview)
     },
 
     list(input: ListTrainingRecordsInput): TrainingRecordsPageResponse {

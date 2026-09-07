@@ -4,21 +4,9 @@ import { trainingRecordsFixture } from "@/mocks/fixtures/training-records"
 import { createTrainingRecordsFaker } from "./training-records"
 
 describe("trainingRecordsFaker", () => {
-  it("derives overview and supports filters and pagination", () => {
+  it("supports filters and pagination", () => {
     const faker = createTrainingRecordsFaker()
     const { practice, interview } = trainingRecordsFixture
-    expect(faker.overview()).toEqual({
-      totalRecordCount: 2,
-      completedRecordCount: 2,
-      totalDurationSeconds: practice.durationSeconds + interview.durationSeconds,
-      answeredQuestionCount: 2,
-      averageScore: 83,
-      targetRoles: [practice.targetRole, interview.targetRole],
-      byKind: {
-        targetedPractice: { recordCount: 1, completedRecordCount: 1, averageScore: 84 },
-        mockInterview: { recordCount: 1, completedRecordCount: 1, averageScore: 82 },
-      },
-    })
     const input = { page: 1, pageSize: 1 }
     const first = faker.list(input)
     expect(first.pagination).toEqual({ ...input, totalItems: 2, totalPages: 2 })

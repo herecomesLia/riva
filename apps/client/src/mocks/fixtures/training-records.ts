@@ -3,6 +3,7 @@ import type {
   TargetedPracticeRecordDetailResponse,
   TrainingRecordQuestion,
   TrainingRecordReferenceAnswer,
+  TrainingRecordsOverviewResponse,
 } from "@/models/training-records"
 
 type ReadyReferenceAnswer = Extract<TrainingRecordReferenceAnswer, { status: "ready" }>
@@ -191,9 +192,33 @@ export const trainingRecordsFixture = {
       },
     ],
   },
+  overview: {
+    totalRecordCount: 2,
+    completedRecordCount: 2,
+    totalDurationSeconds: 2400,
+    answeredQuestionCount: 2,
+    averageScore: 83,
+    targetRoles: [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        title: "Senior Frontend Engineer",
+        company: "ByteDance",
+      },
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        title: "Product Manager",
+        company: "Meituan",
+      },
+    ],
+    byKind: {
+      targetedPractice: { recordCount: 1, completedRecordCount: 1, averageScore: 84 },
+      mockInterview: { recordCount: 1, completedRecordCount: 1, averageScore: 82 },
+    },
+  },
   reference,
 } satisfies {
   practice: TargetedPracticeRecordDetailResponse
   interview: MockInterviewRecordDetailResponse
+  overview: TrainingRecordsOverviewResponse
   reference: ReadyReferenceAnswer
 }
