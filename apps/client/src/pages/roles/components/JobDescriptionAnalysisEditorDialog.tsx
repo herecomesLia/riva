@@ -63,7 +63,11 @@ export function JobDescriptionAnalysisEditorDialog({
   role: RoleView | null
 }) {
   const { t } = useTranslation()
-  const isOpen = field !== null && role?.jdState.status === "ready"
+  const isOpen =
+    field !== null &&
+    role !== null &&
+    !role.isArchived &&
+    (role.jdState.status === "missing" || role.jdState.status === "ready")
 
   return (
     <Dialog onOpenChange={onOpenChange} open={isOpen}>

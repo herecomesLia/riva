@@ -43,7 +43,7 @@ import { getRolesActionErrorCode, type RolesActionErrorCode } from "./roles-erro
 
 export type RolesViewActions = {
   archiveRole: (roleId: string) => Promise<unknown>
-  createRole: (input: CreateTargetRoleRequest) => Promise<unknown>
+  createRole: (input: CreateTargetRoleRequest) => Promise<TargetRoleResponse>
   deleteRole: (roleId: string) => Promise<unknown>
   match: (roleId: string) => Promise<unknown>
   retryJdSynchronization: (roleId: string) => Promise<unknown>
@@ -311,7 +311,10 @@ function RolesReadyView({
           <TargetRoleCreationDialog
             onDirtyChange={handleDirtyChange}
             onManualCreate={async (input) => {
-              await actions.createRole(input)
+              const createdRole = await actions.createRole(input)
+              setRoleCategory("active")
+              setSelectedRoleId(createdRole.id)
+              setActiveTab("job-description")
             }}
             onOpenChange={(open) => !open && requestCloseEditor()}
             onRecognize={async (input) => {

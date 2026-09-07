@@ -21,7 +21,12 @@ function roleFor(scenario: Parameters<typeof createRoleStoryResponse>[0]) {
 }
 
 export const Missing = meta.story({
-  args: { role: roleFor("singleRoleWithoutJobDescription"), synchronizationError: false },
+  args: {
+    onEdit: fn(),
+    onEditAnalysisModule: fn(),
+    role: roleFor("singleRoleWithoutJobDescription"),
+    synchronizationError: false,
+  },
 })
 
 export const Parsing = meta.story({

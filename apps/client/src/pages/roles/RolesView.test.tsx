@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
+import type { TargetRoleResponse } from "@/api/generated/models"
 import { createRoleStoryResponse } from "./stories/role-story-fixtures"
 import type { RecognizeRoleInput, RolesData } from "@/models/target-role-workflow"
 import { renderWithProviders } from "@/test/render"
@@ -17,7 +18,9 @@ function createActions(
 ): RolesViewActions {
   return {
     archiveRole: vi.fn(async () => data),
-    createRole: vi.fn(async () => data),
+    createRole: vi.fn(
+      async () => createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!,
+    ),
     deleteRole: vi.fn(async () => data),
     match: vi.fn(async () => data),
     retryJdSynchronization: vi.fn(async () => data),
@@ -696,8 +699,8 @@ describe("RolesView", () => {
   it("prevents duplicate form submissions while a save is pending", async () => {
     const user = userEvent.setup()
     const data = createRoleStoryResponse("noRoles")
-    let resolveSave!: (value: RolesData) => void
-    const pendingSave = new Promise<RolesData>((resolve) => {
+    let resolveSave!: (value: TargetRoleResponse) => void
+    const pendingSave = new Promise<TargetRoleResponse>((resolve) => {
       resolveSave = resolve
     })
     const createRole = vi.fn(() => pendingSave)
@@ -724,7 +727,7 @@ describe("RolesView", () => {
 
     await waitFor(() => expect(createRole).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(save).toBeDisabled())
-    resolveSave(data)
+    resolveSave(createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!)
   })
 
   it("closes after a successful edit save", async () => {
@@ -845,7 +848,13 @@ describe("RolesView", () => {
     const data = createRoleStoryResponse("singleRoleWithoutJobDescription")
     renderReadyView(data, { initialActiveTab: "job-description" })
 
-    await user.click(await screen.findByRole("button", { name: i18n.t("roles.jd.actions.add") }))
+    const card = await screen.findByTestId("job-description-card")
+    expect(card).toHaveTextContent(i18n.t("roles.jd.cardDescription"))
+    const sections = within(card).getByTestId("job-description-analysis")
+    expect(within(sections).getAllByRole("heading")).toHaveLength(6)
+    expect(within(sections).getAllByRole("button", { name: /^编辑 |^edit /i })).toHaveLength(6)
+    expect(within(sections).queryByRole("listitem")).not.toBeInTheDocument()
+    await user.click(within(card).getByRole("button", { name: i18n.t("roles.jd.actions.replace") }))
     const dialog = await screen.findByRole("dialog")
     expectFixedJobDescriptionEditorLayout(dialog, "job-description-editor-scroll")
     expect(within(dialog).getByLabelText(i18n.t("roles.jd.editor.fieldLabel"))).toHaveValue("")
@@ -959,9 +968,9 @@ describe("RolesView", () => {
     expect(qualificationSection.parentElement).toBe(requiredSkillsSection.parentElement)
   })
 
-  it("opens a module-specific editor without opening the JD source editor", async () => {
+  it("fills an empty module without opening the JD source editor", async () => {
     const user = userEvent.setup()
-    const data = createRoleStoryResponse("roleWithParsedJobDescription")
+    const data = createRoleStoryResponse("singleRoleWithoutJobDescription")
     const updateJd = vi.fn(async () => data)
     renderReadyView(data, {
       actions: createActions(data, { updateJd }),
@@ -976,8 +985,11 @@ describe("RolesView", () => {
     )
     const dialog = await screen.findByRole("dialog")
     expectFixedJobDescriptionEditorLayout(dialog, "job-description-analysis-editor-scroll")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("roles.jd.analysisEditor.addBullet") }),
+    )
     const textarea = within(dialog).getByLabelText(`${summaryTitle} 1`)
-    expect(textarea).toHaveValue(data.roles[0]!.jd!.preferredQualifications[0])
+    expect(textarea).toHaveValue("")
     expect(
       within(dialog).queryByLabelText(i18n.t("roles.jd.editor.fieldLabel")),
     ).not.toBeInTheDocument()
@@ -1144,9 +1156,8 @@ describe("RolesView", () => {
     )
   })
 
-  it("only shows structured-module editors after JD parsing is ready", async () => {
+  it("does not show structured-module editors while JD parsing is running or failed", async () => {
     for (const scenario of [
-      "singleRoleWithoutJobDescription",
       "roleWithJobDescriptionParsing",
       "roleWithJobDescriptionFailed",
     ] as const) {
@@ -1156,6 +1167,7 @@ describe("RolesView", () => {
       expect(await screen.findByTestId("job-description-card")).not.toHaveTextContent(
         "解析结果可按模块校正，修改后匹配分析需要重新生成。",
       )
+      expect(screen.queryByTestId("job-description-analysis")).not.toBeInTheDocument()
       unmount()
     }
   })
@@ -1171,7 +1183,9 @@ describe("RolesView", () => {
       initialActiveTab: "job-description",
     })
 
-    await user.click(await screen.findByRole("button", { name: i18n.t("roles.jd.actions.add") }))
+    await user.click(
+      await screen.findByRole("button", { name: i18n.t("roles.jd.actions.replace") }),
+    )
     const dialog = await screen.findByRole("dialog")
     const textarea = within(dialog).getByLabelText(i18n.t("roles.jd.editor.fieldLabel"))
     await user.type(textarea, "Lead React architecture and TypeScript delivery.")

@@ -41,6 +41,7 @@ export function JobDescriptionCard({
 }) {
   const { t } = useTranslation()
   const { jdState } = role
+  const showSections = jdState.status === "missing" || jdState.status === "ready"
 
   return (
     <Card
@@ -54,7 +55,7 @@ export function JobDescriptionCard({
             <CardTitle>
               <h3>{t("roles.details.sections.jobDescription")}</h3>
             </CardTitle>
-            {jdState.status === "ready" && onEdit && (
+            {showSections && onEdit && (
               <Button
                 className="h-9 gap-2 border-primary px-3 text-sm text-primary translate-y-3 hover:bg-primary/10 hover:text-primary"
                 disabled={pending}
@@ -73,7 +74,6 @@ export function JobDescriptionCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        {jdState.status === "missing" && <JobDescriptionEmpty onEdit={onEdit} pending={pending} />}
         {jdState.status === "parsing" && (
           <ParsingState
             onRetrySynchronization={onRetrySynchronization}
@@ -84,8 +84,8 @@ export function JobDescriptionCard({
         {jdState.status === "failed" && (
           <FailedState failureReason={jdState.reason} onEdit={onEdit} pending={pending} />
         )}
-        {jdState.status === "ready" && (
-          <ReadyState
+        {showSections && (
+          <JobDescriptionSections
             analysis={role.jd}
             canEditAnalysis={!role.isArchived}
             onEditAnalysisModule={onEditAnalysisModule}
@@ -93,29 +93,6 @@ export function JobDescriptionCard({
         )}
       </CardContent>
     </Card>
-  )
-}
-
-function JobDescriptionEmpty({ onEdit, pending }: { onEdit?: () => void; pending?: boolean }) {
-  const { t } = useTranslation()
-  return (
-    <div className="flex flex-col items-start gap-3">
-      <p className="text-sm leading-6 text-muted-foreground">
-        {t("roles.jobDescriptionStatus.missing.description")}
-      </p>
-      {onEdit && (
-        <Button
-          className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
-          disabled={pending}
-          onClick={onEdit}
-          size="sm"
-          variant="outline"
-        >
-          <FilePenLineIcon className="size-4" data-icon="inline-start" />
-          {t("roles.jd.actions.add")}
-        </Button>
-      )}
-    </div>
   )
 }
 
@@ -190,7 +167,7 @@ function FailedState({
   )
 }
 
-function ReadyState({
+function JobDescriptionSections({
   analysis,
   canEditAnalysis,
   onEditAnalysisModule,
@@ -325,7 +302,6 @@ function AnalysisCategorizedList({
   title: string
 }) {
   const entries = Object.keys(labels).filter((key) => groups[key as keyof typeof groups].length > 0)
-  if (!entries.length) return null
   return (
     <AnalysisSection field={field} icon={icon} onEdit={onEdit} title={title}>
       <dl className="flex flex-col gap-3 text-sm leading-6">
@@ -359,7 +335,6 @@ function AnalysisList({
   onEdit?: (field: JdField) => void
   title: string
 }) {
-  if (!items.length) return null
   return (
     <AnalysisSection field={field} icon={icon} onEdit={onEdit} title={title}>
       <ul className="flex list-disc flex-col gap-2 pl-5 text-sm leading-6">
