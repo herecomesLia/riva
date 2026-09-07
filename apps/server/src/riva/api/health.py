@@ -4,8 +4,8 @@ from http import HTTPStatus
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 
-from riva.api.deps import HealthCheckerDep
-from riva.schemas import DependencyHealthStatus, HealthResponse, ServiceHealthStatus
+from riva.api.deps import DatabaseDep, LLMClientDep
+from riva.schemas import HealthResponse, HealthStatus, ServiceHealthStatus
 
 router = APIRouter(tags=["health"])
 
@@ -21,28 +21,20 @@ router = APIRouter(tags=["health"])
         }
     },
 )
-async def health(health_checker: HealthCheckerDep) -> HealthResponse | JSONResponse:
-    database_available, llm_available = await asyncio.gather(
-        health_checker.database.check(),
-        health_checker.llm.check(),
+async def health(
+    database: DatabaseDep, llm: LLMClientDep
+) -> HealthResponse | JSONResponse:
+    database_status, llm_status = await asyncio.gather(
+        database.check_health(),
+        llm.check_health(),
     )
 
-    if not database_available:
+    if database_status != HealthStatus.ok:
         service_status = ServiceHealthStatus.unavailable
-    elif not llm_available:
+    elif llm_status != HealthStatus.ok:
         service_status = ServiceHealthStatus.degraded
     else:
         service_status = ServiceHealthStatus.ok
-    database_status = (
-        DependencyHealthStatus.ok
-        if database_available
-        else DependencyHealthStatus.unavailable
-    )
-    llm_status = (
-        DependencyHealthStatus.ok
-        if llm_available
-        else DependencyHealthStatus.unavailable
-    )
 
     response = HealthResponse(
         status=service_status,

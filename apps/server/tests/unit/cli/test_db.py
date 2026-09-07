@@ -7,6 +7,7 @@ from typer.testing import CliRunner
 
 from riva.cli import db as db_commands
 from riva.cli.main import app
+from riva.core.config import DatabaseSettings
 
 runner = CliRunner()
 DATABASE_URL = "postgresql+psycopg://unused:unused@invalid/unused"
@@ -42,7 +43,6 @@ def database_calls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> tuple[Mock, MagicMock, AsyncMock, AsyncMock]:
     database = MagicMock()
-    database.database_url = DATABASE_URL
     database.__aenter__ = AsyncMock(return_value=database)
     database.__aexit__ = AsyncMock(return_value=None)
     database.create_tables = AsyncMock()
@@ -87,7 +87,7 @@ def test_database_command_yes_executes_requested_operation(
     result = runner.invoke(app, ["db", command, "--yes"])
 
     assert result.exit_code == 0, result.output
-    database_factory.assert_called_once_with(DATABASE_URL)
+    database_factory.assert_called_once_with(DatabaseSettings(url=DATABASE_URL))
     database.__aenter__.assert_awaited_once_with()
     database.__aexit__.assert_awaited_once()
     getattr(database, operation).assert_awaited_once_with()

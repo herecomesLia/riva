@@ -1,16 +1,24 @@
+import asyncio
 from typing import Self
 
+from async_lru import alru_cache
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from openai import APIStatusError, AsyncOpenAI
 
 from riva.core.config import LLMSettings
 from riva.llm.errors import LLMError, LLMNotConfiguredError
+from riva.schemas.health import HealthStatus
 
 
 class LLMClient:
     def __init__(self, settings: LLMSettings) -> None:
         self._settings = settings
+        self._cached_health = (
+            alru_cache(maxsize=1, ttl=settings.health.ttl_seconds)(self._check_health)
+            if settings.health.ttl_seconds > 0
+            else None
+        )
         self._chat_model: BaseChatModel | None = None
         self._probe_client: AsyncOpenAI | None = None
 
@@ -37,6 +45,29 @@ class LLMClient:
         return self._chat_model
 
     async def close(self) -> None:
+        try:
+            if self._cached_health is not None:
+                try:
+                    await self._cached_health.cache_close()
+                finally:
+                    self._cached_health.cache_clear()
+        finally:
+            await self._close_clients()
+
+    async def check_health(self) -> HealthStatus:
+        if self._cached_health is not None:
+            return await self._cached_health()
+        return await self._check_health()
+
+    async def _check_health(self) -> HealthStatus:
+        try:
+            async with asyncio.timeout(self._settings.health.timeout_seconds):
+                await self.ping()
+        except TimeoutError, LLMError:
+            return HealthStatus.unavailable
+        return HealthStatus.ok
+
+    async def _close_clients(self) -> None:
         probe_client = self._probe_client
         chat_model = self._chat_model
         self._probe_client = None
@@ -103,7 +134,7 @@ class LLMClient:
                 self._probe_client = AsyncOpenAI(
                     api_key=api_key,
                     base_url=base_url,
-                    timeout=None,  # The health coordinator bounds the entire probe.
+                    timeout=None,  # check_health bounds the entire probe.
                     max_retries=0,
                 )
             except Exception as exc:

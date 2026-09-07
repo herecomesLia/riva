@@ -6,9 +6,13 @@ import httpx
 import pytest
 from openai import APIStatusError
 
-from riva.core.config import LLMSettings
+from riva.core.config import DatabaseSettings, HealthCheckSettings, LLMSettings
+from riva.db import Database
+from riva.db.errors import DatabaseUnavailableError
 from riva.llm.client import LLMClient
 from riva.llm.errors import LLMError, LLMNotConfiguredError
+from riva.schemas.health import HealthStatus
+from tests.support.settings import PLACEHOLDER_DATABASE_URL
 
 
 def _configured_client(**overrides: object) -> LLMClient:
@@ -134,7 +138,9 @@ async def test_ping_does_not_fallback_for_provider_failure() -> None:
         await client.ping()
 
     assert raised.value.__cause__ is failure
-    retrieve.assert_awaited_once_with("test-model")
+    assert await client.check_health() == HealthStatus.unavailable
+    assert retrieve.await_count == 2
+    retrieve.assert_awaited_with("test-model")
     list_models.assert_not_called()
     await client.close()
 
@@ -165,6 +171,7 @@ async def test_ping_reports_not_configured_without_remote_probe(
     with pytest.raises(LLMNotConfiguredError):
         await client.ping()
 
+    assert await client.check_health() == HealthStatus.unavailable
     async_openai.assert_not_called()
     await client.close()
 
@@ -186,3 +193,40 @@ async def test_context_manager_releases_initialized_clients() -> None:
     probe_close.assert_awaited_once_with()
     root_close.assert_called_once_with()
     root_async_close.assert_awaited_once_with()
+
+
+@pytest.mark.parametrize(
+    ("database_ttl", "llm_ttl", "database_calls", "llm_calls"),
+    [(5, 0, 1, 2), (0, 30, 2, 1)],
+)
+@pytest.mark.parametrize("available", [True, False])
+async def test_health_respects_independent_cache_policies(
+    database_ttl: int,
+    llm_ttl: int,
+    database_calls: int,
+    llm_calls: int,
+    available: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database = Database(
+        DatabaseSettings(
+            url=PLACEHOLDER_DATABASE_URL,
+            health=HealthCheckSettings(timeout_seconds=2, ttl_seconds=database_ttl),
+        )
+    )
+    llm = _configured_client(
+        health=HealthCheckSettings(timeout_seconds=5, ttl_seconds=llm_ttl),
+    )
+    database_ping = AsyncMock(
+        side_effect=None if available else DatabaseUnavailableError("unavailable")
+    )
+    llm_ping = AsyncMock(side_effect=None if available else LLMError("unavailable"))
+    monkeypatch.setattr(database, "ping", database_ping)
+    monkeypatch.setattr(llm, "ping", llm_ping)
+    expected = HealthStatus.ok if available else HealthStatus.unavailable
+    async with database, llm:
+        for _ in range(2):
+            assert await database.check_health() == expected
+            assert await llm.check_health() == expected
+        assert database_ping.await_count == database_calls
+        assert llm_ping.await_count == llm_calls

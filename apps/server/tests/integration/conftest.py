@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from testcontainers.community.postgres import PostgresContainer
 
 from riva.core.app import create_app, wrap_cors
-from riva.core.config import Settings
+from riva.core.config import DatabaseSettings, Settings
 from riva.db import Database
 from riva.services.users import UserService
 from tests.support.clock import Clock
@@ -54,7 +54,7 @@ def test_database_url(postgres_container: PostgresContainer) -> str:
 
 
 async def _initialize_database(database_url: str) -> None:
-    database = Database(database_url)
+    database = Database(DatabaseSettings(url=database_url))
     try:
         await database.reset()
     finally:
@@ -71,7 +71,7 @@ async def database(
     test_database_url: str,
     initialized_database: None,
 ) -> AsyncIterator[Database]:
-    test_database = Database(test_database_url)
+    test_database = Database(DatabaseSettings(url=test_database_url))
     try:
         async with test_database.engine.connect() as connection:
             transaction = await connection.begin()
@@ -91,7 +91,7 @@ async def database(
 
 @pytest.fixture
 async def resettable_database(test_database_url: str) -> AsyncIterator[Database]:
-    test_database = Database(test_database_url)
+    test_database = Database(DatabaseSettings(url=test_database_url))
     try:
         await test_database.reset()
         yield test_database
@@ -110,7 +110,7 @@ async def db_session(database: Database) -> AsyncIterator[AsyncSession]:
 
 @pytest.fixture
 def settings(test_database_url: str) -> Settings:
-    return make_test_settings(database_url=test_database_url)
+    return make_test_settings(database=DatabaseSettings(url=test_database_url))
 
 
 @pytest.fixture

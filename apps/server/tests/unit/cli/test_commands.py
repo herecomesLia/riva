@@ -141,7 +141,7 @@ def test_worker_runs_with_environment_settings(
     assert result.exit_code == 0, result.output
     run_worker.assert_awaited_once()
     settings = run_worker.await_args.args[0]
-    assert settings.database_url == "postgresql+psycopg://unused:unused@invalid/unused"
+    assert settings.database.url == "postgresql+psycopg://unused:unused@invalid/unused"
     assert settings.tasks.concurrency == 6
     assert run_worker.await_args.kwargs["concurrency"] is None
     configure_logging.assert_called_once_with(LogLevel.WARNING, LogFormat.JSON)

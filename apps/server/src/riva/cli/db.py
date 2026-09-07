@@ -50,10 +50,10 @@ def setup(
         if not typer.confirm("Continue?", default=False):
             raise typer.Exit(code=1)
 
-    database_url = load_settings(env_file=env_file).database_url
+    database_settings = load_settings(env_file=env_file).database
 
     async def run() -> None:
-        async with Database(database_url) as database:
+        async with Database(database_settings) as database:
             await database.create_tables()
             await setup_task_schema(database)
 
@@ -97,10 +97,10 @@ def reset(
         if not typer.confirm("Continue?", default=False):
             raise typer.Exit(code=1)
 
-    database_url = load_settings(env_file=env_file).database_url
+    database_settings = load_settings(env_file=env_file).database
 
     async def run() -> None:
-        async with Database(database_url) as database:
+        async with Database(database_settings) as database:
             await database.reset()
             await reset_task_schema(database)
 

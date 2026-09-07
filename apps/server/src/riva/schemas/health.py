@@ -9,14 +9,13 @@ class ServiceHealthStatus(StrEnum):
     unavailable = "unavailable"
 
 
-class DependencyHealthStatus(StrEnum):
+class HealthStatus(StrEnum):
     ok = "ok"
     unavailable = "unavailable"
     degraded = "degraded"
-    unknown = "unknown"
 
 
 class HealthResponse(ResponseModel):
     status: ServiceHealthStatus
-    database: DependencyHealthStatus
-    llm: DependencyHealthStatus
+    database: HealthStatus
+    llm: HealthStatus

@@ -5,12 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type DependencyHealthStatus =
-  (typeof DependencyHealthStatus)[keyof typeof DependencyHealthStatus]
+export type HealthStatus = (typeof HealthStatus)[keyof typeof HealthStatus]
 
-export const DependencyHealthStatus = {
+export const HealthStatus = {
   ok: "ok",
   unavailable: "unavailable",
   degraded: "degraded",
-  unknown: "unknown",
 } as const

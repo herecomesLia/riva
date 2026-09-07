@@ -1,6 +1,6 @@
 from riva.core.config import (
     CORSSettings,
-    HealthSettings,
+    DatabaseSettings,
     LLMSettings,
     SessionSettings,
     Settings,
@@ -20,11 +20,10 @@ def make_test_settings(**overrides: object) -> Settings:
         "port": 7482,
         "log_level": LogLevel.INFO,
         "log_format": LogFormat.CONSOLE,
-        "database_url": PLACEHOLDER_DATABASE_URL,
+        "database": DatabaseSettings(url=PLACEHOLDER_DATABASE_URL),
         "cors": CORSSettings(allowed_origins=[TEST_ORIGIN]),
         "session": SessionSettings(digest_key=TEST_SESSION_DIGEST_KEY),
         "llm": LLMSettings(),
-        "health": HealthSettings(),
         "tasks": TaskSettings(),
     }
     values.update(overrides)

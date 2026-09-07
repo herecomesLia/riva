@@ -6,8 +6,8 @@ from pydantic import ValidationError
 
 from riva.core.config import (
     CORSSettings,
-    HealthProbeSettings,
-    HealthSettings,
+    DatabaseSettings,
+    HealthCheckSettings,
     LLMSettings,
     SameSitePolicy,
     SessionSettings,
@@ -33,16 +33,18 @@ def clear_riva_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     for field_name in SessionSettings.model_fields:
         monkeypatch.delenv(f"RIVA_SESSION_{field_name.upper()}", raising=False)
 
-    for dependency in HealthSettings.model_fields:
-        for field_name in HealthProbeSettings.model_fields:
+    for field_name in DatabaseSettings.model_fields:
+        monkeypatch.delenv(f"RIVA_DATABASE_{field_name.upper()}", raising=False)
+    for dependency in ("DATABASE", "LLM"):
+        for field_name in HealthCheckSettings.model_fields:
             monkeypatch.delenv(
-                f"RIVA_HEALTH_{dependency.upper()}_{field_name.upper()}", raising=False
+                f"RIVA_{dependency}_HEALTH_{field_name.upper()}", raising=False
             )
 
 
 def _settings(**overrides: object) -> Settings:
     values: dict[str, object] = {
-        "database_url": DATABASE_URL,
+        "database": DatabaseSettings(url=DATABASE_URL),
         "session": SessionSettings(digest_key=SESSION_DIGEST_KEY),
     }
     values.update(overrides)
@@ -104,21 +106,21 @@ def test_load_settings_source_precedence(
         f"RIVA_SESSION_DIGEST_KEY={SESSION_DIGEST_KEY}\n"
         "RIVA_HOST=dotenv-host\n"
         "RIVA_PORT=7000\n"
-        "RIVA_HEALTH_DATABASE_TIMEOUT_SECONDS=1.5\n"
-        "RIVA_HEALTH_LLM_TTL_SECONDS=15\n"
+        "RIVA_DATABASE_HEALTH_TIMEOUT_SECONDS=1.5\n"
+        "RIVA_LLM_HEALTH_TTL_SECONDS=15\n"
     )
     monkeypatch.setenv("RIVA_HOST", "env-host")
     monkeypatch.setenv("RIVA_PORT", "8000")
-    monkeypatch.setenv("RIVA_HEALTH_LLM_TTL_SECONDS", "0")
+    monkeypatch.setenv("RIVA_LLM_HEALTH_TTL_SECONDS", "0")
 
     settings = load_settings(env_file=env_file, overrides={"port": 9000})
 
-    assert settings.database_url == DATABASE_URL
+    assert settings.database.url == DATABASE_URL
     assert settings.session.digest_key == SESSION_DIGEST_KEY
     assert settings.host == "env-host"
     assert settings.port == 9000
-    assert settings.health.database.timeout_seconds == 1.5
-    assert settings.health.llm.ttl_seconds == 0
+    assert settings.database.health.timeout_seconds == 1.5
+    assert settings.llm.health.ttl_seconds == 0
 
 
 def _session(**overrides: object) -> SessionSettings:
@@ -203,7 +205,10 @@ def test_write_environ_writes_all_settings(
         port=8000,
         log_level="debug",
         log_format="json",
-        database_url="postgresql+psycopg://riva:riva@db/riva",
+        database={
+            "url": "postgresql+psycopg://riva:riva@db/riva",
+            "health": {"timeout_seconds": 1.5, "ttl_seconds": 0},
+        },
         cors={
             "allowed_origins": ["https://a.test", "https://b.test"],
             "allow_credentials": False,
@@ -223,10 +228,7 @@ def test_write_environ_writes_all_settings(
             "base_url": "https://llm.test/v1",
             "timeout_seconds": 12,
             "max_retries": 3,
-        },
-        health={
-            "database": {"timeout_seconds": 1.5, "ttl_seconds": 0},
-            "llm": {"timeout_seconds": 7, "ttl_seconds": 18},
+            "health": {"timeout_seconds": 7, "ttl_seconds": 18},
         },
         tasks={
             "concurrency": 8,
@@ -244,10 +246,10 @@ def test_write_environ_writes_all_settings(
         "RIVA_LLM_BASE_URL": "https://llm.test/v1",
         "RIVA_LLM_TIMEOUT_SECONDS": "12.0",
         "RIVA_LLM_MAX_RETRIES": "3",
-        "RIVA_HEALTH_DATABASE_TIMEOUT_SECONDS": "1.5",
-        "RIVA_HEALTH_DATABASE_TTL_SECONDS": "0.0",
-        "RIVA_HEALTH_LLM_TIMEOUT_SECONDS": "7.0",
-        "RIVA_HEALTH_LLM_TTL_SECONDS": "18.0",
+        "RIVA_DATABASE_HEALTH_TIMEOUT_SECONDS": "1.5",
+        "RIVA_DATABASE_HEALTH_TTL_SECONDS": "0.0",
+        "RIVA_LLM_HEALTH_TIMEOUT_SECONDS": "7.0",
+        "RIVA_LLM_HEALTH_TTL_SECONDS": "18.0",
         "RIVA_TASKS_CONCURRENCY": "8",
         "RIVA_TASKS_SHUTDOWN_TIMEOUT_SECONDS": "12.5",
         "RIVA_CORS_ALLOWED_ORIGINS": "https://a.test,https://b.test",

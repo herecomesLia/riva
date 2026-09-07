@@ -6,14 +6,14 @@
  */
 import { faker } from "@faker-js/faker"
 
-import { DependencyHealthStatus, ServiceHealthStatus } from "../../models"
+import { HealthStatus, ServiceHealthStatus } from "../../models"
 import type { HealthResponse } from "../../models"
 
 export const getCheckHealthResponseMock = (
   overrideResponse: Partial<Extract<HealthResponse, object>> = {},
 ): HealthResponse => ({
   status: faker.helpers.arrayElement(Object.values(ServiceHealthStatus)),
-  database: faker.helpers.arrayElement(Object.values(DependencyHealthStatus)),
-  llm: faker.helpers.arrayElement(Object.values(DependencyHealthStatus)),
+  database: faker.helpers.arrayElement(Object.values(HealthStatus)),
+  llm: faker.helpers.arrayElement(Object.values(HealthStatus)),
   ...overrideResponse,
 })

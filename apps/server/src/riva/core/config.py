@@ -87,12 +87,34 @@ class SessionSettings(BaseModel):
         )
 
 
+class HealthCheckSettings(BaseModel):
+    timeout_seconds: float = Field(gt=0)
+    ttl_seconds: float = Field(ge=0)
+
+
+class DatabaseSettings(BaseModel):
+    url: str
+    health: HealthCheckSettings = Field(
+        default_factory=lambda: HealthCheckSettings(timeout_seconds=2, ttl_seconds=5)
+    )
+
+    def write_environ(self) -> None:
+        os.environ["RIVA_DATABASE_URL"] = self.url
+        os.environ["RIVA_DATABASE_HEALTH_TIMEOUT_SECONDS"] = str(
+            self.health.timeout_seconds
+        )
+        os.environ["RIVA_DATABASE_HEALTH_TTL_SECONDS"] = str(self.health.ttl_seconds)
+
+
 class LLMSettings(BaseModel):
     model: str | None = None
     api_key: SecretStr | None = None
     base_url: AnyHttpUrl | None = None
     timeout_seconds: float = Field(default=60, gt=0)
     max_retries: int = Field(default=2, ge=0)
+    health: HealthCheckSettings = Field(
+        default_factory=lambda: HealthCheckSettings(timeout_seconds=5, ttl_seconds=30)
+    )
 
     @field_validator("base_url", mode="before")
     @classmethod
@@ -131,27 +153,8 @@ class LLMSettings(BaseModel):
         )
         os.environ["RIVA_LLM_TIMEOUT_SECONDS"] = str(self.timeout_seconds)
         os.environ["RIVA_LLM_MAX_RETRIES"] = str(self.max_retries)
-
-
-class HealthProbeSettings(BaseModel):
-    timeout_seconds: float = Field(gt=0)
-    ttl_seconds: float = Field(ge=0)
-
-
-class HealthSettings(BaseModel):
-    database: HealthProbeSettings = Field(
-        default_factory=lambda: HealthProbeSettings(timeout_seconds=2, ttl_seconds=5)
-    )
-    llm: HealthProbeSettings = Field(
-        default_factory=lambda: HealthProbeSettings(timeout_seconds=5, ttl_seconds=30)
-    )
-
-    def write_environ(self) -> None:
-        for dependency, probe in (("DATABASE", self.database), ("LLM", self.llm)):
-            os.environ[f"RIVA_HEALTH_{dependency}_TIMEOUT_SECONDS"] = str(
-                probe.timeout_seconds
-            )
-            os.environ[f"RIVA_HEALTH_{dependency}_TTL_SECONDS"] = str(probe.ttl_seconds)
+        os.environ["RIVA_LLM_HEALTH_TIMEOUT_SECONDS"] = str(self.health.timeout_seconds)
+        os.environ["RIVA_LLM_HEALTH_TTL_SECONDS"] = str(self.health.ttl_seconds)
 
 
 class TaskSettings(BaseModel):
@@ -170,11 +173,10 @@ class Settings(BaseModel):
     port: int = 7482
     log_level: LogLevel = LogLevel.INFO
     log_format: LogFormat = LogFormat.CONSOLE
-    database_url: str
+    database: DatabaseSettings
     cors: CORSSettings = Field(default_factory=CORSSettings)
     session: SessionSettings
     llm: LLMSettings = Field(default_factory=LLMSettings)
-    health: HealthSettings = Field(default_factory=HealthSettings)
     tasks: TaskSettings = Field(default_factory=TaskSettings)
 
     def write_environ(self) -> None:
@@ -182,11 +184,10 @@ class Settings(BaseModel):
         os.environ["RIVA_PORT"] = str(self.port)
         os.environ["RIVA_LOG_LEVEL"] = self.log_level.value
         os.environ["RIVA_LOG_FORMAT"] = self.log_format.value
-        os.environ["RIVA_DATABASE_URL"] = self.database_url
+        self.database.write_environ()
         self.cors.write_environ()
         self.session.write_environ()
         self.llm.write_environ()
-        self.health.write_environ()
         self.tasks.write_environ()
 
 
@@ -201,7 +202,18 @@ def load_settings(
     converter.register_structure_hook(AnyHttpUrl | None, lambda value, _: value)
 
     # typed-settings reads leaf defaults, not nested Pydantic default factories.
-    loaders: list[Loader] = [DictLoader({"health": HealthSettings().model_dump()})]
+    loaders: list[Loader] = [
+        DictLoader(
+            {
+                "database": {
+                    "health": DatabaseSettings.model_fields["health"]
+                    .get_default(call_default_factory=True)
+                    .model_dump()
+                },
+                "llm": LLMSettings().model_dump(),
+            }
+        )
+    ]
     if env_file is not None:
         loaders.append(DotEnvLoader(prefix="RIVA_", dotenv_path=env_file))
     loaders.append(EnvLoader(prefix="RIVA_"))

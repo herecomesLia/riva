@@ -6,8 +6,8 @@ from riva.schemas.career_profile import (
 )
 from riva.schemas.errors import ErrorBody, ErrorIssue, ErrorResponse
 from riva.schemas.health import (
-    DependencyHealthStatus,
     HealthResponse,
+    HealthStatus,
     ServiceHealthStatus,
 )
 from riva.schemas.users import UpdateCurrentUserRequest, UserResponse
@@ -15,11 +15,11 @@ from riva.schemas.users import UpdateCurrentUserRequest, UserResponse
 __all__ = [
     "CareerProfileResponse",
     "CreateCareerProfileRequest",
-    "DependencyHealthStatus",
     "ErrorBody",
     "ErrorIssue",
     "ErrorResponse",
     "HealthResponse",
+    "HealthStatus",
     "LoginCredentials",
     "RegisterCredentials",
     "ServiceHealthStatus",

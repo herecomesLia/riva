@@ -12,7 +12,7 @@ async def run_worker(
     queues: tuple[str, ...] | None = None,
 ) -> None:
     configure_task_registry(app)
-    connector = create_task_connector(settings.database_url)
+    connector = create_task_connector(settings.database.url)
     with app.replace_connector(connector):
         async with app.open_async():
             if not await app.check_connection_async():

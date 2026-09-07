@@ -1,5 +1,7 @@
+import asyncio
 from typing import Self
 
+from async_lru import alru_cache
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -9,8 +11,10 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.schema import CreateSchema, DropSchema
 
+from riva.core.config import DatabaseSettings
 from riva.db.base import Base
 from riva.db.errors import DatabaseUnavailableError
+from riva.schemas.health import HealthStatus
 
 
 def load_models() -> None:
@@ -18,9 +22,15 @@ def load_models() -> None:
 
 
 class Database:
-    def __init__(self, database_url: str) -> None:
+    def __init__(self, settings: DatabaseSettings) -> None:
+        self._settings = settings
+        self._cached_health = (
+            alru_cache(maxsize=1, ttl=settings.health.ttl_seconds)(self._check_health)
+            if settings.health.ttl_seconds > 0
+            else None
+        )
         self.engine: AsyncEngine = create_async_engine(
-            database_url,
+            settings.url,
             pool_pre_ping=True,
         )
         self.sessionmaker: async_sessionmaker[AsyncSession] = async_sessionmaker(
@@ -29,7 +39,27 @@ class Database:
         )
 
     async def dispose(self) -> None:
-        await self.engine.dispose()
+        try:
+            if self._cached_health is not None:
+                try:
+                    await self._cached_health.cache_close()
+                finally:
+                    self._cached_health.cache_clear()
+        finally:
+            await self.engine.dispose()
+
+    async def check_health(self) -> HealthStatus:
+        if self._cached_health is not None:
+            return await self._cached_health()
+        return await self._check_health()
+
+    async def _check_health(self) -> HealthStatus:
+        try:
+            async with asyncio.timeout(self._settings.health.timeout_seconds):
+                await self.ping()
+        except TimeoutError, DatabaseUnavailableError:
+            return HealthStatus.unavailable
+        return HealthStatus.ok
 
     async def __aenter__(self) -> Self:
         return self

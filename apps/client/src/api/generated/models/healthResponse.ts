@@ -4,11 +4,11 @@
  * Riva API
  * OpenAPI spec version: 0.1.0
  */
-import type { DependencyHealthStatus } from "./dependencyHealthStatus"
+import type { HealthStatus } from "./healthStatus"
 import type { ServiceHealthStatus } from "./serviceHealthStatus"
 
 export interface HealthResponse {
   status: ServiceHealthStatus
-  database: DependencyHealthStatus
-  llm: DependencyHealthStatus
+  database: HealthStatus
+  llm: HealthStatus
 }

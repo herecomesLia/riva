@@ -12,10 +12,10 @@ from starlette.types import ASGIApp
 from riva.api.errors.handlers import register_exception_handlers
 from riva.api.routes import router
 from riva.core.config import Settings, load_settings
-from riva.core.health import HealthChecker
 from riva.core.logging import RequestLoggingMiddleware
 from riva.db import Database
 from riva.llm import LLMClient
+from riva.schemas.health import HealthStatus
 from riva.utils import seconds_to_ms
 
 
@@ -28,16 +28,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     database: Database | None = app.state.database
     if database is None:
-        database = Database(settings.database_url)
+        database = Database(settings.database)
         app.state.database = database
 
     llm: LLMClient | None = app.state.llm
     if llm is None:
         llm = LLMClient(settings.llm)
         app.state.llm = llm
-
-    health = HealthChecker(settings.health, database, llm)
-    app.state.health = health
 
     logger = structlog.get_logger("riva.app")
     lifecycle_fields = {
@@ -49,13 +46,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     shutdown_started_at: float | None = None
 
     try:
-        async with database, llm, health:
+        async with database, llm:
             await database.ping()
             startup_succeeded = True
 
             if not settings.llm.configured:
                 logger.warning("llm.not_configured")
-            elif await health.llm.check():
+            elif await llm.check_health() == HealthStatus.ok:
                 logger.info("llm.available", model=settings.llm.model)
             else:
                 logger.warning("llm.unavailable", model=settings.llm.model)
@@ -132,7 +129,7 @@ def create_asgi_app(settings: Settings | None = None) -> ASGIApp:
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
-    database = Database(settings.database_url) if settings is not None else None
+    database = Database(settings.database) if settings is not None else None
 
     app = FastAPI(title="Riva API", lifespan=lifespan)
     app.state.settings = settings

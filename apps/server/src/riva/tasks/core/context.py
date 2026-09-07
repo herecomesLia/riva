@@ -19,7 +19,7 @@ class TaskResources:
 @asynccontextmanager
 async def task_resources(settings: Settings) -> AsyncGenerator[TaskResources]:
     async with (
-        Database(settings.database_url) as database,
+        Database(settings.database) as database,
         LLMClient(settings.llm) as llm,
     ):
         yield TaskResources(database=database, llm=llm)

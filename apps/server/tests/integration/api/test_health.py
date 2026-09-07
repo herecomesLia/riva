@@ -4,6 +4,8 @@ import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 
+from riva.schemas.health import HealthStatus
+
 
 @pytest.mark.parametrize(
     (
@@ -57,14 +59,20 @@ async def test_health_reports_dependency_state(
     expected_body: dict[str, str],
 ) -> None:
     monkeypatch.setattr(
-        app.state.health.database,
-        "check",
-        AsyncMock(return_value=database_available),
+        app.state.database,
+        "check_health",
+        AsyncMock(
+            return_value=HealthStatus.ok
+            if database_available
+            else HealthStatus.unavailable
+        ),
     )
     monkeypatch.setattr(
-        app.state.health.llm,
-        "check",
-        AsyncMock(return_value=llm_available),
+        app.state.llm,
+        "check_health",
+        AsyncMock(
+            return_value=HealthStatus.ok if llm_available else HealthStatus.unavailable
+        ),
     )
 
     response = await client.get("/api/health")

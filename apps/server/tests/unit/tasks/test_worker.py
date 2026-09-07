@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from riva.core.config import DatabaseSettings
 from riva.db import Database
 from riva.llm import LLMClient
 from riva.tasks import TaskResources
@@ -17,7 +18,7 @@ async def test_worker_resource_lifecycle(
 ) -> None:
     events = []
     settings = make_test_settings()
-    database = Database(settings.database_url)
+    database = Database(settings.database)
     original_dispose = database.dispose
     llm = LLMClient(settings.llm)
 
@@ -29,8 +30,8 @@ async def test_worker_resource_lifecycle(
     llm_close = AsyncMock(wraps=llm.close)
     monkeypatch.setattr(llm, "close", llm_close)
 
-    def create_database(database_url: str) -> Database:
-        assert database_url == settings.database_url
+    def create_database(database_settings: DatabaseSettings) -> Database:
+        assert database_settings is settings.database
         events.append("resources")
         return database
 

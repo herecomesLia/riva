@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from riva.api.cookies import set_session_cookie
 from riva.api.errors import AuthRequiredError
 from riva.core.config import Settings
-from riva.core.health import HealthChecker
 from riva.db import Database
+from riva.llm import LLMClient
 from riva.models import User
 from riva.services.career_profiles import CareerProfileService
 from riva.services.target_roles import TargetRoleService
@@ -27,9 +27,10 @@ def get_database(request: Request) -> Database:
     return request.app.state.database
 
 
-async def get_db_session(
-    database: Annotated[Database, Depends(get_database)],
-) -> AsyncIterator[AsyncSession]:
+DatabaseDep = Annotated[Database, Depends(get_database)]
+
+
+async def get_db_session(database: DatabaseDep) -> AsyncIterator[AsyncSession]:
     async with database.sessionmaker() as session:
         yield session
 
@@ -37,11 +38,11 @@ async def get_db_session(
 DbSessionDep = Annotated[AsyncSession, Depends(get_db_session)]
 
 
-def get_health_checker(request: Request) -> HealthChecker:
-    return request.app.state.health
+def get_llm(request: Request) -> LLMClient:
+    return request.app.state.llm
 
 
-HealthCheckerDep = Annotated[HealthChecker, Depends(get_health_checker)]
+LLMClientDep = Annotated[LLMClient, Depends(get_llm)]
 
 
 async def get_user_service(
