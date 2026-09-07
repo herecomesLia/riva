@@ -1,7 +1,8 @@
 from fastapi import APIRouter, status
 from fastapi.exceptions import RequestValidationError
 
-from riva.api.deps import CareerProfileServiceDep, CurrentUserDep, csrf_guard
+from riva.api.csrf import csrf_guard
+from riva.api.deps import CareerProfileServiceDep, CurrentUserDep
 from riva.api.errors import AuthRequiredError, CsrfFailedError
 from riva.api.errors.openapi import error_responses
 from riva.models.career_profile import CareerProfile

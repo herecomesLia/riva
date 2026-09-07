@@ -1,7 +1,8 @@
 from fastapi import APIRouter, status
 from fastapi.exceptions import RequestValidationError
 
-from riva.api.deps import CurrentUserDep, UserServiceDep, csrf_guard
+from riva.api.csrf import csrf_guard
+from riva.api.deps import CurrentUserDep, UserServiceDep
 from riva.api.errors import (
     APINotImplementedError,
     AuthRequiredError,

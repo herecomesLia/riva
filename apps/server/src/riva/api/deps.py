@@ -6,19 +6,30 @@ from fastapi import Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.api.cookies import set_session_cookie
-from riva.api.csrf import csrf_protect
 from riva.api.errors import AuthRequiredError
+from riva.core.config import Settings
+from riva.core.health import HealthChecker
 from riva.db import Database
 from riva.models import User
 from riva.services.career_profiles import CareerProfileService
 from riva.services.target_roles import TargetRoleService
 from riva.services.users import UserService
 
-csrf_guard = Depends(csrf_protect)
+
+def get_settings(request: Request) -> Settings:
+    return request.app.state.settings
 
 
-async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:
-    database: Database = request.app.state.database
+SettingsDep = Annotated[Settings, Depends(get_settings)]
+
+
+def get_database(request: Request) -> Database:
+    return request.app.state.database
+
+
+async def get_db_session(
+    database: Annotated[Database, Depends(get_database)],
+) -> AsyncIterator[AsyncSession]:
     async with database.sessionmaker() as session:
         yield session
 
@@ -26,11 +37,18 @@ async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:
 DbSessionDep = Annotated[AsyncSession, Depends(get_db_session)]
 
 
+def get_health_checker(request: Request) -> HealthChecker:
+    return request.app.state.health
+
+
+HealthCheckerDep = Annotated[HealthChecker, Depends(get_health_checker)]
+
+
 async def get_user_service(
-    request: Request,
     session: DbSessionDep,
+    settings: SettingsDep,
 ) -> UserService:
-    return UserService(session, request.app.state.settings)
+    return UserService(session, settings)
 
 
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
@@ -40,8 +58,8 @@ async def require_current_user(
     request: Request,
     response: Response,
     user_service: UserServiceDep,
+    settings: SettingsDep,
 ) -> User:
-    settings = request.app.state.settings
     token = request.cookies.get(settings.session.cookie_name)
     if token is None:
         raise AuthRequiredError()
@@ -50,7 +68,7 @@ async def require_current_user(
     user = session_state.user
     structlog.contextvars.bind_contextvars(user_id=str(user.id))
     if session_state.refreshed:
-        set_session_cookie(response, settings, token)
+        set_session_cookie(response, token, settings)
     return user
 
 

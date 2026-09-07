@@ -3,7 +3,7 @@ from fastapi import Response
 from riva.core.config import Settings
 
 
-def set_session_cookie(response: Response, settings: Settings, token: str) -> None:
+def set_session_cookie(response: Response, token: str, settings: Settings) -> None:
     response.set_cookie(
         key=settings.session.cookie_name,
         value=token,

@@ -1,18 +1,18 @@
 from urllib.parse import urlsplit
 
-from fastapi import Request
+from fastapi import Depends, Request
 
+from riva.api.deps import SettingsDep
 from riva.api.errors import CsrfFailedError
 from riva.core.config import Settings
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
-async def csrf_protect(request: Request) -> None:
+async def csrf_protect(request: Request, settings: SettingsDep) -> None:
     if request.method.upper() not in UNSAFE_METHODS:
         return
 
-    settings: Settings = request.app.state.settings
     origin = request.headers.get("origin")
     if origin is not None:
         if _is_allowed_source(origin, request, settings):
@@ -24,6 +24,9 @@ async def csrf_protect(request: Request) -> None:
         return
 
     raise CsrfFailedError()
+
+
+csrf_guard = Depends(csrf_protect)
 
 
 def _is_allowed_source(source: str, request: Request, settings: Settings) -> bool:

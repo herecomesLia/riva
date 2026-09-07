@@ -17,7 +17,7 @@ def test_set_session_cookie_uses_secure_defaults() -> None:
     settings = make_test_settings()
     response = Response()
 
-    set_session_cookie(response, settings, "session-token")
+    set_session_cookie(response, "session-token", settings)
 
     cookie = _cookie(response, settings.session.cookie_name)
     assert cookie.value == "session-token"
@@ -41,7 +41,7 @@ def test_set_session_cookie_uses_custom_settings() -> None:
     )
     response = Response()
 
-    set_session_cookie(response, settings, "session-token")
+    set_session_cookie(response, "session-token", settings)
 
     cookie = _cookie(response, "custom_session")
     assert cookie.value == "session-token"

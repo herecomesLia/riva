@@ -3,7 +3,8 @@ from uuid import UUID
 from fastapi import APIRouter, status
 from fastapi.exceptions import RequestValidationError
 
-from riva.api.deps import CurrentUserDep, TargetRoleServiceDep, csrf_guard
+from riva.api.csrf import csrf_guard
+from riva.api.deps import CurrentUserDep, TargetRoleServiceDep
 from riva.api.errors import AuthRequiredError, CsrfFailedError
 from riva.api.errors.openapi import error_responses
 from riva.models.target_role import TargetRole

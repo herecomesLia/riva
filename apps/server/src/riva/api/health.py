@@ -1,9 +1,10 @@
 import asyncio
 from http import HTTPStatus
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 
+from riva.api.deps import HealthCheckerDep
 from riva.schemas import DependencyHealthStatus, HealthResponse, ServiceHealthStatus
 
 router = APIRouter(tags=["health"])
@@ -20,10 +21,10 @@ router = APIRouter(tags=["health"])
         }
     },
 )
-async def health(request: Request) -> HealthResponse | JSONResponse:
+async def health(health_checker: HealthCheckerDep) -> HealthResponse | JSONResponse:
     database_available, llm_available = await asyncio.gather(
-        request.app.state.health.database.check(),
-        request.app.state.health.llm.check(),
+        health_checker.database.check(),
+        health_checker.llm.check(),
     )
 
     if not database_available:

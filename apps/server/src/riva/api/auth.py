@@ -3,7 +3,8 @@ from fastapi import APIRouter, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 
 from riva.api.cookies import delete_session_cookie, set_session_cookie
-from riva.api.deps import UserServiceDep, csrf_guard
+from riva.api.csrf import csrf_guard
+from riva.api.deps import SettingsDep, UserServiceDep
 from riva.api.errors import CsrfFailedError
 from riva.api.errors.openapi import error_responses
 from riva.models import User
@@ -33,12 +34,12 @@ router = APIRouter(
 )
 async def register(
     payload: RegisterCredentials,
-    request: Request,
     response: Response,
     user_service: UserServiceDep,
+    settings: SettingsDep,
 ) -> User:
     result = await user_service.register(payload.username, payload.password)
-    set_session_cookie(response, request.app.state.settings, result.token)
+    set_session_cookie(response, result.token, settings)
     user_id = str(result.user.id)
     structlog.contextvars.bind_contextvars(user_id=user_id)
     logger.info("auth.register")
@@ -59,14 +60,14 @@ async def login(
     request: Request,
     response: Response,
     user_service: UserServiceDep,
+    settings: SettingsDep,
 ) -> User:
-    settings = request.app.state.settings
     result = await user_service.login(
         payload.username,
         payload.password,
         current_token=request.cookies.get(settings.session.cookie_name),
     )
-    set_session_cookie(response, settings, result.token)
+    set_session_cookie(response, result.token, settings)
     user_id = str(result.user.id)
     structlog.contextvars.bind_contextvars(user_id=user_id)
     logger.info("auth.login")
@@ -82,8 +83,8 @@ async def logout(
     request: Request,
     response: Response,
     user_service: UserServiceDep,
+    settings: SettingsDep,
 ) -> None:
-    settings = request.app.state.settings
     user_id = await user_service.logout(
         request.cookies.get(settings.session.cookie_name)
     )
