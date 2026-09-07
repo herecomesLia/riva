@@ -1,7 +1,9 @@
 import os
 from enum import StrEnum
-from typing import Annotated, Self
+from pathlib import Path
+from typing import Self
 
+import typed_settings
 from pydantic import (
     AnyHttpUrl,
     BaseModel,
@@ -10,7 +12,8 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from typed_settings import default_converter, register_strlist_hook
+from typed_settings.loaders import DictLoader, DotEnvLoader, EnvLoader, Loader
 
 from riva.core.logging import LogFormat, LogLevel
 
@@ -22,12 +25,14 @@ class SameSitePolicy(StrEnum):
 
 
 class CORSSettings(BaseModel):
-    allowed_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    allowed_origins: list[str] = []
     allow_credentials: bool = True
 
     @field_validator("allowed_origins", mode="before")
     @classmethod
     def parse_allowed_origins(cls, value: object) -> object:
+        if value == [""]:
+            return []
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
@@ -143,14 +148,7 @@ class TaskSettings(BaseModel):
         )
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_prefix="RIVA_",
-        env_nested_delimiter="_",
-        env_nested_max_split=1,
-        extra="ignore",
-    )
-
+class Settings(BaseModel):
     host: str = "127.0.0.1"
     port: int = 7482
     log_level: LogLevel = LogLevel.INFO
@@ -171,6 +169,26 @@ class Settings(BaseSettings):
         self.session.write_environ()
         self.llm.write_environ()
         self.tasks.write_environ()
+
+
+def load_settings(
+    *,
+    env_file: Path | None = None,
+    overrides: dict[str, object] | None = None,
+) -> Settings:
+    converter = default_converter()
+    register_strlist_hook(converter, sep=",")
+    # Let Pydantic validate URLs after the existing empty-string validator.
+    converter.register_structure_hook(AnyHttpUrl | None, lambda value, _: value)
+
+    loaders: list[Loader] = []
+    if env_file is not None:
+        loaders.append(DotEnvLoader(prefix="RIVA_", dotenv_path=env_file))
+    loaders.append(EnvLoader(prefix="RIVA_"))
+    if overrides:
+        loaders.append(DictLoader(overrides))
+
+    return typed_settings.load_settings(Settings, loaders, converter=converter)
 
 
 def _write_optional_environ(name: str, value: str | None) -> None:

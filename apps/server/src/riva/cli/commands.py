@@ -8,7 +8,7 @@ import typer
 from rich import print_json
 
 from riva.core.app import create_app
-from riva.core.config import Settings
+from riva.core.config import load_settings
 from riva.core.logging import LogFormat, LogLevel, configure_logging
 from riva.tasks.core import run_worker
 
@@ -65,7 +65,7 @@ def start(
     if log_format is not None:
         overrides["log_format"] = log_format
 
-    settings = Settings(_env_file=env_file, **overrides)
+    settings = load_settings(env_file=env_file, overrides=overrides)
     settings.write_environ()
     configure_logging(settings.log_level, settings.log_format)
 
@@ -170,7 +170,7 @@ def worker(
     if log_format is not None:
         overrides["log_format"] = log_format
 
-    settings = Settings(_env_file=env_file, **overrides)
+    settings = load_settings(env_file=env_file, overrides=overrides)
     configure_logging(settings.log_level, settings.log_format)
     asyncio.run(
         run_worker(
@@ -196,7 +196,7 @@ def dev(
     """Start and reload the API server and background worker together."""
     from riva.cli.dev import run_dev
 
-    settings = Settings(_env_file=env_file)
+    settings = load_settings(env_file=env_file)
     shared_args = ["--env-file", str(env_file.resolve())] if env_file else []
     asyncio.run(
         run_dev(

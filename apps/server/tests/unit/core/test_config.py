@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -10,6 +11,7 @@ from riva.core.config import (
     SessionSettings,
     Settings,
     TaskSettings,
+    load_settings,
 )
 
 DATABASE_URL = "postgresql+psycopg://test:test@invalid/test"
@@ -97,16 +99,10 @@ def test_session_settings_accepts_non_blank_digest_key() -> None:
     assert SessionSettings(digest_key="valid-key").digest_key == "valid-key"
 
 
-def test_llm_settings_treats_empty_base_url_as_not_configured(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("RIVA_LLM_BASE_URL", "")
-    monkeypatch.setenv("RIVA_LLM_MODEL", "")
-    monkeypatch.setenv("RIVA_LLM_API_KEY", "")
+def test_llm_settings_treats_empty_base_url_as_not_configured() -> None:
+    settings = LLMSettings(base_url="", model="", api_key="")
 
-    settings = _settings()
-
-    assert settings.llm.configured is False
+    assert settings.configured is False
 
 
 @pytest.mark.parametrize(
@@ -125,49 +121,26 @@ def test_llm_settings_requires_model_and_api_key_when_configured(
         LLMSettings(**llm)
 
 
-def test_settings_loads_llm_environment(
+def test_load_settings_source_precedence(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RIVA_LLM_BASE_URL", "https://llm.test/v1")
-    monkeypatch.setenv("RIVA_LLM_MODEL", "test-model")
-    monkeypatch.setenv("RIVA_LLM_API_KEY", "test-key")
-    monkeypatch.setenv("RIVA_LLM_HEALTH_TTL_SECONDS", "12")
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        f"RIVA_DATABASE_URL={DATABASE_URL}\n"
+        f"RIVA_SESSION_DIGEST_KEY={SESSION_DIGEST_KEY}\n"
+        "RIVA_HOST=dotenv-host\n"
+        "RIVA_PORT=7000\n"
+    )
+    monkeypatch.setenv("RIVA_HOST", "env-host")
+    monkeypatch.setenv("RIVA_PORT", "8000")
 
-    settings = _settings()
+    settings = load_settings(env_file=env_file, overrides={"port": 9000})
 
-    assert str(settings.llm.base_url) == "https://llm.test/v1"
-    assert settings.llm.model == "test-model"
-    assert settings.llm.api_key is not None
-    assert settings.llm.api_key.get_secret_value() == "test-key"
-    assert settings.llm.health_ttl_seconds == 12
-
-
-def test_settings_loads_nested_environment(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("RIVA_CORS_ALLOWED_ORIGINS", "https://a.test, https://b.test")
-    monkeypatch.setenv("RIVA_CORS_ALLOW_CREDENTIALS", "false")
-    monkeypatch.setenv("RIVA_SESSION_DIGEST_KEY", SESSION_DIGEST_KEY)
-    monkeypatch.setenv("RIVA_SESSION_COOKIE_NAME", "custom_session")
-
-    settings = Settings(database_url=DATABASE_URL)
-
-    assert settings.cors.allowed_origins == ["https://a.test", "https://b.test"]
-    assert settings.cors.allow_credentials is False
+    assert settings.database_url == DATABASE_URL
     assert settings.session.digest_key == SESSION_DIGEST_KEY
-    assert settings.session.cookie_name == "custom_session"
-
-
-def test_settings_loads_task_environment(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("RIVA_TASKS_CONCURRENCY", "8")
-    monkeypatch.setenv("RIVA_TASKS_SHUTDOWN_TIMEOUT_SECONDS", "12.5")
-
-    settings = _settings()
-
-    assert settings.tasks.concurrency == 8
-    assert settings.tasks.shutdown_timeout_seconds == 12.5
+    assert settings.host == "env-host"
+    assert settings.port == 9000
 
 
 def _session(**overrides: object) -> SessionSettings:

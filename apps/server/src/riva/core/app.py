@@ -11,7 +11,7 @@ from starlette.types import ASGIApp
 
 from riva.api.errors.handlers import register_exception_handlers
 from riva.api.routes import router
-from riva.core.config import Settings
+from riva.core.config import Settings, load_settings
 from riva.core.logging import RequestLoggingMiddleware
 from riva.db import Database
 from riva.llm import LLMClient
@@ -22,7 +22,7 @@ from riva.utils import seconds_to_ms
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     settings: Settings | None = app.state.settings
     if settings is None:
-        settings = Settings()
+        settings = load_settings()
         app.state.settings = settings
 
     database: Database | None = app.state.database
@@ -123,7 +123,7 @@ def wrap_cors(app: ASGIApp, settings: Settings) -> ASGIApp:
 
 
 def create_asgi_app(settings: Settings | None = None) -> ASGIApp:
-    settings = settings or Settings()
+    settings = settings or load_settings()
     return wrap_cors(create_app(settings), settings)
 
 

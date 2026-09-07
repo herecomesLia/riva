@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 from rich import print as rprint
 
-from riva.core.config import Settings
+from riva.core.config import load_settings
 from riva.db import Database
 from riva.tasks.core import reset_task_schema, setup_task_schema
 
@@ -50,7 +50,7 @@ def setup(
         if not typer.confirm("Continue?", default=False):
             raise typer.Exit(code=1)
 
-    database_url = Settings(_env_file=env_file).database_url
+    database_url = load_settings(env_file=env_file).database_url
 
     async def run() -> None:
         async with Database(database_url) as database:
@@ -97,7 +97,7 @@ def reset(
         if not typer.confirm("Continue?", default=False):
             raise typer.Exit(code=1)
 
-    database_url = Settings(_env_file=env_file).database_url
+    database_url = load_settings(env_file=env_file).database_url
 
     async def run() -> None:
         async with Database(database_url) as database:
