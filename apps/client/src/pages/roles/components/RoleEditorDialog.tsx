@@ -217,13 +217,17 @@ function SelectField({ form, label, name, options }: any) {
       {(field: any) => (
         <Field>
           <FieldLabel htmlFor={field.name}>{label}</FieldLabel>
-          <Select onValueChange={field.handleChange} value={field.state.value}>
+          <Select
+            items={Object.fromEntries(options)}
+            onValueChange={field.handleChange}
+            value={field.state.value}
+          >
             <FieldControl>
               <SelectTrigger id={field.name} onBlur={field.handleBlur}>
                 <SelectValue />
               </SelectTrigger>
             </FieldControl>
-            <SelectContent>
+            <SelectContent alignItemWithTrigger={false} side="bottom" align="start" sideOffset={4}>
               <SelectGroup>
                 {options.map(([value, optionLabel]: [string, string]) => (
                   <SelectItem key={value} value={value}>
