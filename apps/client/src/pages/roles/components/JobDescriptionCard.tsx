@@ -304,11 +304,11 @@ function AnalysisCategorizedList({
   const entries = Object.keys(labels).filter((key) => groups[key as keyof typeof groups].length > 0)
   return (
     <AnalysisSection field={field} icon={icon} onEdit={onEdit} title={title}>
-      <dl className="flex flex-col gap-3 text-sm leading-6">
+      <dl className="grid grid-cols-[fit-content(40%)_minmax(0,1fr)] gap-x-6 gap-y-3 text-sm leading-6">
         {entries.map((key) => (
-          <div className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-3" key={String(key)}>
-            <dt className="text-muted-foreground">{labels[key]}</dt>
-            <dd>
+          <div className="col-span-2 grid grid-cols-subgrid" key={String(key)}>
+            <dt className="min-w-0 wrap-anywhere text-muted-foreground">{labels[key]}</dt>
+            <dd className="min-w-0 wrap-anywhere">
               <ul className="flex flex-col gap-1">
                 {groups[key as keyof typeof groups].map((item) => (
                   <li key={item}>{item}</li>
