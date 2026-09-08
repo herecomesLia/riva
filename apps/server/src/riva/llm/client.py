@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import AsyncExitStack
-from typing import Literal, Self
+from typing import Self, get_args
 
 from async_lru import alru_cache
 from langchain_core.language_models import BaseChatModel
@@ -9,6 +9,7 @@ from openai import APIStatusError, AsyncOpenAI
 
 from riva.core.config import LLMModelSettings, LLMSettings
 from riva.llm.errors import LLMError, LLMNotConfiguredError
+from riva.llm.policies import LLMModelSlot
 from riva.schemas.health import HealthStatus
 
 
@@ -31,9 +32,7 @@ class LLMClient:
     async def __aexit__(self, *args: object) -> None:
         await self.close()
 
-    def chat_model(
-        self, slot: Literal["default", "reasoning"] = "default"
-    ) -> BaseChatModel:
+    def chat_model(self, slot: LLMModelSlot = "default") -> BaseChatModel:
         api_key, base_url = self._require_configured()
         model = self._resolve_model(slot)
         key = (model.id, model.use_responses_api)
@@ -51,8 +50,8 @@ class LLMClient:
                 raise LLMError("Failed to initialize LLM chat model.") from exc
         return self._chat_models[key]
 
-    def _resolve_model(self, slot: Literal["default", "reasoning"]) -> LLMModelSettings:
-        if slot not in ("default", "reasoning"):
+    def _resolve_model(self, slot: LLMModelSlot) -> LLMModelSettings:
+        if slot not in get_args(LLMModelSlot.__value__):
             raise ValueError(f"Unknown LLM model slot: {slot}")
         return getattr(self.settings.models, slot)
 
@@ -132,7 +131,7 @@ class LLMClient:
             raise LLMNotConfiguredError("LLM configuration is incomplete.")
         return api_key.get_secret_value(), str(base_url)
 
-    async def ping(self, slot: Literal["default", "reasoning"] | None = None) -> None:
+    async def ping(self, slot: LLMModelSlot | None = None) -> None:
         self._require_configured()
         model_ids = (
             self._model_ids() if slot is None else [self._resolve_model(slot).id]

@@ -165,7 +165,7 @@ class LLMSettings(BaseModel):
         return self.base_url is not None
 
     def write_environ(self) -> None:
-        for slot in ("default", "reasoning"):
+        for slot in LLMModelsSettings.model_fields:
             model = getattr(self.models, slot)
             prefix = f"RIVA_LLM_MODELS_{slot.upper()}"
             _write_optional_environ(f"{prefix}_ID", model.id)
