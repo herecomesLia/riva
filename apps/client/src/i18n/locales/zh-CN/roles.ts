@@ -135,6 +135,14 @@ export const roles = {
       title: "暂时无法获取解析结果",
       description: "JD 已保存并仍处于解析中。可以重新同步，不会重复创建解析任务。",
     },
+    emptyHints: {
+      responsibilities: "填写该岗位负责的工作内容与预期成果。",
+      requirements: "填写学历、专业、工作经验等要求。",
+      hardSkills: "填写需要掌握的技术、工具与方法。",
+      preferredQualifications: "填写非必需但有竞争优势的经验或能力。",
+      softSkills: "填写沟通协作、问题分析等能力要求。",
+      businessDomains: "填写岗位涉及的行业、业务场景或产品领域。",
+    },
     analysis: {
       responsibilities: "岗位职责",
       requiredSkills: "必备技能",

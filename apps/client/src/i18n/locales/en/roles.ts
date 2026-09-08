@@ -144,6 +144,15 @@ export const roles = {
       description:
         "The JD is saved and remains in parsing. Synchronizing again will not create another parsing job.",
     },
+    emptyHints: {
+      responsibilities: "Describe the role’s responsibilities and expected outcomes.",
+      requirements: "Add education, field of study, work experience, and other requirements.",
+      hardSkills: "List the required technologies, tools, and methods.",
+      preferredQualifications: "Add experience or skills that are helpful but not required.",
+      softSkills:
+        "Describe requirements such as communication, collaboration, and problem analysis.",
+      businessDomains: "Specify the industries, business contexts, or product areas involved.",
+    },
     analysis: {
       responsibilities: "Responsibilities",
       requiredSkills: "Required Skills",
