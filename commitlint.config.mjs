@@ -1,3 +1,4 @@
+// Prefer a short, single-line summary; add a body only when more detail is needed.
 const TYPES = ["feat", "fix", "refactor", "test", "chore", "docs"]
 const SCOPES = ["client", "server", "fullstack", "tooling"]
 
