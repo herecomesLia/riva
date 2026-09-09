@@ -95,7 +95,7 @@ function CurrentRoleHeader({
       <CardAction>
         <Button nativeButton={false} render={<Link to="/roles" />} size="sm" variant="link">
           {t("dashboard.currentRole.actions.adjust")}
-          <ArrowRightIcon data-icon="inline-end" />
+          <ArrowRightIcon data-icon="inline-end" strokeWidth={1.5} />
         </Button>
       </CardAction>
       {context.length > 0 && <CardDescription>{context.join(" · ")}</CardDescription>}

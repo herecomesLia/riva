@@ -55,7 +55,7 @@ export function WeaknessesCard({ state }: WeaknessesCardProps) {
         ) : (
           <Button nativeButton={false} render={<Link to="/practice" />} size="sm" variant="link">
             {t("dashboard.actions.startPractice")}
-            <ArrowRightIcon data-icon="inline-end" />
+            <ArrowRightIcon data-icon="inline-end" strokeWidth={1.5} />
           </Button>
         )}
       </CardFooter>
