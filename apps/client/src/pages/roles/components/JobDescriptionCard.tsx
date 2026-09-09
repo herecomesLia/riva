@@ -270,6 +270,7 @@ function AnalysisSection({
             onClick={() => onEdit(field)}
             size="xs"
             variant="ghost"
+            className="border-primary text-primary hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/10"
           >
             <PencilIcon data-icon="inline-start" />
             {t("roles.jd.actions.editModule")}
