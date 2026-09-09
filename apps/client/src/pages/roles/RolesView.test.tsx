@@ -465,12 +465,8 @@ describe("RolesView", () => {
     const roleButton = await screen.findByRole("button", {
       name: new RegExp(`^${currentRole.title}`),
     })
-    expect(roleButton).toHaveClass(
-      "border",
-      "focus-visible:border-primary",
-      "focus-visible:ring-1",
-      "active:not-aria-[haspopup]:translate-y-0",
-    )
+    expect(roleButton).toHaveClass("border", "focus-visible:border-primary", "focus-visible:ring-1")
+    expect(roleButton).not.toHaveClass("active:not-aria-[haspopup]:translate-y-px")
     expect(roleButton).toHaveClass("px-2.5", "py-2.5")
     expect(screen.getByRole("button", { name: new RegExp(`^${otherRole.title}`) })).toHaveClass(
       "border",

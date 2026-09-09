@@ -51,7 +51,7 @@ export function MatchingAnalysisCard({
 
   return (
     <Card
-      className="border border-border/70 bg-card shadow-none"
+      className="bg-card shadow-none ring-border"
       data-testid="matching-analysis-card"
       size="sm"
     >

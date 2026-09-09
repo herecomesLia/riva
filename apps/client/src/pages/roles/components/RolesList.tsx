@@ -112,7 +112,7 @@ function RoleListItem({
     <Button
       aria-pressed={selected}
       className={cn(
-        "h-auto w-full justify-start overflow-hidden rounded-2xl border px-2.5 py-2.5 text-left whitespace-normal transition-colors focus-visible:border-primary focus-visible:ring-1 active:not-aria-[haspopup]:translate-y-0",
+        "h-auto w-full justify-start overflow-hidden rounded-2xl border px-2.5 py-2.5 text-left whitespace-normal transition-colors focus-visible:border-primary focus-visible:ring-1",
         selected
           ? isArchived
             ? "border-muted-foreground/50 bg-muted text-foreground"

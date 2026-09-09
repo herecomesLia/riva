@@ -51,7 +51,7 @@ export function LoginPage({ mode = "login" }: { mode?: LoginPageMode }) {
           </div>
         </section>
 
-        <section className="flex min-h-dvh flex-col gap-8 bg-background px-4 py-8 sm:p-8 lg:p-12">
+        <section className="flex min-h-dvh flex-col gap-8 bg-card px-4 py-8 sm:p-8 lg:p-12">
           <div className="flex items-center justify-between lg:justify-end">
             <div className="flex items-center gap-3 text-lg font-semibold lg:hidden">
               <div className="flex size-8 items-center justify-center rounded-lg bg-muted">
@@ -67,11 +67,11 @@ export function LoginPage({ mode = "login" }: { mode?: LoginPageMode }) {
 
           <div className="flex flex-1 items-center justify-center">
             <div className="flex w-full max-w-[420px] flex-col gap-8">
-              <div className="flex flex-col gap-2 text-center">
-                <h1 className="text-3xl font-bold tracking-normal">
+              <div className="flex flex-col gap-3">
+                <h1 className="text-3xl font-semibold tracking-tight">
                   {isRegisterMode ? t("login.registerTitle") : t("login.title")}
                 </h1>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm leading-6 text-muted-foreground">
                   {isRegisterMode ? t("login.registerDescription") : t("login.description")}
                 </p>
               </div>

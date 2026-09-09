@@ -58,21 +58,26 @@ function DashboardDefaultView({
         }
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
+    <div className="@container/dashboard mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6">
       <DashboardHeader displayName={displayName} />
 
       <div
         className="flex flex-col gap-6"
         data-testid={content.status === "loading" ? "dashboard-loading-state" : undefined}
       >
-        <section className="grid gap-4 lg:grid-cols-12">
+        <section className="relative grid gap-4 @3xl/dashboard:grid-cols-12">
+          {/* At 220px wide, the artwork has 12px of padding below the torso. */}
+          <div className="pointer-events-none absolute right-[20%] bottom-[calc(100%-0.75rem)] hidden w-55 @3xl/dashboard:block">
+            <img alt="" className="w-full mix-blend-multiply dark:hidden" src={dashboardRobot} />
+            <img alt="" className="hidden w-full dark:block" src={dashboardRobotDark} />
+          </div>
           <CurrentRoleCard state={contentState.currentRole} />
           <RecommendationCard state={contentState.recommendation} />
         </section>
 
         <DashboardMetrics state={contentState.metrics} />
 
-        <section className="grid gap-4 lg:grid-cols-12">
+        <section className="grid gap-4 @3xl/dashboard:grid-cols-12">
           <PerformanceTrendCard state={contentState.performanceTrend} />
           <WeaknessesCard state={contentState.weaknesses} />
         </section>
@@ -85,13 +90,9 @@ function DashboardHeader({ displayName }: { displayName: string }) {
   const { t } = useTranslation()
 
   return (
-    <header className="relative flex flex-col gap-2.5 lg:pr-72">
-      <div className="pointer-events-none absolute -top-5 right-50 hidden w-55 lg:block">
-        <img alt="" className="w-full mix-blend-multiply dark:hidden" src={dashboardRobot} />
-        <img alt="" className="hidden w-full dark:block" src={dashboardRobotDark} />
-      </div>
-      <div className="relative z-10 flex flex-col gap-2.5">
-        <h1 className="font-heading text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">
+    <header className="flex flex-col justify-center @3xl/dashboard:min-h-24 @3xl/dashboard:pr-[calc(20%+14rem)]">
+      <div className="flex flex-col gap-2">
+        <h1 className="font-heading text-3xl font-semibold leading-tight tracking-tight">
           {t("dashboard.title")}
         </h1>
         <p className="text-base leading-7 text-muted-foreground">
@@ -108,7 +109,7 @@ function DashboardErrorView({ onRetry }: { onRetry: () => void }) {
   const { t } = useTranslation()
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <Card role="alert">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

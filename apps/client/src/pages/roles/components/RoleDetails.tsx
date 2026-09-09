@@ -49,11 +49,11 @@ export function RoleDetails({
   const isCurrent = role.id === activeRoleId
 
   return (
-    <Card className="min-w-0 bg-card shadow-sm" data-testid="role-details-card">
+    <Card className="@container/role min-w-0" data-testid="role-details-card">
       <CardHeader className="border-b border-border/70 pb-(--card-spacing)">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-3 @lg/role:flex-row @lg/role:items-start @lg/role:justify-between">
           <div className="flex min-w-0 flex-col gap-1">
-            <CardTitle className="text-2xl font-semibold tracking-tight">
+            <CardTitle className="break-words text-xl font-semibold leading-snug tracking-tight @lg/role:text-2xl">
               <h2>{role.title}</h2>
             </CardTitle>
             <CardDescription>{role.company ?? t("roles.fallbackValue")}</CardDescription>

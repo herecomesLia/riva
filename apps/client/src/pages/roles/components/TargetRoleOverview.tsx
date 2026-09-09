@@ -11,8 +11,7 @@ import {
 import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
+import { Card, CardContent } from "@/components/ui/card"
 import type { RoleView } from "@/models/target-role-workflow"
 
 import type { RoleDetailsActions } from "./RoleDetails"
@@ -32,26 +31,17 @@ export function TargetRoleOverview({
 
   return (
     <Card
-      className="border border-border/70 bg-card shadow-none"
+      aria-label={t("roles.details.sections.basics")}
+      className="bg-card shadow-none ring-border"
       data-testid="target-role-overview"
       size="sm"
     >
-      <CardHeader>
-        <CardTitle>
-          <h3>{t("roles.details.sections.basics")}</h3>
-        </CardTitle>
-      </CardHeader>
       <CardContent className="flex flex-col gap-6">
+        <h3 className="text-base font-medium">{t("roles.details.sections.basics")}</h3>
         {actions && (
           <div className="flex flex-wrap gap-2" data-testid="role-actions">
-            <Button
-              className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
-              disabled={pending}
-              onClick={actions.edit}
-              size="sm"
-              variant="outline"
-            >
-              <PencilIcon className="size-4" data-icon="inline-start" />
+            <Button disabled={pending} onClick={actions.edit} size="sm" variant="outline">
+              <PencilIcon data-icon="inline-start" />
               {t("roles.actions.edit")}
             </Button>
             {!isCurrent && !role.isArchived && (
@@ -72,16 +62,19 @@ export function TargetRoleOverview({
                 {t("roles.actions.restore")}
               </Button>
             )}
-            <Button disabled={pending} onClick={actions.delete} size="sm" variant="destructive">
+            <Button
+              className="text-destructive hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+              disabled={pending}
+              onClick={actions.delete}
+              size="sm"
+              variant="outline"
+            >
               <Trash2Icon data-icon="inline-start" />
               {t("roles.actions.delete")}
             </Button>
           </div>
         )}
-
-        {actions && <Separator />}
-
-        <dl className="grid gap-4 sm:grid-cols-2">
+        <dl className="grid gap-4 @lg/role:grid-cols-3">
           <RoleField
             icon={Building2Icon}
             label={t("roles.details.fields.company")}
@@ -117,10 +110,10 @@ function RoleField({
   value: string
 }) {
   return (
-    <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+    <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1">
       <Icon aria-hidden="true" className="row-span-2 mt-0.5 size-5 text-muted-foreground" />
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 text-sm font-medium">{value}</dd>
+      <dd className="min-w-0 break-words text-sm font-medium">{value}</dd>
     </div>
   )
 }

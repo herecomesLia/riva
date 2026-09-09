@@ -87,6 +87,29 @@ describe("AppShell", () => {
     expect(await screen.findByRole("heading", { name: today })).toBeInTheDocument()
   })
 
+  it("resizes the sidebar within bounds and preserves its width across collapse", async () => {
+    const user = userEvent.setup()
+    const { container } = renderWithProviders(<AppShell />, {
+      router: { initialEntries: ["/dashboard"] },
+    })
+    const rail = await screen.findByRole("separator", { name: t("common.sidebar.resize") })
+    rail.focus()
+    await user.keyboard("{End}{ArrowRight}")
+    expect(rail).toHaveAttribute("aria-valuenow", "22")
+    await user.keyboard("{Home}{ArrowLeft}")
+    expect(rail).toHaveAttribute("aria-valuenow", "12")
+    await user.keyboard("{ArrowRight}{ArrowRight}")
+    expect(container.querySelector('[data-slot="sidebar-wrapper"]')).toHaveStyle({
+      "--sidebar-width": "14rem",
+    })
+    await user.keyboard("{Control>}b{/Control}")
+    await user.click(screen.getByRole("button", { name: t("common.sidebar.toggle") }))
+    expect(screen.getByRole("separator", { name: t("common.sidebar.resize") })).toHaveAttribute(
+      "aria-valuenow",
+      "14",
+    )
+  })
+
   it("shows today's localized date in the dashboard top bar", async () => {
     renderWithProviders(<AppShell />, {
       router: {

@@ -21,7 +21,7 @@ export function HistoryOverview({ state }: { state: Loadable<TrainingRecordsOver
 
   return (
     <section aria-label={t("history.overview.title")}>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 @sm/app:grid-cols-2 @4xl/app:grid-cols-4">
         {metrics.map(({ icon: Icon, key }) => (
           <Card key={key} size="sm">
             <CardHeader>

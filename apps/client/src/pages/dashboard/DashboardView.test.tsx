@@ -108,6 +108,9 @@ describe("DashboardView", () => {
     expect(recommendationLink.getAttribute("href")).toContain(
       `targetRoleId=${dashboardStoryFixture.recommendation!.targetRoleId}`,
     )
+    const historyLink = screen.getByRole("link", { name: i18n.t("dashboard.actions.viewHistory") })
+    expect(historyLink).toHaveClass("border-border")
+    expect(historyLink).not.toHaveClass("border-transparent")
 
     const chart = screen.getByRole("img", { name: "最近 10 次专项练习评分表现" })
     fireEvent.focus(chart)
@@ -145,8 +148,11 @@ describe("DashboardView", () => {
     expect(screen.getByText(partialDashboardResponse.weaknesses[0].description)).toBeInTheDocument()
 
     const chart = screen.getByRole("img", { name: "最近 10 次专项练习评分表现" })
+    expect(chart.querySelector("circle")).toHaveAttribute("r", "4")
     fireEvent.focus(chart)
     expect(await screen.findByText("专项练习 第1次")).toBeInTheDocument()
+    fireEvent.blur(chart)
+    expect(chart.querySelector("circle")).toHaveAttribute("r", "4")
   })
 
   it("renders only the page-level error and calls retry", async () => {

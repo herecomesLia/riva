@@ -35,7 +35,10 @@ export function MobileTargetRoleSelector({
   const visibleRoles = getRolesForCategory(roles, category)
 
   return (
-    <section className="flex flex-col gap-2 lg:hidden" data-testid="mobile-role-selector">
+    <section
+      className="flex min-w-0 flex-col gap-2 @4xl/app:hidden"
+      data-testid="mobile-role-selector"
+    >
       <h2 className="text-sm font-medium">{t("roles.mobileSelector.label")}</h2>
       <div
         aria-label={t("roles.list.categoryLabel")}

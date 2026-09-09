@@ -54,5 +54,6 @@ export const common = {
     description: "显示移动端侧边栏。",
     title: "侧边栏",
     toggle: "切换侧边栏",
+    resize: "调整侧边栏宽度",
   },
 } as const

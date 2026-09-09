@@ -1,4 +1,5 @@
 import {
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -53,17 +54,32 @@ type PerformanceTrendCardProps = {
 export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
   const { i18n, t } = useTranslation()
   const chartRef = useRef<SVGSVGElement>(null)
+  const [chartWidth, setChartWidth] = useState(performanceChart.width)
   const [performanceType, setPerformanceType] =
     useState<keyof DashboardResponse["performanceTrend"]>("targetedPractice")
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<PerformanceTooltipPosition | null>(null)
   const performanceTrend = state.status === "ready" ? state.data : null
   const points = performanceTrend ? performanceTrend[performanceType] : []
-  const chartPoints = getPerformanceChartPoints(points)
+  const chartPoints = getPerformanceChartPoints(points, chartWidth)
   const linePath = getLinePath(chartPoints)
   const areaPath = getAreaPath(chartPoints)
   const isLoading = state.status === "loading"
   const hasPoints = points.length > 0
+  useLayoutEffect(() => {
+    const chart = chartRef.current?.parentElement
+    if (!chart) return
+    const measure = () => {
+      const width = chart.getBoundingClientRect().width
+      if (width > 0) setChartWidth(width)
+      setActiveIndex(null)
+      setTooltipPosition(null)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(chart)
+    return () => observer.disconnect()
+  }, [hasPoints])
   const activePoint = activeIndex === null ? null : (chartPoints[activeIndex] ?? null)
   const summary = hasPoints
     ? {
@@ -91,9 +107,8 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
 
     const bounds = chart.getBoundingClientRect()
     const point = chartPoints[index]
-    const chartWidth = bounds.width || performanceChart.width
     const chartHeight = bounds.height || performanceChart.height
-    const pointX = (point.x / performanceChart.width) * chartWidth
+    const pointX = point.x
     const pointY = (point.y / performanceChart.height) * chartHeight
     const canPlaceOnRight =
       pointX + performanceTooltip.offset + performanceTooltip.width <= chartWidth
@@ -117,7 +132,12 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
     }
 
     const bounds = chart.getBoundingClientRect()
-    const pointerRatio = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width))
+    const pointerRatio = clamp(
+      (event.clientX - bounds.left - performanceChart.padding.left) /
+        (chartWidth - performanceChart.padding.left - performanceChart.padding.right),
+      0,
+      1,
+    )
     const nextIndex = Math.round(pointerRatio * (chartPoints.length - 1))
 
     showTooltip(nextIndex)
@@ -149,10 +169,10 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
   }
 
   return (
-    <Card className="lg:col-span-7">
-      <CardHeader>
+    <Card className="@container/trend min-w-0 @3xl/dashboard:col-span-7">
+      <CardHeader className="flex flex-col gap-2 @md/trend:grid">
         <CardTitle>{t("dashboard.performanceTrend.title")}</CardTitle>
-        <CardAction>
+        <CardAction className="self-start">
           {isLoading ? (
             <Skeleton className="h-10 w-36" />
           ) : (
@@ -165,7 +185,7 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
                 <Button
                   aria-pressed={performanceType === type}
                   className={cn(
-                    "h-8 rounded-lg px-2.5 text-xs font-normal transition-colors hover:bg-transparent hover:font-medium hover:text-foreground dark:hover:bg-transparent",
+                    "h-8 rounded-lg px-2.5 text-xs font-medium transition-colors hover:bg-transparent hover:text-foreground dark:hover:bg-transparent",
                     performanceType === type &&
                       "bg-muted font-medium shadow-xs hover:bg-muted dark:hover:bg-muted",
                   )}
@@ -191,7 +211,7 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
       <CardContent
         className={
           isLoading || summary
-            ? "grid gap-6 lg:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1.3fr)] lg:items-end"
+            ? "grid gap-6 @lg/trend:grid-cols-[minmax(9rem,0.7fr)_minmax(0,1.3fr)] @lg/trend:items-end"
             : "flex min-h-46 items-center"
         }
       >
@@ -199,7 +219,7 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
           <PerformanceTrendLoadingContent />
         ) : summary ? (
           <>
-            <dl className="grid grid-cols-2 gap-4 lg:grid-cols-1">
+            <dl className="grid grid-cols-2 gap-4 @sm/trend:grid-cols-3 @lg/trend:grid-cols-1">
               <div className="flex flex-col gap-1">
                 <dt className="text-xs font-medium text-muted-foreground">
                   {t("dashboard.performanceTrend.trainingDays")}
@@ -268,7 +288,7 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
                 ref={chartRef}
                 role="img"
                 tabIndex={0}
-                viewBox={`0 0 ${performanceChart.width} ${performanceChart.height}`}
+                viewBox={`0 0 ${chartWidth} ${performanceChart.height}`}
               >
                 <defs>
                   <linearGradient id="performance-trend-area" x1="0" x2="0" y1="0" y2="1">
@@ -302,7 +322,7 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
                         strokeDasharray="4 4"
                         strokeWidth="1"
                         x1={performanceChart.padding.left}
-                        x2={performanceChart.width - performanceChart.padding.right}
+                        x2={chartWidth - performanceChart.padding.right}
                         y1={y}
                         y2={y}
                       />
@@ -325,6 +345,14 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
                   strokeLinejoin="round"
                   strokeWidth="2.5"
                 />
+                {chartPoints.length === 1 && !activePoint && (
+                  <circle
+                    className="fill-primary"
+                    cx={chartPoints[0].x}
+                    cy={chartPoints[0].y}
+                    r="4"
+                  />
+                )}
                 {activePoint && (
                   <>
                     <line
@@ -351,7 +379,9 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
                     <text
                       className="fill-muted-foreground text-[10px]"
                       key={point.id}
-                      textAnchor="middle"
+                      textAnchor={
+                        index === 0 ? "start" : index === chartPoints.length - 1 ? "end" : "middle"
+                      }
                       x={point.x}
                       y={performanceChart.height - 7}
                     >
@@ -375,7 +405,7 @@ export function PerformanceTrendCard({ state }: PerformanceTrendCardProps) {
 function PerformanceTrendLoadingContent() {
   return (
     <>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-1">
+      <div className="grid grid-cols-2 gap-4 @sm/trend:grid-cols-3 @lg/trend:grid-cols-1">
         <Skeleton className="h-12 w-20" />
         <Skeleton className="h-12 w-20" />
         <Skeleton className="h-12 w-20" />
@@ -389,8 +419,11 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(Math.max(value, minimum), maximum)
 }
 
-function getPerformanceChartPoints(points: DashboardPerformanceRecord[]): PerformanceChartPoint[] {
-  const { height, padding, width } = performanceChart
+function getPerformanceChartPoints(
+  points: DashboardPerformanceRecord[],
+  width: number,
+): PerformanceChartPoint[] {
+  const { height, padding } = performanceChart
   const chartHeight = height - padding.top - padding.bottom
   const chartWidth = width - padding.left - padding.right
 

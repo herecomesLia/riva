@@ -20,7 +20,7 @@ export function PracticeBottomActionBar({
 }: PracticeBottomActionBarProps) {
   return (
     <section
-      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur transition-[left] duration-200 ease-linear md:left-(--sidebar-width) md:group-has-data-[collapsible=icon]/sidebar-wrapper:left-(--sidebar-width-icon)"
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur transition-[left] duration-200 ease-linear group-data-[resizing=true]/sidebar-wrapper:transition-none md:left-(--sidebar-width) md:group-has-data-[collapsible=icon]/sidebar-wrapper:left-(--sidebar-width-icon)"
       aria-label={ariaLabel}
       data-testid={testId}
     >

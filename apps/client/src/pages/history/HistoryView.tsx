@@ -39,7 +39,7 @@ export function HistoryView({
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-      <header className="flex max-w-3xl flex-col gap-2.5">
+      <header className="flex max-w-3xl flex-col gap-2">
         <h1 className="font-heading text-3xl font-semibold leading-tight tracking-tight">
           {t("history.title")}
         </h1>

@@ -92,7 +92,7 @@ describe("InterviewView", () => {
     )
   })
 
-  it("matches the targeted-practice spacing around setup dividers", async () => {
+  it("keeps setup dividers spaced without doubling the footer gap", async () => {
     renderReadyView()
 
     const targetRoleField = (
@@ -112,8 +112,9 @@ describe("InterviewView", () => {
       "border-t",
       "border-border",
       "gap-5",
-      "py-5",
+      "pt-5",
     )
+    expect(difficultyFieldSet?.parentElement).not.toHaveClass("py-5", "pb-5")
 
     const durationFieldSet = screen
       .getByText(i18n.t("interview.setup.fields.duration"))

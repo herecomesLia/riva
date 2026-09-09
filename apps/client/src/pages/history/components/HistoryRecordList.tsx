@@ -163,7 +163,7 @@ function HistoryRecordCard({
           </p>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+      <CardContent className="grid gap-4 @3xl/app:grid-cols-[minmax(0,1fr)_auto]">
         <div className="flex min-w-0 flex-col gap-1.5">
           <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <SparklesIcon aria-hidden="true" className="size-4" />
@@ -173,7 +173,7 @@ function HistoryRecordCard({
             {record.reviewSummary ?? t("history.records.noReview")}
           </p>
         </div>
-        <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3 md:min-w-72">
+        <dl className="grid grid-cols-1 gap-4 text-sm @sm/app:grid-cols-3 @3xl/app:min-w-72">
           <RecordDatum
             label={t("history.overview.metrics.duration")}
             value={t("history.records.duration", {

@@ -101,15 +101,15 @@ export function InterviewReviewView(props: InterviewReviewViewProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 sm:px-0">
+    <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6">
       <header className="flex flex-col gap-2">
         <Badge className="w-fit" variant="secondary">
           {t("interview.review.badge")}
         </Badge>
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">
+        <h1 className="font-heading text-3xl font-semibold leading-tight tracking-tight">
           {t("interview.review.title")}
         </h1>
-        <p className="max-w-3xl text-sm text-muted-foreground">
+        <p className="max-w-3xl text-base leading-7 text-muted-foreground">
           {t("interview.review.description")}
         </p>
       </header>
@@ -181,7 +181,7 @@ function ReviewLoading() {
       </Card>
       <ReviewLoadingCard title={t("interview.review.sections.dimensions")} rows={4} />
       <ReviewLoadingCard title={t("interview.review.sections.questions")} rows={3} />
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 @3xl/app:grid-cols-2">
         <ReviewLoadingCard title={t("interview.review.sections.strengths")} />
         <ReviewLoadingCard title={t("interview.review.sections.frequentIssues")} />
         <ReviewLoadingCard title={t("interview.review.sections.weaknesses")} />
@@ -238,7 +238,7 @@ function ReviewContent({
       {isComplete ? <InterviewDimensionScores review={data.review} /> : null}
       <InterviewQuestionDetails details={data.questionDetails} />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 @3xl/app:grid-cols-2">
         <InterviewReviewListCard
           icon={<CheckCircle2Icon aria-hidden="true" />}
           items={data.review.mainStrengths}
@@ -303,7 +303,7 @@ function NextTrainingCard({
   const { t } = useTranslation()
 
   return (
-    <Card className="border-primary/20 bg-primary/5">
+    <Card className="bg-primary/5 ring-primary/20">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <SparklesIcon aria-hidden="true" />

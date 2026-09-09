@@ -25,6 +25,7 @@ import type { Loadable } from "@/types"
 
 import { MobileTargetRoleSelector } from "./components/MobileTargetRoleSelector"
 import { RoleDetails, type TargetRoleTab } from "./components/RoleDetails"
+import { TargetRoleProgressSummary } from "./components/TargetRoleProgressSummary"
 import { RoleEditorDialog } from "./components/RoleEditorDialog"
 import { TargetRoleCreationDialog } from "./components/TargetRoleCreationDialog"
 import { JobDescriptionEditorDialog } from "./components/JobDescriptionEditorDialog"
@@ -38,7 +39,6 @@ import {
   RolesLoadingState,
   RolesNoSelectionState,
 } from "./components/RolesPageStates"
-import { TargetRoleProgressSummary } from "./components/TargetRoleProgressSummary"
 import { getRolesActionErrorCode, type RolesActionErrorCode } from "./roles-errors"
 
 export type RolesViewActions = {
@@ -204,9 +204,9 @@ function RolesReadyView({
               <AlertDescription>{t(`roles.errors.${actionError}`)}</AlertDescription>
             </Alert>
           )}
-          <div className="grid items-start gap-6 lg:grid-cols-[23rem_minmax(0,1fr)]">
+          <div className="grid items-start gap-6 @4xl/app:grid-cols-[minmax(15rem,0.7fr)_minmax(0,1.3fr)]">
             <aside
-              className="hidden min-h-0 gap-4 lg:sticky lg:top-20 lg:flex lg:max-h-[calc(100dvh-6.5rem)] lg:self-start lg:flex-col"
+              className="hidden min-h-0 min-w-0 gap-4 @4xl/app:sticky @4xl/app:top-20 @4xl/app:flex @4xl/app:self-start @4xl/app:flex-col"
               data-testid="roles-desktop-navigation"
             >
               <RolesList
@@ -235,7 +235,7 @@ function RolesReadyView({
                 selectedRole={selectedRole}
               />
               {selectedRole && (
-                <div className="lg:hidden">
+                <div className="@4xl/app:hidden">
                   <TargetRoleProgressSummary
                     isCurrent={selectedRole.id === data.activeRoleId}
                     role={selectedRole}

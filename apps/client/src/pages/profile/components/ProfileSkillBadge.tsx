@@ -10,7 +10,7 @@ type ProfileSkillBadgeProps = {
 export function ProfileSkillBadge({ name, showIcon = true }: ProfileSkillBadgeProps) {
   return (
     <Badge
-      className="h-auto min-h-6 max-w-full gap-1.5 whitespace-normal break-words border-primary/20 bg-primary/10 px-2.5 py-1 text-primary hover:bg-primary/15"
+      className="h-auto min-h-6 max-w-full gap-1.5 rounded-md whitespace-normal break-words border-transparent bg-muted px-2.5 py-1 text-secondary-foreground"
       variant="outline"
     >
       {showIcon && <CodeXmlIcon aria-hidden="true" data-icon="inline-start" />}

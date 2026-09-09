@@ -61,5 +61,6 @@ export const common = {
     description: "Displays the mobile sidebar.",
     title: "Sidebar",
     toggle: "Toggle sidebar",
+    resize: "Resize sidebar",
   },
 } as const

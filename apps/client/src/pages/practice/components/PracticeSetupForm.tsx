@@ -68,8 +68,6 @@ const questionTypes: QuestionType[] = [
   "technicalFoundation",
 ]
 const sources: QuestionSource[] = ["personalized", "saved", "history"]
-const practiceOptionStateClassName =
-  "hover:bg-card focus:border-primary focus:text-primary focus-visible:border-primary focus-visible:text-primary aria-pressed:border-primary aria-pressed:bg-card aria-pressed:text-primary"
 
 type PracticeSetupFormProps = {
   context: PracticeSetupContext
@@ -109,7 +107,7 @@ export function PracticeSetupForm({
 
   return (
     <form
-      className="flex flex-col gap-7"
+      className="@container/setup flex flex-col gap-6"
       noValidate
       onSubmit={(event) => {
         event.preventDefault()
@@ -211,11 +209,7 @@ export function PracticeSetupForm({
                         {questionTypes
                           .filter((type) => supportedQuestionTypes.includes(type))
                           .map((type) => (
-                            <ToggleGroupItem
-                              className={practiceOptionStateClassName}
-                              key={type}
-                              value={type}
-                            >
+                            <ToggleGroupItem key={type} value={type}>
                               {t(`practice.questionTypes.${type}`)}
                             </ToggleGroupItem>
                           ))}
@@ -228,10 +222,10 @@ export function PracticeSetupForm({
           </form.Subscribe>
         </div>
 
-        <div className="grid gap-5 border-t border-border py-5 md:grid-cols-2 md:gap-0">
+        <div className="grid gap-5 border-t border-border py-5 @2xl/setup:grid-cols-2 @2xl/setup:gap-0">
           <form.Field name="difficulty">
             {(field) => (
-              <FieldSet className="md:pr-6" data-disabled={pending}>
+              <FieldSet className="@2xl/setup:pr-6" data-disabled={pending}>
                 <FieldLegend
                   className="flex items-center gap-2 [&>svg]:size-4 [&>svg]:text-primary"
                   variant="label"
@@ -241,7 +235,7 @@ export function PracticeSetupForm({
                 </FieldLegend>
                 <ToggleGroup
                   aria-label={t("practice.setup.fields.difficulty")}
-                  className="flex w-full justify-start"
+                  className="flex w-full flex-wrap justify-start"
                   disabled={pending}
                   onValueChange={(values) => {
                     const value = values[0]
@@ -252,11 +246,7 @@ export function PracticeSetupForm({
                   variant="outline"
                 >
                   {context.availableDifficulties.map((difficulty) => (
-                    <ToggleGroupItem
-                      className={practiceOptionStateClassName}
-                      key={difficulty}
-                      value={difficulty}
-                    >
+                    <ToggleGroupItem key={difficulty} value={difficulty}>
                       {t(`practice.difficulty.${difficulty}`)}
                     </ToggleGroupItem>
                   ))}
@@ -265,7 +255,7 @@ export function PracticeSetupForm({
             )}
           </form.Field>
 
-          <div className="border-t border-border pt-5 md:border-t-0 md:border-l md:pt-0 md:pl-6">
+          <div className="border-t border-border pt-5 @2xl/setup:border-t-0 @2xl/setup:border-l @2xl/setup:pt-0 @2xl/setup:pl-6">
             <form.Field name="source">
               {(field) => (
                 <FieldSet data-disabled={pending}>
@@ -289,11 +279,7 @@ export function PracticeSetupForm({
                     variant="outline"
                   >
                     {sources.map((source) => (
-                      <ToggleGroupItem
-                        className={practiceOptionStateClassName}
-                        key={source}
-                        value={source}
-                      >
+                      <ToggleGroupItem key={source} value={source}>
                         {t(`practice.sources.${source}`)}
                       </ToggleGroupItem>
                     ))}

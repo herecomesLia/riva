@@ -41,9 +41,6 @@ type InterviewSetupFormProps = {
   onStart: (input: InterviewConfiguration) => Promise<void>
 }
 
-const interviewOptionStateClassName =
-  "hover:bg-card focus:border-primary focus:text-primary focus-visible:border-primary focus-visible:text-primary aria-pressed:border-primary aria-pressed:bg-card aria-pressed:text-primary"
-
 function getInitialConfiguration(
   setup: InterviewSetup,
   historyEntryResolution?: InterviewTrainingEntryResolution,
@@ -117,7 +114,7 @@ export function InterviewSetupForm({
         void form.handleSubmit()
       }}
     >
-      <CardContent className="flex flex-col gap-6">
+      <CardContent className="@container/setup flex flex-col gap-6">
         {historyEntryResolution && (
           <TrainingEntryPreparationAlert
             confirmed={adjustmentConfirmed}
@@ -205,11 +202,7 @@ export function InterviewSetupForm({
                           variant="outline"
                         >
                           {selectedRole?.supportedRounds.map((round) => (
-                            <ToggleGroupItem
-                              className={interviewOptionStateClassName}
-                              key={round}
-                              value={round}
-                            >
+                            <ToggleGroupItem key={round} value={round}>
                               {t(`interview.rounds.${round}`)}
                             </ToggleGroupItem>
                           ))}
@@ -222,10 +215,10 @@ export function InterviewSetupForm({
             </form.Subscribe>
           </div>
 
-          <div className="grid gap-5 border-t border-border py-5 md:grid-cols-2 md:gap-0">
+          <div className="grid gap-5 border-t border-border pt-5 @2xl/setup:grid-cols-2 @2xl/setup:gap-0">
             <form.Field name="difficulty">
               {(field) => (
-                <FieldSet className="md:pr-6" data-disabled={pending}>
+                <FieldSet className="@2xl/setup:pr-6" data-disabled={pending}>
                   <FieldLegend
                     className="flex items-center gap-2 [&>svg]:size-4 [&>svg]:text-primary"
                     variant="label"
@@ -246,11 +239,7 @@ export function InterviewSetupForm({
                     variant="outline"
                   >
                     {setup.availableDifficulties.map((difficulty) => (
-                      <ToggleGroupItem
-                        className={interviewOptionStateClassName}
-                        key={difficulty}
-                        value={difficulty}
-                      >
+                      <ToggleGroupItem key={difficulty} value={difficulty}>
                         {t(`interview.difficulty.${difficulty}`)}
                       </ToggleGroupItem>
                     ))}
@@ -259,7 +248,7 @@ export function InterviewSetupForm({
               )}
             </form.Field>
 
-            <div className="border-t border-border pt-5 md:border-t-0 md:border-l md:pt-0 md:pl-6">
+            <div className="border-t border-border pt-5 @2xl/setup:border-t-0 @2xl/setup:border-l @2xl/setup:pt-0 @2xl/setup:pl-6">
               <form.Field name="durationMinutes">
                 {(field) => (
                   <FieldSet data-disabled={pending}>
@@ -283,11 +272,7 @@ export function InterviewSetupForm({
                       variant="outline"
                     >
                       {setup.availableDurationMinutes.map((durationMinutes) => (
-                        <ToggleGroupItem
-                          className={interviewOptionStateClassName}
-                          key={durationMinutes}
-                          value={String(durationMinutes)}
-                        >
+                        <ToggleGroupItem key={durationMinutes} value={String(durationMinutes)}>
                           {t("interview.setup.durationMinutes", { minutes: durationMinutes })}
                         </ToggleGroupItem>
                       ))}
@@ -308,7 +293,7 @@ export function InterviewSetupForm({
         </FieldGroup>
       </CardContent>
 
-      <CardFooter className="mt-7">
+      <CardFooter className="mt-6">
         <form.Subscribe selector={(state) => state.values.targetRoleId}>
           {(targetRoleId) => (
             <Button

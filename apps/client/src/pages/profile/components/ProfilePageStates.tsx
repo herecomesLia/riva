@@ -21,9 +21,13 @@ export function ProfileLoadingState() {
   const { t } = useTranslation()
 
   return (
-    <div aria-busy="true" className="flex flex-col gap-6" data-testid="profile-loading-state">
-      <div className="grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
-        <div className="flex min-w-0 flex-col gap-2">
+    <div
+      aria-busy="true"
+      className="mx-auto flex w-full max-w-7xl flex-col gap-6"
+      data-testid="profile-loading-state"
+    >
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 @3xl/app:grid-cols-[minmax(0,1fr)_auto_auto] @3xl/app:gap-6">
+        <div className="col-span-2 flex min-w-0 flex-col gap-2 @3xl/app:col-span-1">
           <ProfileHeaderIntro />
           <div
             aria-label={t("common.pageState.loading.title")}
@@ -36,13 +40,13 @@ export function ProfileLoadingState() {
             <Skeleton className="h-4 w-36 max-w-full" />
           </div>
         </div>
-        <div className="justify-self-center lg:pr-6">
+        <div className="justify-self-start @3xl/app:px-4">
           <Skeleton className="size-24 rounded-full" />
         </div>
-        <Skeleton className="h-8 w-28 max-w-full justify-self-start lg:justify-self-end" />
+        <Skeleton className="h-10 w-28 max-w-full justify-self-end" />
       </div>
       <div
-        className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(18rem,2fr)]"
+        className="grid items-stretch gap-6 @3xl/app:grid-cols-[minmax(0,3fr)_minmax(18rem,2fr)]"
         data-testid="profile-loading-summary-sections"
       >
         <ProfileSkeletonCard className="h-full" section="education" />

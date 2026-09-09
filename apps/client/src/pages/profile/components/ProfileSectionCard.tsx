@@ -42,13 +42,7 @@ export function ProfileSectionCard({
         </CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
         <CardAction>
-          <Button
-            className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
-            disabled={!onEdit}
-            onClick={onEdit}
-            size="xs"
-            variant="outline"
-          >
+          <Button disabled={!onEdit} onClick={onEdit} size="sm" variant="ghost">
             <PencilIcon data-icon="inline-start" />
             {t("profile.actions.edit")}
           </Button>

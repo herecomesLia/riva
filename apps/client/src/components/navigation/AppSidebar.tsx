@@ -85,13 +85,13 @@ const appNavigationItems: AppNavigationItem[] = [
 export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className="py-3">
         <AppSidebarHeader />
       </SidebarHeader>
       <SidebarContent>
         <NavigationList />
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="border-t border-sidebar-border py-3">
         <AppSidebarUser />
       </SidebarFooter>
       <SidebarRail />
@@ -106,7 +106,7 @@ function NavigationList() {
   return (
     <SidebarGroup>
       <SidebarGroupContent>
-        <SidebarMenu>
+        <SidebarMenu className="gap-1.5">
           {appNavigationItems.map((item) => {
             const Icon = item.icon
             const matchDescendants = item.to === "/interview" || item.to === "/history"
@@ -115,6 +115,7 @@ function NavigationList() {
             return (
               <SidebarMenuItem key={item.to}>
                 <SidebarMenuButton
+                  className="h-10 gap-3 data-active:font-semibold"
                   isActive={isActive}
                   render={<Link activeOptions={{ exact: !matchDescendants }} to={item.to} />}
                   tooltip={t(item.labelKey)}
@@ -147,8 +148,12 @@ function AppSidebarHeader() {
             <BriefcaseBusinessIcon />
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-medium">{t("app.name")}</span>
-            <span className="truncate text-xs">{t("appShell.appDescription")}</span>
+            <span className="truncate text-lg font-semibold tracking-tight text-foreground">
+              {t("app.name")}
+            </span>
+            <span className="truncate text-xs text-muted-foreground">
+              {t("appShell.appDescription")}
+            </span>
           </div>
         </SidebarMenuButton>
       </SidebarMenuItem>

@@ -109,7 +109,7 @@ export function DashboardMetrics({ state }: DashboardMetricsProps) {
   return (
     <section
       aria-label={t("dashboard.metrics.eyebrow")}
-      className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      className="grid gap-4 @sm/app:grid-cols-2 @4xl/app:grid-cols-4"
     >
       {metricOrder.map((key) => (
         <MetricCard

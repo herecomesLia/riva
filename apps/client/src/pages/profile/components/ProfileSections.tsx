@@ -15,7 +15,7 @@ export function ProfileSections({ onStartEditing, profile }: ProfileSectionsProp
   return (
     <div className="flex flex-col gap-6">
       <section
-        className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(18rem,2fr)]"
+        className="grid items-stretch gap-6 @3xl/app:grid-cols-[minmax(0,3fr)_minmax(18rem,2fr)]"
         data-testid="profile-summary-sections"
       >
         <EducationCard education={profile.education} onEdit={() => onStartEditing("education")} />

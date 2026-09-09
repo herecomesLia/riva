@@ -19,7 +19,7 @@ export function RolesLoadingState() {
   return (
     <div
       aria-busy="true"
-      className="grid items-start gap-6 lg:grid-cols-[23rem_minmax(0,1fr)]"
+      className="grid items-start gap-6 @4xl/app:grid-cols-[minmax(15rem,0.7fr)_minmax(0,1.3fr)]"
       data-testid="roles-loading-state"
     >
       <Card data-testid="roles-list-loading-card">

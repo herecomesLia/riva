@@ -53,7 +53,14 @@ export function TrainingRecommendationCard({
       )}
       {entry && (
         <CardFooter>
-          <Link className={buttonVariants({ size })} search={entry.search} to={entry.to}>
+          <Link
+            className={buttonVariants({
+              size,
+              className: "h-auto min-h-9 max-w-full whitespace-normal py-2 text-center",
+            })}
+            search={entry.search}
+            to={entry.to}
+          >
             <PlayIcon aria-hidden="true" data-icon="inline-start" />
             {t(`history.detail.recommendationActions.${entry.action}`)}
           </Link>

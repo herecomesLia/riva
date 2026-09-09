@@ -27,19 +27,12 @@ export function RecommendationCard({ state }: RecommendationCardProps) {
   const recommendation = state.status === "ready" ? state.data : null
 
   return (
-    <Card className="lg:col-span-7">
+    <Card className="@container/recommendation min-w-0 ring-primary/20 @3xl/dashboard:col-span-7">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <SparklesIcon />
+          <SparklesIcon className="size-4 text-primary" />
           {t("dashboard.recommendation.eyebrow")}
         </CardTitle>
-        {state.status === "loading" ? (
-          <Skeleton className="h-4 w-4/5" />
-        ) : recommendation ? (
-          <CardDescription>{recommendation.recommendation.reason}</CardDescription>
-        ) : (
-          <CardDescription>{t("dashboard.recommendation.empty.description")}</CardDescription>
-        )}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {state.status === "loading" ? (
@@ -47,12 +40,15 @@ export function RecommendationCard({ state }: RecommendationCardProps) {
         ) : recommendation ? (
           <RecommendationDataContent recommendation={recommendation} />
         ) : (
-          <p className="font-heading text-xl font-medium">
-            {t("dashboard.recommendation.empty.title")}
-          </p>
+          <>
+            <p className="font-heading text-xl font-semibold leading-snug">
+              {t("dashboard.recommendation.empty.title")}
+            </p>
+            <CardDescription>{t("dashboard.recommendation.empty.description")}</CardDescription>
+          </>
         )}
       </CardContent>
-      <CardFooter className="flex flex-wrap gap-2">
+      <CardFooter className="mt-auto flex flex-col items-stretch gap-2 @sm/recommendation:flex-row @sm/recommendation:flex-wrap [&>a]:h-auto [&>a]:min-h-10 [&>a]:min-w-0 [&>a]:whitespace-normal [&>a]:py-2 [&>a]:text-center">
         {state.status === "loading" ? (
           <RecommendationLoadingFooter />
         ) : recommendation ? (
@@ -75,6 +71,7 @@ function RecommendationLoadingContent() {
   return (
     <>
       <Skeleton className="h-6 w-4/5" />
+      <Skeleton className="h-4 w-full" />
       <div className="flex gap-2">
         <Skeleton className="h-6 w-24 rounded-full" />
         <Skeleton className="h-6 w-28 rounded-full" />
@@ -93,9 +90,10 @@ function RecommendationDataContent({
 
   return (
     <>
-      <p className="font-heading text-xl font-medium">
+      <p className="font-heading text-xl font-semibold leading-snug tracking-tight">
         {t(`dashboard.recommendation.actions.${content.action}.title`)}
       </p>
+      <CardDescription className="leading-6">{content.reason}</CardDescription>
       <div className="flex flex-wrap gap-2">
         {"questionType" in content && (
           <Badge variant="outline">{t(`history.questionTypes.${content.questionType}`)}</Badge>
@@ -117,8 +115,8 @@ function RecommendationDataContent({
 function RecommendationLoadingFooter() {
   return (
     <>
-      <Skeleton className="h-9 w-28" />
-      <Skeleton className="h-9 w-24" />
+      <Skeleton className="h-10 w-28" />
+      <Skeleton className="h-10 w-24" />
     </>
   )
 }

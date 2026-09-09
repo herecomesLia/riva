@@ -44,11 +44,7 @@ export function JobDescriptionCard({
   const showSections = jdState.status === "missing" || jdState.status === "ready"
 
   return (
-    <Card
-      className="border border-border/70 bg-card shadow-none"
-      data-testid="job-description-card"
-      size="sm"
-    >
+    <Card className="bg-card shadow-none ring-border" data-testid="job-description-card" size="sm">
       <CardHeader>
         <div className="flex flex-col gap-1">
           <div className="flex min-h-9 flex-wrap items-center justify-between gap-3">
@@ -271,10 +267,9 @@ function AnalysisSection({
         {onEdit && field && (
           <Button
             aria-label={t("roles.jd.actions.editModuleLabel", { module: title })}
-            className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
             onClick={() => onEdit(field)}
             size="xs"
-            variant="outline"
+            variant="ghost"
           >
             <PencilIcon data-icon="inline-start" />
             {t("roles.jd.actions.editModule")}

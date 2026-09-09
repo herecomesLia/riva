@@ -21,7 +21,7 @@ export function AppShell() {
       <AppSidebar />
       <SidebarInset>
         <AppTopbar />
-        <main className="min-w-0 flex-1 px-4 py-6 md:px-6">
+        <main className="@container/app min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 xl:px-10">
           <Outlet />
         </main>
       </SidebarInset>

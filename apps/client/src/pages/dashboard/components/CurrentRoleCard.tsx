@@ -44,7 +44,7 @@ export function CurrentRoleCard({ state }: CurrentRoleCardProps) {
   const currentRole = state.status === "ready" ? state.data : null
 
   return (
-    <Card className="lg:col-span-5">
+    <Card className="min-w-0 @3xl/dashboard:col-span-5">
       <CardHeader>
         <CardTitle>{t("dashboard.currentRole.eyebrow")}</CardTitle>
 
@@ -93,8 +93,9 @@ function CurrentRoleHeader({
   return (
     <>
       <CardAction>
-        <Button nativeButton={false} render={<Link to="/roles" />} size="sm" variant="outline">
+        <Button nativeButton={false} render={<Link to="/roles" />} size="sm" variant="link">
           {t("dashboard.currentRole.actions.adjust")}
+          <ArrowRightIcon data-icon="inline-end" />
         </Button>
       </CardAction>
       {context.length > 0 && <CardDescription>{context.join(" · ")}</CardDescription>}
@@ -169,7 +170,7 @@ function CurrentRoleDataContent({
           <BriefcaseBusinessIcon className="size-5" />
         </div>
         <div className="min-w-0">
-          <p className="truncate font-heading text-2xl font-medium tracking-tight">
+          <p className="break-words font-heading text-xl font-semibold leading-snug tracking-tight">
             {currentRole.title}
           </p>
           {currentRole.location && (

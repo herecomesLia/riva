@@ -44,13 +44,13 @@ export function HistoryFilters({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr_1fr]">
+          <div className="grid gap-5 @3xl/app:grid-cols-[1.5fr_1fr_1fr]">
             <FilterSkeleton />
             <FilterSkeleton />
             <FilterSkeleton />
           </div>
         ) : (
-          <FieldGroup className="grid gap-5 lg:grid-cols-[1.5fr_1fr_1fr]">
+          <FieldGroup className="grid gap-5 @3xl/app:grid-cols-[1.5fr_1fr_1fr]">
             <FieldSet>
               <FieldLegend variant="label">{t("history.filters.kindLabel")}</FieldLegend>
               <ToggleGroup

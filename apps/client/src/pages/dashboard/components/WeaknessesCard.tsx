@@ -31,7 +31,7 @@ export function WeaknessesCard({ state }: WeaknessesCardProps) {
   const { t } = useTranslation()
 
   return (
-    <Card className="lg:col-span-5">
+    <Card className="min-w-0 @3xl/dashboard:col-span-5">
       <CardHeader>
         <CardTitle>{t("dashboard.weaknesses.eyebrow")}</CardTitle>
         {state.status === "loading" ? (

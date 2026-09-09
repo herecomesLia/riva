@@ -584,9 +584,9 @@ describe("PracticeView", () => {
       "border-t",
       "border-border",
       "pt-5",
-      "md:border-t-0",
-      "md:border-l",
-      "md:pl-6",
+      "@2xl/setup:border-t-0",
+      "@2xl/setup:border-l",
+      "@2xl/setup:pl-6",
     )
     expect(
       screen
