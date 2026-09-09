@@ -27,7 +27,7 @@ export function RecommendationCard({ state }: RecommendationCardProps) {
   const recommendation = state.status === "ready" ? state.data : null
 
   return (
-    <Card className="@container/recommendation min-w-0 ring-primary/20 @3xl/dashboard:col-span-7">
+    <Card className="@container/recommendation min-w-0 @3xl/dashboard:col-span-7">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <SparklesIcon className="size-4 text-primary" />
