@@ -1,8 +1,10 @@
 import asyncio
+from collections.abc import AsyncGenerator
+from contextlib import AsyncContextDecorator, asynccontextmanager
 from types import EllipsisType
 
 from langchain_core.runnables import Runnable, RunnableConfig
-from langchain_core.runnables.config import merge_configs
+from langchain_core.runnables.config import merge_configs, var_child_runnable_config
 from openai import (
     APIConnectionError,
     APIStatusError,
@@ -31,19 +33,48 @@ class LLMExecutor:
         config: RunnableConfig | None = None,
         execution_timeout_seconds: float | None | EllipsisType = ...,
     ) -> Output:
-        """Omit timeout to inherit the default; pass None to disable it."""
+        async with self.scope(
+            config=config, execution_timeout_seconds=execution_timeout_seconds
+        ) as merged_config:
+            return await runnable.ainvoke(input, config=merged_config)
+
+    def wrap(
+        self,
+        *,
+        config: RunnableConfig | None = None,
+        execution_timeout_seconds: float | None | EllipsisType = ...,
+    ) -> AsyncContextDecorator:
+        """Decorate an async function with the execution scope."""
+        return self.scope(
+            config=config, execution_timeout_seconds=execution_timeout_seconds
+        )
+
+    @asynccontextmanager
+    async def scope(
+        self,
+        *,
+        config: RunnableConfig | None = None,
+        execution_timeout_seconds: float | None | EllipsisType = ...,
+    ) -> AsyncGenerator[RunnableConfig]:
+        """Propagate merged config without creating a tracing run.
+
+        Omit timeout to inherit the default; pass None to disable it.
+        """
         timeout = (
             self.execution_timeout_seconds
             if execution_timeout_seconds is ...
             else execution_timeout_seconds
         )
         deadline = asyncio.timeout(timeout)
+        inherited_config = var_child_runnable_config.get()
+        # merge_configs reads the ambient config for each argument. Clear it
+        # while merging so inherited callbacks are included only once.
+        token = var_child_runnable_config.set(None)
         try:
+            merged_config = merge_configs(inherited_config, self.base_config, config)
+            var_child_runnable_config.set(merged_config)
             async with deadline:
-                return await runnable.ainvoke(
-                    input,
-                    config=merge_configs(self.base_config, config),
-                )
+                yield merged_config
         except (APIConnectionError, RateLimitError, InternalServerError) as exc:
             raise LLMUnavailableError() from exc
         except APIStatusError as exc:
@@ -52,3 +83,5 @@ class LLMExecutor:
             if not deadline.expired():
                 raise
             raise LLMUnavailableError() from exc
+        finally:
+            var_child_runnable_config.reset(token)
