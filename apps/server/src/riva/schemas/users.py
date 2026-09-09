@@ -19,12 +19,18 @@ DisplayName = Annotated[
 
 class UserResponse(ResponseModel):
     id: UUID
-    username: str
-    display_name: str
-    avatar_url: str | None
+    username: str = Field(description="Account identifier used to sign in.")
+    display_name: str = Field(
+        description="Name shown in the interface, distinct from the sign-in username."
+    )
+    avatar_url: str | None = Field(
+        description="Avatar address; null when no avatar is available."
+    )
 
 
 class UpdateCurrentUserRequest(NonEmptyPartialUpdateRequest):
+    """Update supplied profile fields; an empty request or explicit null is invalid."""
+
     display_name: DisplayName | SkipJsonSchema[None] = Field(
         default_factory=lambda: None,
     )

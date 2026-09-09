@@ -10,6 +10,7 @@ export interface CreateTargetRoleRequest {
   /** @minLength 1 */
   title: string
   company?: string | null
+  /** Campus or experienced hiring track, not employment type. */
   recruitmentTrack?: RecruitmentTrack | null
   location?: string | null
 }

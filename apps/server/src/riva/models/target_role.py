@@ -19,32 +19,91 @@ class RecruitmentTrack(StrEnum):
 
 
 class JobRequirements(BaseModel):
-    education: list[NonBlankStr] = Field(default_factory=list)
-    graduation_cohorts: list[NonBlankStr] = Field(default_factory=list)
-    majors: list[NonBlankStr] = Field(default_factory=list)
-    experience: list[NonBlankStr] = Field(default_factory=list)
-    languages: list[NonBlankStr] = Field(default_factory=list)
-    certifications: list[NonBlankStr] = Field(default_factory=list)
-    other: list[NonBlankStr] = Field(default_factory=list)
+    education: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Required degrees or education levels, excluding fields of study.",
+    )
+    graduation_cohorts: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Eligible graduation cohorts, retaining stated years and ranges.",
+    )
+    majors: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Required fields of study, excluding degree levels.",
+    )
+    experience: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Required work experience, including duration and qualifying conditions.",
+    )
+    languages: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Required natural languages and proficiency levels, not programming languages.",
+    )
+    certifications: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Required certificates or professional credentials.",
+    )
+    other: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Other mandatory eligibility conditions not covered by the named categories.",
+    )
 
 
 class HardSkills(BaseModel):
-    programming_languages: list[NonBlankStr] = Field(default_factory=list)
-    frameworks_and_libraries: list[NonBlankStr] = Field(default_factory=list)
-    platforms: list[NonBlankStr] = Field(default_factory=list)
-    tools: list[NonBlankStr] = Field(default_factory=list)
-    concepts_and_methods: list[NonBlankStr] = Field(default_factory=list)
-    databases_and_middleware: list[NonBlankStr] = Field(default_factory=list)
-    other: list[NonBlankStr] = Field(default_factory=list)
+    programming_languages: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Required programming languages and stated proficiency.",
+    )
+    frameworks_and_libraries: list[NonBlankStr] = Field(
+        default_factory=list, description="Required software frameworks and libraries."
+    )
+    platforms: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Required operating, cloud or application platforms, such as Web or Android.",
+    )
+    tools: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Required software tools used to perform the work.",
+    )
+    concepts_and_methods: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Required technical knowledge, principles and methods, such as architecture or accessibility.",
+    )
+    databases_and_middleware: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Required databases, data stores and middleware technologies.",
+    )
+    other: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Other required technical skills not covered by the named categories.",
+    )
 
 
 class JobDescriptionContent(BaseModel):
-    responsibilities: list[NonBlankStr] = Field(default_factory=list)
-    requirements: JobRequirements = Field(default_factory=JobRequirements)
-    hard_skills: HardSkills = Field(default_factory=HardSkills)
-    soft_skills: list[NonBlankStr] = Field(default_factory=list)
-    preferred_qualifications: list[NonBlankStr] = Field(default_factory=list)
-    business_domains: list[NonBlankStr] = Field(default_factory=list)
+    responsibilities: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Work activities and expected outcomes, expressed as separate points.",
+    )
+    requirements: JobRequirements = Field(
+        default_factory=JobRequirements,
+        description="Mandatory eligibility conditions; preferred conditions belong in preferred_qualifications.",
+    )
+    hard_skills: HardSkills = Field(
+        default_factory=HardSkills,
+        description="Required technical skills, retaining stated proficiency and conditions; excludes preferred-only skills.",
+    )
+    soft_skills: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Required interpersonal and organizational abilities, including communication, collaboration and problem analysis.",
+    )
+    preferred_qualifications: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Preferred, bonus or optional qualifications, including skills that are not mandatory.",
+    )
+    business_domains: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Business sectors, contexts or product domains; excludes generic engineering activities.",
+    )
 
 
 class JobDescription(Base):

@@ -8,5 +8,6 @@ import type { TargetRoleResponse } from "./targetRoleResponse"
 
 export interface TargetRoleListResponse {
   targetRoles: TargetRoleResponse[]
+  /** The currently selected target role, not all unarchived roles; null when none is selected. */
   activeTargetRoleId: string | null
 }

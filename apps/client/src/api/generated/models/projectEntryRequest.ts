@@ -6,17 +6,30 @@
  */
 
 export interface ProjectEntryRequest {
-  /** @pattern ^[0-9]{4}-(?:0[1-9]|1[0-2])$ */
+  /**
+   * Start month in YYYY-MM format.
+   * @pattern ^[0-9]{4}-(?:0[1-9]|1[0-2])$
+   */
   startDate: string
+  /** End month in YYYY-MM format; null means ongoing. */
   endDate: string | null
   /** @minLength 1 */
   name: string
   role?: string | null
-  /** @items.minLength 1 */
+  /**
+   * Separate points describing the project and its scope.
+   * @items.minLength 1
+   */
   description?: string[]
-  /** @items.minLength 1 */
+  /**
+   * Separate points describing project outcomes and impact.
+   * @items.minLength 1
+   */
   achievements?: string[]
-  /** @items.minLength 1 */
+  /**
+   * Technologies used in this project; independent of the profile's top-level skills list.
+   * @items.minLength 1
+   */
   techStack?: string[]
   url?: string | null
 }

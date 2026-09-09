@@ -24,8 +24,12 @@ class EmploymentType(StrEnum):
 
 class EducationEntry(YearMonthRangeModel):
     school: NonBlankStr
-    degree: NonBlankStr | None = None
-    major: NonBlankStr | None = None
+    degree: NonBlankStr | None = Field(
+        default=None, description="Degree or education level; null when unspecified."
+    )
+    major: NonBlankStr | None = Field(
+        default=None, description="Field of study; null when unspecified."
+    )
 
 
 class WorkExperienceEntry(YearMonthRangeModel):
@@ -33,25 +37,55 @@ class WorkExperienceEntry(YearMonthRangeModel):
     title: NonBlankStr
     employment_type: EmploymentType | None = None
     location: NonBlankStr | None = None
-    responsibilities: list[NonBlankStr] = Field(default_factory=list)
-    achievements: list[NonBlankStr] = Field(default_factory=list)
-    skills: list[NonBlankStr] = Field(default_factory=list)
+    responsibilities: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Duties and activities performed in this work experience.",
+    )
+    achievements: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Outcomes and impact achieved in this work experience, distinct from duties.",
+    )
+    skills: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Related skills selected from the career profile's top-level skills list.",
+    )
 
 
 class ProjectEntry(YearMonthRangeModel):
     name: NonBlankStr
     role: NonBlankStr | None = None
-    description: list[NonBlankStr] = Field(default_factory=list)
-    achievements: list[NonBlankStr] = Field(default_factory=list)
-    tech_stack: list[NonBlankStr] = Field(default_factory=list)
+    description: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Separate points describing the project and its scope.",
+    )
+    achievements: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Separate points describing project outcomes and impact.",
+    )
+    tech_stack: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Technologies used in this project; independent of the profile's top-level skills list.",
+    )
     url: HttpUrl | None = None
 
 
 class CareerProfileContent(BaseModel):
-    education: list[EducationEntry] = Field(default_factory=list)
-    work_experiences: list[WorkExperienceEntry] = Field(default_factory=list)
-    projects: list[ProjectEntry] = Field(default_factory=list)
-    skills: list[NonBlankStr] = Field(default_factory=list)
+    education: list[EducationEntry] = Field(
+        default_factory=list,
+        description="Education history, including institutions, degrees, fields of study and dates.",
+    )
+    work_experiences: list[WorkExperienceEntry] = Field(
+        default_factory=list,
+        description="Work history, including roles, responsibilities, achievements and related skills.",
+    )
+    projects: list[ProjectEntry] = Field(
+        default_factory=list,
+        description="Project experience, including contributions, outcomes and project-specific technologies.",
+    )
+    skills: list[NonBlankStr] = Field(
+        default_factory=list,
+        description="Profile-wide skill names available for association with work experiences.",
+    )
 
     @model_validator(mode="after")
     def validate_skill_consistency(self) -> Self:

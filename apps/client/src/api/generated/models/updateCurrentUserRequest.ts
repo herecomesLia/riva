@@ -5,6 +5,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * Update supplied profile fields; an empty request or explicit null is invalid.
+ */
 export interface UpdateCurrentUserRequest {
   /**
    * @minLength 1

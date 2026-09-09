@@ -6,6 +6,11 @@
  */
 import type { RecruitmentTrack } from "./recruitmentTrack"
 
+/**
+ * Update supplied fields only; at least one field is required.
+ *
+ * Null clears company, recruitment track or location, but is not allowed for title.
+ */
 export interface UpdateTargetRoleRequest {
   /** @minLength 1 */
   title?: string

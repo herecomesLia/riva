@@ -6,18 +6,39 @@
  */
 
 export interface HardSkillsResponse {
-  /** @items.minLength 1 */
+  /**
+   * Required programming languages and stated proficiency.
+   * @items.minLength 1
+   */
   programmingLanguages: string[]
-  /** @items.minLength 1 */
+  /**
+   * Required software frameworks and libraries.
+   * @items.minLength 1
+   */
   frameworksAndLibraries: string[]
-  /** @items.minLength 1 */
+  /**
+   * Required operating, cloud or application platforms, such as Web or Android.
+   * @items.minLength 1
+   */
   platforms: string[]
-  /** @items.minLength 1 */
+  /**
+   * Required software tools used to perform the work.
+   * @items.minLength 1
+   */
   tools: string[]
-  /** @items.minLength 1 */
+  /**
+   * Required technical knowledge, principles and methods, such as architecture or accessibility.
+   * @items.minLength 1
+   */
   conceptsAndMethods: string[]
-  /** @items.minLength 1 */
+  /**
+   * Required databases, data stores and middleware technologies.
+   * @items.minLength 1
+   */
   databasesAndMiddleware: string[]
-  /** @items.minLength 1 */
+  /**
+   * Other required technical skills not covered by the named categories.
+   * @items.minLength 1
+   */
   other: string[]
 }

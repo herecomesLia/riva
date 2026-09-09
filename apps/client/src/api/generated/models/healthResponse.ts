@@ -8,7 +8,10 @@ import type { HealthStatus } from "./healthStatus"
 import type { ServiceHealthStatus } from "./serviceHealthStatus"
 
 export interface HealthResponse {
+  /** Overall availability: unavailable when the database is unhealthy; degraded when only the LLM dependency is unhealthy. */
   status: ServiceHealthStatus
+  /** Database probe status. */
   database: HealthStatus
+  /** Configured LLM model availability: degraded when only some models are available; unavailable when disabled or none are available. */
   llm: HealthStatus
 }

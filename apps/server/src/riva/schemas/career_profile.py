@@ -43,25 +43,43 @@ class ProjectEntryResponse(ProjectEntry, ResponseModel):
 
 
 class CreateCareerProfileRequest(CareerProfileContent, RequestModel):
-    education: list[EducationEntryRequest] = Field(default_factory=list)
+    """Initial profile content. Omitted sections start empty."""
+
+    education: list[EducationEntryRequest] = Field(
+        default_factory=list,
+        description="Education history, including institutions, degrees, fields of study and dates.",
+    )
     work_experiences: list[WorkExperienceEntryRequest] = Field(
         default_factory=list,
+        description="Work history, including roles, responsibilities, achievements and related skills.",
     )
-    projects: list[ProjectEntryRequest] = Field(default_factory=list)
+    projects: list[ProjectEntryRequest] = Field(
+        default_factory=list,
+        description="Project experience, including contributions, outcomes and project-specific technologies.",
+    )
 
 
 class UpdateCareerProfileRequest(NonEmptyPartialUpdateRequest):
+    """Replace each supplied section in full. Omitted sections stay unchanged.
+
+    Empty lists clear sections; null is not accepted. At least one section is required.
+    """
+
     education: list[EducationEntryRequest] | SkipJsonSchema[None] = Field(
         default_factory=lambda: None,
+        description="Replacement education history; omitted leaves it unchanged and [] clears it.",
     )
     work_experiences: list[WorkExperienceEntryRequest] | SkipJsonSchema[None] = Field(
         default_factory=lambda: None,
+        description="Replacement work history; omitted leaves it unchanged and [] clears it.",
     )
     projects: list[ProjectEntryRequest] | SkipJsonSchema[None] = Field(
         default_factory=lambda: None,
+        description="Replacement project experience; omitted leaves it unchanged and [] clears it.",
     )
     skills: list[NonBlankStr] | SkipJsonSchema[None] = Field(
         default_factory=lambda: None,
+        description="Replacement profile-wide skills; must include all skills associated with the resulting work history. Omitted leaves it unchanged; [] clears it.",
     )
 
     @field_validator(
@@ -97,8 +115,14 @@ class UpdateCareerProfileRequest(NonEmptyPartialUpdateRequest):
 
 
 class CareerProfileResponse(CareerProfileContent, ResponseModel):
-    education: list[EducationEntryResponse]
-    work_experiences: list[WorkExperienceEntryResponse]
-    projects: list[ProjectEntryResponse]
+    education: list[EducationEntryResponse] = Field(
+        description="Education history, including institutions, degrees, fields of study and dates."
+    )
+    work_experiences: list[WorkExperienceEntryResponse] = Field(
+        description="Work history, including roles, responsibilities, achievements and related skills."
+    )
+    projects: list[ProjectEntryResponse] = Field(
+        description="Project experience, including contributions, outcomes and project-specific technologies."
+    )
     created_at: datetime
     updated_at: datetime

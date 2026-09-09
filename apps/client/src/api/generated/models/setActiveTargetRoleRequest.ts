@@ -6,5 +6,6 @@
  */
 
 export interface SetActiveTargetRoleRequest {
+  /** Unarchived target role to select as the current role. */
   targetRoleId: string
 }

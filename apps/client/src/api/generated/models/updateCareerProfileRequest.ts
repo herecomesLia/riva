@@ -8,10 +8,21 @@ import type { EducationEntryRequest } from "./educationEntryRequest"
 import type { ProjectEntryRequest } from "./projectEntryRequest"
 import type { WorkExperienceEntryRequest } from "./workExperienceEntryRequest"
 
+/**
+ * Replace each supplied section in full. Omitted sections stay unchanged.
+ *
+ * Empty lists clear sections; null is not accepted. At least one section is required.
+ */
 export interface UpdateCareerProfileRequest {
+  /** Replacement education history; omitted leaves it unchanged and [] clears it. */
   education?: EducationEntryRequest[]
+  /** Replacement work history; omitted leaves it unchanged and [] clears it. */
   workExperiences?: WorkExperienceEntryRequest[]
+  /** Replacement project experience; omitted leaves it unchanged and [] clears it. */
   projects?: ProjectEntryRequest[]
-  /** @items.minLength 1 */
+  /**
+   * Replacement profile-wide skills; must include all skills associated with the resulting work history. Omitted leaves it unchanged; [] clears it.
+   * @items.minLength 1
+   */
   skills?: string[]
 }

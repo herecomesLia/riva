@@ -7,8 +7,12 @@
 import type { EmploymentType } from "./employmentType"
 
 export interface WorkExperienceEntryRequest {
-  /** @pattern ^[0-9]{4}-(?:0[1-9]|1[0-2])$ */
+  /**
+   * Start month in YYYY-MM format.
+   * @pattern ^[0-9]{4}-(?:0[1-9]|1[0-2])$
+   */
   startDate: string
+  /** End month in YYYY-MM format; null means ongoing. */
   endDate: string | null
   /** @minLength 1 */
   company: string
@@ -16,10 +20,19 @@ export interface WorkExperienceEntryRequest {
   title: string
   employmentType?: EmploymentType | null
   location?: string | null
-  /** @items.minLength 1 */
+  /**
+   * Duties and activities performed in this work experience.
+   * @items.minLength 1
+   */
   responsibilities?: string[]
-  /** @items.minLength 1 */
+  /**
+   * Outcomes and impact achieved in this work experience, distinct from duties.
+   * @items.minLength 1
+   */
   achievements?: string[]
-  /** @items.minLength 1 */
+  /**
+   * Related skills selected from the career profile's top-level skills list.
+   * @items.minLength 1
+   */
   skills?: string[]
 }

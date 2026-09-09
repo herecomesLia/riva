@@ -11,8 +11,10 @@ export interface TargetRoleResponse {
   id: string
   title: string
   company: string | null
+  /** Campus or experienced hiring track, not employment type; null when unspecified. */
   recruitmentTrack: RecruitmentTrack | null
   location: string | null
+  /** Whether the saved role is archived. An archived role cannot be the current target role. */
   isArchived: boolean
   jd: JobDescriptionResponse
   createdAt: string

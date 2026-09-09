@@ -35,17 +35,25 @@ class HardSkillsResponse(HardSkills, ResponseModel):
 
 
 class JobDescriptionResponse(JobDescriptionContent, ResponseModel):
-    requirements: JobRequirementsResponse
-    hard_skills: HardSkillsResponse
+    requirements: JobRequirementsResponse = Field(
+        description="Mandatory eligibility conditions; excludes preferred qualifications."
+    )
+    hard_skills: HardSkillsResponse = Field(
+        description="Required technical skills, retaining proficiency and conditions; excludes preferred-only skills."
+    )
 
 
 class TargetRoleResponse(ResponseModel):
     id: UUID
     title: str
     company: str | None
-    recruitment_track: RecruitmentTrack | None
+    recruitment_track: RecruitmentTrack | None = Field(
+        description="Campus or experienced hiring track, not employment type; null when unspecified."
+    )
     location: str | None
-    is_archived: bool
+    is_archived: bool = Field(
+        description="Whether the saved role is archived. An archived role cannot be the current target role."
+    )
     jd: JobDescriptionResponse
     created_at: datetime
     updated_at: datetime
@@ -53,17 +61,27 @@ class TargetRoleResponse(ResponseModel):
 
 class TargetRoleListResponse(ResponseModel):
     target_roles: list[TargetRoleResponse]
-    active_target_role_id: UUID | None
+    active_target_role_id: UUID | None = Field(
+        description="The currently selected target role, not all unarchived roles; null when none is selected."
+    )
 
 
 class CreateTargetRoleRequest(RequestModel):
     title: NonBlankStr
     company: NonBlankStr | None = None
-    recruitment_track: RecruitmentTrack | None = None
+    recruitment_track: RecruitmentTrack | None = Field(
+        default=None,
+        description="Campus or experienced hiring track, not employment type.",
+    )
     location: NonBlankStr | None = None
 
 
 class UpdateTargetRoleRequest(NonEmptyPartialUpdateRequest):
+    """Update supplied fields only; at least one field is required.
+
+    Null clears company, recruitment track or location, but is not allowed for title.
+    """
+
     title: NonBlankStr | SkipJsonSchema[None] = Field(default_factory=lambda: None)
     company: NonBlankStr | None = None
     recruitment_track: RecruitmentTrack | None = None
@@ -78,10 +96,19 @@ class UpdateTargetRoleRequest(NonEmptyPartialUpdateRequest):
 
 
 class SetActiveTargetRoleRequest(RequestModel):
-    target_role_id: UUID
+    target_role_id: UUID = Field(
+        description="Unarchived target role to select as the current role."
+    )
 
 
 class UpdateJobDescriptionRequest(NonEmptyPartialUpdateRequest):
+    """Replace supplied sections in full, without reparsing the source JD.
+
+    Omitted sections stay unchanged; null is not accepted. Lists can be cleared
+    with []. Category objects are replaced, not recursively merged: omitted
+    subcategories become empty. At least one section is required.
+    """
+
     responsibilities: list[NonBlankStr] | SkipJsonSchema[None] = Field(
         default_factory=lambda: None
     )

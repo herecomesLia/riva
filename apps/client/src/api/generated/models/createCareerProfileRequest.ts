@@ -8,10 +8,19 @@ import type { EducationEntryRequest } from "./educationEntryRequest"
 import type { ProjectEntryRequest } from "./projectEntryRequest"
 import type { WorkExperienceEntryRequest } from "./workExperienceEntryRequest"
 
+/**
+ * Initial profile content. Omitted sections start empty.
+ */
 export interface CreateCareerProfileRequest {
+  /** Education history, including institutions, degrees, fields of study and dates. */
   education?: EducationEntryRequest[]
+  /** Work history, including roles, responsibilities, achievements and related skills. */
   workExperiences?: WorkExperienceEntryRequest[]
+  /** Project experience, including contributions, outcomes and project-specific technologies. */
   projects?: ProjectEntryRequest[]
-  /** @items.minLength 1 */
+  /**
+   * Profile-wide skill names available for association with work experiences.
+   * @items.minLength 1
+   */
   skills?: string[]
 }

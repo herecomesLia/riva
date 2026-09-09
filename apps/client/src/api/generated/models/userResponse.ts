@@ -7,7 +7,10 @@
 
 export interface UserResponse {
   id: string
+  /** Account identifier used to sign in. */
   username: string
+  /** Name shown in the interface, distinct from the sign-in username. */
   displayName: string
+  /** Avatar address; null when no avatar is available. */
   avatarUrl: string | null
 }

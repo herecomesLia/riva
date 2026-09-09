@@ -8,14 +8,28 @@ import type { HardSkillsResponse } from "./hardSkillsResponse"
 import type { JobRequirementsResponse } from "./jobRequirementsResponse"
 
 export interface JobDescriptionResponse {
-  /** @items.minLength 1 */
+  /**
+   * Work activities and expected outcomes, expressed as separate points.
+   * @items.minLength 1
+   */
   responsibilities: string[]
+  /** Mandatory eligibility conditions; excludes preferred qualifications. */
   requirements: JobRequirementsResponse
+  /** Required technical skills, retaining proficiency and conditions; excludes preferred-only skills. */
   hardSkills: HardSkillsResponse
-  /** @items.minLength 1 */
+  /**
+   * Required interpersonal and organizational abilities, including communication, collaboration and problem analysis.
+   * @items.minLength 1
+   */
   softSkills: string[]
-  /** @items.minLength 1 */
+  /**
+   * Preferred, bonus or optional qualifications, including skills that are not mandatory.
+   * @items.minLength 1
+   */
   preferredQualifications: string[]
-  /** @items.minLength 1 */
+  /**
+   * Business sectors, contexts or product domains; excludes generic engineering activities.
+   * @items.minLength 1
+   */
   businessDomains: string[]
 }

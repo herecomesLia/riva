@@ -6,11 +6,17 @@
  */
 
 export interface EducationEntryRequest {
-  /** @pattern ^[0-9]{4}-(?:0[1-9]|1[0-2])$ */
+  /**
+   * Start month in YYYY-MM format.
+   * @pattern ^[0-9]{4}-(?:0[1-9]|1[0-2])$
+   */
   startDate: string
+  /** End month in YYYY-MM format; null means ongoing. */
   endDate: string | null
   /** @minLength 1 */
   school: string
+  /** Degree or education level; null when unspecified. */
   degree?: string | null
+  /** Field of study; null when unspecified. */
   major?: string | null
 }

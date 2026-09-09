@@ -6,6 +6,7 @@
  */
 
 export interface ErrorIssue {
+  /** Path to the invalid value, including request source such as body, field names and array indices. */
   location: (string | number)[]
   message: string
 }

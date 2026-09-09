@@ -9,10 +9,16 @@ import type { ProjectEntryResponse } from "./projectEntryResponse"
 import type { WorkExperienceEntryResponse } from "./workExperienceEntryResponse"
 
 export interface CareerProfileResponse {
+  /** Education history, including institutions, degrees, fields of study and dates. */
   education: EducationEntryResponse[]
+  /** Work history, including roles, responsibilities, achievements and related skills. */
   workExperiences: WorkExperienceEntryResponse[]
+  /** Project experience, including contributions, outcomes and project-specific technologies. */
   projects: ProjectEntryResponse[]
-  /** @items.minLength 1 */
+  /**
+   * Profile-wide skill names available for association with work experiences.
+   * @items.minLength 1
+   */
   skills: string[]
   createdAt: string
   updatedAt: string

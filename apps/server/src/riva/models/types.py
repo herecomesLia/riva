@@ -1,6 +1,6 @@
 from typing import Annotated, Self
 
-from pydantic import BaseModel, StringConstraints, model_validator
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 NonBlankStr = Annotated[
     str,
@@ -20,9 +20,10 @@ YearMonth = Annotated[
 
 
 class YearMonthRangeModel(BaseModel):
-    start_date: YearMonth
-    # None means the range continues to the present.
-    end_date: YearMonth | None
+    start_date: YearMonth = Field(description="Start month in YYYY-MM format.")
+    end_date: YearMonth | None = Field(
+        description="End month in YYYY-MM format; null means ongoing."
+    )
 
     @model_validator(mode="after")
     def validate_date_range(self) -> Self:

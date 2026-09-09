@@ -6,18 +6,39 @@
  */
 
 export interface JobRequirementsResponse {
-  /** @items.minLength 1 */
+  /**
+   * Required degrees or education levels, excluding fields of study.
+   * @items.minLength 1
+   */
   education: string[]
-  /** @items.minLength 1 */
+  /**
+   * Eligible graduation cohorts, retaining stated years and ranges.
+   * @items.minLength 1
+   */
   graduationCohorts: string[]
-  /** @items.minLength 1 */
+  /**
+   * Required fields of study, excluding degree levels.
+   * @items.minLength 1
+   */
   majors: string[]
-  /** @items.minLength 1 */
+  /**
+   * Required work experience, including duration and qualifying conditions.
+   * @items.minLength 1
+   */
   experience: string[]
-  /** @items.minLength 1 */
+  /**
+   * Required natural languages and proficiency levels, not programming languages.
+   * @items.minLength 1
+   */
   languages: string[]
-  /** @items.minLength 1 */
+  /**
+   * Required certificates or professional credentials.
+   * @items.minLength 1
+   */
   certifications: string[]
-  /** @items.minLength 1 */
+  /**
+   * Other mandatory eligibility conditions not covered by the named categories.
+   * @items.minLength 1
+   */
   other: string[]
 }

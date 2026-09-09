@@ -8,7 +8,10 @@ import type { ErrorCode } from "./errorCode"
 import type { ErrorIssue } from "./errorIssue"
 
 export interface ErrorBody {
+  /** Stable machine-readable error code. */
   code: ErrorCode
+  /** Human-readable explanation; not a stable identifier for programmatic handling. */
   message: string
+  /** Field-level error details; empty when no field-level details are available. */
   issues: ErrorIssue[]
 }
