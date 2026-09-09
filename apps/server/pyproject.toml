@@ -19,7 +19,6 @@ dependencies = [
   "langchain-openai>=1.6.0",
   "openai>=3.7.0",
   "procrastinate>=3.9.0,<3.10",
-  "attrs>=26.1.0",
 ]
 
 [dependency-groups]

@@ -49,7 +49,7 @@ def _probe_client(
 def test_chat_model_uses_runtime_configuration_and_is_reused(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client = _configured_client(timeout_seconds=12, max_retries=3)
+    client = _configured_client()
     chat_model = object()
     chat_openai = MagicMock(return_value=chat_model)
     monkeypatch.setattr("riva.llm.client.ChatOpenAI", chat_openai)
@@ -64,8 +64,7 @@ def test_chat_model_uses_runtime_configuration_and_is_reused(
         use_responses_api=False,
         api_key="test-key",
         base_url="https://llm.test/v1",
-        timeout=12,
-        max_retries=3,
+        max_retries=0,
     )
 
 
@@ -111,7 +110,7 @@ async def test_ping_retrieves_configured_model_without_fallback() -> None:
 @pytest.mark.parametrize(
     ("reasoning_id", "responses"), [("reasoning-model", False), ("test-model", True)]
 )
-async def test_chat_slots_select_and_close_distinct_model_definitions(
+async def test_chat_slots_select_distinct_model_definitions(
     monkeypatch: pytest.MonkeyPatch, reasoning_id: str, responses: bool
 ) -> None:
     client = _configured_client(
@@ -120,13 +119,7 @@ async def test_chat_slots_select_and_close_distinct_model_definitions(
             "reasoning": {"id": reasoning_id, "use_responses_api": responses},
         }
     )
-    models = [
-        SimpleNamespace(
-            root_client=SimpleNamespace(close=MagicMock()),
-            root_async_client=SimpleNamespace(close=AsyncMock()),
-        )
-        for _ in range(2)
-    ]
+    models = [object(), object()]
     constructor = MagicMock(side_effect=models)
     monkeypatch.setattr("riva.llm.client.ChatOpenAI", constructor)
     probe, _, _ = _probe_client()
@@ -140,9 +133,6 @@ async def test_chat_slots_select_and_close_distinct_model_definitions(
     assert constructor.call_args_list[1].kwargs["use_responses_api"] is responses
     await client.close()
     probe.close.assert_awaited_once_with()
-    for model in models:
-        model.root_client.close.assert_called_once_with()
-        model.root_async_client.close.assert_awaited_once_with()
 
 
 @pytest.mark.parametrize("slot", [None, "default", "reasoning"])

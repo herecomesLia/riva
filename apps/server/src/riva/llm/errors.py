@@ -9,6 +9,10 @@ class LLMNotConfiguredError(LLMError):
     pass
 
 
+class LLMRequestError(LLMError):
+    pass
+
+
 class LLMUnavailableError(DependencyUnavailableError):
     dependency = "llm"
     code = ErrorCode.DEPENDENCY_LLM_UNAVAILABLE

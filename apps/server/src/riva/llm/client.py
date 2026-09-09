@@ -1,6 +1,5 @@
 import asyncio
-from contextlib import AsyncExitStack
-from typing import Self, get_args
+from typing import Literal, Self, get_args
 
 from async_lru import alru_cache
 from langchain_core.language_models import BaseChatModel
@@ -9,8 +8,9 @@ from openai import APIStatusError, AsyncOpenAI
 
 from riva.core.config import LLMModelSettings, LLMSettings
 from riva.llm.errors import LLMError, LLMNotConfiguredError
-from riva.llm.policies import LLMModelSlot
 from riva.schemas.health import HealthStatus
+
+type LLMModelSlot = Literal["default", "reasoning"]
 
 
 class LLMClient:
@@ -43,8 +43,8 @@ class LLMClient:
                     use_responses_api=model.use_responses_api,
                     api_key=api_key,
                     base_url=base_url,
-                    timeout=self.settings.timeout_seconds,
-                    max_retries=self.settings.max_retries,
+                    # Callers configure Runnable retries; avoid stacking SDK retries.
+                    max_retries=0,
                 )
             except Exception as exc:
                 raise LLMError("Failed to initialize LLM chat model.") from exc
@@ -75,7 +75,11 @@ class LLMClient:
                 finally:
                     self._cached_health.cache_clear()
         finally:
-            await self._close_clients()
+            self._chat_models.clear()
+            probe_client = self._probe_client
+            self._probe_client = None
+            if probe_client is not None:
+                await probe_client.close()
 
     async def check_health(self) -> HealthStatus:
         if not self.settings.configured:
@@ -97,25 +101,6 @@ class LLMClient:
         except TimeoutError, LLMError:
             return False
         return True
-
-    async def _close_clients(self) -> None:
-        probe_client = self._probe_client
-        chat_models = self._chat_models
-        self._probe_client = None
-        self._chat_models = {}
-
-        async with AsyncExitStack() as stack:
-            if probe_client is not None:
-                stack.push_async_callback(probe_client.close)
-            for chat_model in {
-                id(model): model for model in chat_models.values()
-            }.values():
-                root_client = getattr(chat_model, "root_client", None)
-                root_async_client = getattr(chat_model, "root_async_client", None)
-                if root_client is not None:
-                    stack.callback(root_client.close)
-                if root_async_client is not None:
-                    stack.push_async_callback(root_async_client.close)
 
     def _require_configured(self) -> tuple[str, str]:
         if not self.settings.configured:

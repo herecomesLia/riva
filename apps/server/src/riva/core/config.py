@@ -133,8 +133,6 @@ class LLMSettings(BaseModel):
     models: LLMModelsSettings = Field(default_factory=LLMModelsSettings)
     api_key: SecretStr | None = None
     base_url: AnyHttpUrl | None = None
-    timeout_seconds: float = Field(default=60, gt=0)
-    max_retries: int = Field(default=2, ge=0)
     health: HealthCheckSettings = Field(
         default_factory=lambda: HealthCheckSettings(timeout_seconds=5, ttl_seconds=30)
     )
@@ -180,8 +178,6 @@ class LLMSettings(BaseModel):
             "RIVA_LLM_BASE_URL",
             str(self.base_url) if self.base_url else None,
         )
-        os.environ["RIVA_LLM_TIMEOUT_SECONDS"] = str(self.timeout_seconds)
-        os.environ["RIVA_LLM_MAX_RETRIES"] = str(self.max_retries)
         os.environ["RIVA_LLM_HEALTH_TIMEOUT_SECONDS"] = str(self.health.timeout_seconds)
         os.environ["RIVA_LLM_HEALTH_TTL_SECONDS"] = str(self.health.ttl_seconds)
 

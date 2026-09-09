@@ -248,8 +248,6 @@ def test_write_environ_writes_all_settings(
             "models": {"default": {"id": "test-model", "use_responses_api": True}},
             "api_key": "test-key",
             "base_url": "https://llm.test/v1",
-            "timeout_seconds": 12,
-            "max_retries": 3,
             "health": {"timeout_seconds": 7, "ttl_seconds": 18},
         },
         tasks={
@@ -269,8 +267,6 @@ def test_write_environ_writes_all_settings(
         "RIVA_LLM_MODELS_REASONING_USE_RESPONSES_API": "true",
         "RIVA_LLM_API_KEY": "test-key",
         "RIVA_LLM_BASE_URL": "https://llm.test/v1",
-        "RIVA_LLM_TIMEOUT_SECONDS": "12.0",
-        "RIVA_LLM_MAX_RETRIES": "3",
         "RIVA_DATABASE_HEALTH_TIMEOUT_SECONDS": "1.5",
         "RIVA_DATABASE_HEALTH_TTL_SECONDS": "0.0",
         "RIVA_LLM_HEALTH_TIMEOUT_SECONDS": "7.0",
