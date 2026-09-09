@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 import procrastinate
 import psycopg
+from procrastinate.jobs import Status
 from procrastinate.tasks import configure_task
 from procrastinate.types import JSONValue
 from sqlalchemy import text
@@ -11,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from riva.tasks.core.app import TASK_SCHEMA, app
 from riva.tasks.errors import TaskError
 from riva.tasks.registry import Task
+from riva.tasks.types import JobStatus
+from riva.utils import utc_now
 
 
 async def defer_job(
@@ -25,6 +28,45 @@ async def defer_job(
             job_manager=app.job_manager,
             connection=connection,
         ).defer_async(**task_kwargs)
+
+
+async def get_job_status(session: AsyncSession, job_id: int) -> JobStatus:
+    async with _task_connection(session) as connection:
+        # Procrastinate 3.9 does not accept an external connection for status queries.
+        # Its built-in query also omits abort_requested, needed to identify aborting jobs.
+        rows = await app.connector.execute_query_all_async_with_connection(
+            connection,
+            query="SELECT status, abort_requested FROM procrastinate_jobs WHERE id = %(job_id)s",
+            job_id=job_id,
+        )
+    if not rows:
+        raise TaskError(f"Job {job_id} was not found.")
+    status = Status(rows[0]["status"])
+    if status is Status.DOING and rows[0]["abort_requested"]:
+        return JobStatus.ABORTING
+    return {
+        Status.TODO: JobStatus.QUEUED,
+        Status.DOING: JobStatus.RUNNING,
+        Status.SUCCEEDED: JobStatus.SUCCEEDED,
+        Status.FAILED: JobStatus.FAILED,
+        Status.ABORTING: JobStatus.ABORTING,
+        Status.ABORTED: JobStatus.ABORTED,
+        Status.CANCELLED: JobStatus.CANCELLED,
+    }[status]
+
+
+async def retry_job(session: AsyncSession, job_id: int) -> None:
+    async with _task_connection(session) as connection:
+        # Procrastinate 3.9 does not accept an external connection for retry.
+        await app.connector.execute_query_all_async_with_connection(
+            connection,
+            query=procrastinate.sql.queries["retry_job"],
+            job_id=job_id,
+            retry_at=utc_now(),
+            new_priority=None,
+            new_queue_name=None,
+            new_lock=None,
+        )
 
 
 async def cancel_job(

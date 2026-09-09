@@ -1,13 +1,23 @@
 from typing import cast
 from uuid import UUID
 
+import pytest
 from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.db import Database
 from riva.models import User
 from riva.tasks import Task
-from riva.tasks.core import cancel_job, defer_job, reset_task_schema
+from riva.tasks.core import (
+    cancel_job,
+    defer_job,
+    get_job_status,
+    reset_task_schema,
+    retry_job,
+)
+from riva.tasks.errors import TaskError
 from riva.tasks.registry import TaskSpec
+from riva.tasks.types import JobStatus
 
 TRANSACTIONAL_TASK = cast(
     Task,
@@ -73,6 +83,96 @@ async def test_defer_commits_with_business_write(database: Database) -> None:
 
     assert await _display_name(database, user_id) == "Before"
     assert await _job_status(database, job_id) == ("todo", False)
+
+
+async def _set_job_status(
+    session: AsyncSession,
+    job_id: int,
+    status: str,
+    *,
+    abort_requested: bool = False,
+) -> None:
+    # Procrastinate's status triggers resolve types through search_path.
+    search_path = await session.scalar(text("SHOW search_path"))
+    await session.execute(text("SET LOCAL search_path TO procrastinate, public"))
+    await session.execute(
+        text(
+            "UPDATE procrastinate_jobs "
+            "SET status = :status, abort_requested = :abort_requested WHERE id = :job_id"
+        ),
+        {"job_id": job_id, "status": status, "abort_requested": abort_requested},
+    )
+    await session.execute(
+        text("SELECT set_config('search_path', :search_path, true)"),
+        {"search_path": search_path},
+    )
+
+
+@pytest.mark.parametrize(
+    ("status", "abort_requested", "expected"),
+    [
+        ("todo", False, JobStatus.QUEUED),
+        ("doing", False, JobStatus.RUNNING),
+        ("doing", True, JobStatus.ABORTING),
+        ("succeeded", False, JobStatus.SUCCEEDED),
+        ("failed", False, JobStatus.FAILED),
+        ("aborting", False, JobStatus.ABORTING),
+        ("aborted", False, JobStatus.ABORTED),
+        ("cancelled", True, JobStatus.CANCELLED),
+    ],
+)
+async def test_get_job_status_maps_uncommitted_state(
+    database: Database,
+    status: str,
+    abort_requested: bool,
+    expected: JobStatus,
+) -> None:
+    await reset_task_schema(database)
+    async with database.sessionmaker() as session:
+        job_id = await defer_job(session, TRANSACTIONAL_TASK)
+        await _set_job_status(session, job_id, status, abort_requested=abort_requested)
+        search_path = await session.scalar(text("SHOW search_path"))
+
+        assert await get_job_status(session, job_id) is expected
+        assert await session.scalar(text("SHOW search_path")) == search_path
+
+
+async def test_get_job_status_rejects_missing_job(database: Database) -> None:
+    await reset_task_schema(database)
+    async with database.sessionmaker() as session:
+        with pytest.raises(TaskError, match="Job -1 was not found"):
+            await get_job_status(session, -1)
+
+
+@pytest.mark.parametrize("commit", [True, False], ids=["commit", "rollback"])
+async def test_retry_is_atomic_with_business_write(
+    database: Database, commit: bool
+) -> None:
+    await reset_task_schema(database)
+    user_id, job_id = await _create_user_and_job(database, username="RetryJob")
+    async with database.sessionmaker() as session:
+        await _set_job_status(session, job_id, "failed")
+        await session.commit()
+
+        user = await session.get(User, user_id)
+        assert user is not None
+        user.display_name = "After"
+        await session.flush()
+        search_path = await session.scalar(text("SHOW search_path"))
+        await retry_job(session, job_id)
+
+        assert await get_job_status(session, job_id) is JobStatus.QUEUED
+        assert await session.scalar(text("SHOW search_path")) == search_path
+        if commit:
+            await session.commit()
+        else:
+            await session.rollback()
+
+    assert await _display_name(database, user_id) == ("After" if commit else "Before")
+    assert await _job_status(database, job_id) == (
+        "todo" if commit else "failed",
+        False,
+    )
 
 
 async def test_defer_rolls_back_with_business_write(database: Database) -> None:
