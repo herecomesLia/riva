@@ -1,6 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from riva.errors import ErrorCode
 from riva.models.target_role import (
     HardSkills,
     JobDescription,
@@ -12,6 +11,7 @@ from riva.services.types import UNSET
 from riva.tasks import (
     JobStatus,
     Task,
+    TaskErrorCode,
     TaskState,
     TaskStatus,
     cancel_job,
@@ -82,7 +82,7 @@ class JobDescriptionService:
         if status is JobStatus.FAILED:
             return TaskState(
                 TaskStatus.FAILED,
-                jd.extraction_error_code or ErrorCode.SERVER_INTERNAL_ERROR,
+                jd.extraction_error_code or TaskErrorCode.INTERNAL_ERROR,
             )
         return TaskState(
             {

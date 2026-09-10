@@ -10,7 +10,6 @@ from procrastinate.jobs import Job
 from sqlalchemy import text
 
 from riva.db import Database
-from riva.errors import ErrorCode
 from riva.llm import LLMClient
 from riva.llm.errors import LLMOutputError, LLMUnavailableError
 from riva.models import User
@@ -23,7 +22,15 @@ from riva.models.target_role import (
 )
 from riva.services.job_descriptions import JobDescriptionService
 from riva.services.target_roles import TargetRoleService
-from riva.tasks import JobStatus, Task, TaskResources, TaskStatus, app, get_job_status
+from riva.tasks import (
+    JobStatus,
+    Task,
+    TaskErrorCode,
+    TaskResources,
+    TaskStatus,
+    app,
+    get_job_status,
+)
 from riva.tasks.core.app import create_task_connector
 from riva.tasks.registry import configure_task_registry
 from riva.tasks.target_roles import extract_jd_text
@@ -76,10 +83,10 @@ def run_extraction_worker(resources: TaskResources) -> Callable[[], Awaitable[No
 @pytest.mark.parametrize(
     ("failure", "code", "resolution"),
     [
-        (LLMOutputError("Invalid output"), ErrorCode.AI_INVALID_OUTPUT, "retry"),
-        (LLMUnavailableError(), ErrorCode.DEPENDENCY_LLM_UNAVAILABLE, "retry"),
-        (ValueError("Unexpected"), ErrorCode.SERVER_INTERNAL_ERROR, "retry"),
-        (LLMOutputError("Invalid output"), ErrorCode.AI_INVALID_OUTPUT, "manual"),
+        (LLMOutputError("Invalid output"), TaskErrorCode.INVALID_OUTPUT, "retry"),
+        (LLMUnavailableError(), TaskErrorCode.LLM_UNAVAILABLE, "retry"),
+        (ValueError("Unexpected"), TaskErrorCode.INTERNAL_ERROR, "retry"),
+        (LLMOutputError("Invalid output"), TaskErrorCode.INVALID_OUTPUT, "manual"),
     ],
 )
 async def test_failure_preserves_content_and_can_be_resolved(
@@ -88,7 +95,7 @@ async def test_failure_preserves_content_and_can_be_resolved(
     extract: AsyncMock,
     run_extraction_worker: Callable[[], Awaitable[None]],
     failure: Exception,
-    code: ErrorCode,
+    code: TaskErrorCode,
     resolution: str,
 ) -> None:
     async with extraction_database.sessionmaker() as reader:

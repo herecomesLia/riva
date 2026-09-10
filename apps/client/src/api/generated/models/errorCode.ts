@@ -8,7 +8,6 @@
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode]
 
 export const ErrorCode = {
-  aiinvalid_output: "ai.invalid_output",
   dependencydatabase_unavailable: "dependency.database_unavailable",
   dependencyllm_unavailable: "dependency.llm_unavailable",
   requestcsrf_failed: "request.csrf_failed",

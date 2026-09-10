@@ -9,8 +9,8 @@ from sqlalchemy.sql.sqltypes import Uuid
 
 from riva.db.base import Base
 from riva.db.types import PydanticJSONB
-from riva.errors import ErrorCode
 from riva.models.types import NonBlankStr
+from riva.tasks.types import TaskErrorCode
 from riva.utils import utc_now
 
 
@@ -116,9 +116,9 @@ class JobDescription(Base):
         primary_key=True,
     )
     extraction_job_id: Mapped[int | None] = mapped_column(BigInteger)
-    extraction_error_code: Mapped[ErrorCode | None] = mapped_column(
+    extraction_error_code: Mapped[TaskErrorCode | None] = mapped_column(
         Enum(
-            ErrorCode,
+            TaskErrorCode,
             values_callable=lambda enum: [member.value for member in enum],
             native_enum=False,
             validate_strings=True,

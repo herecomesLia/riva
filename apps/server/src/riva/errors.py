@@ -3,7 +3,6 @@ from typing import ClassVar
 
 
 class ErrorCode(StrEnum):
-    AI_INVALID_OUTPUT = "ai.invalid_output"
     DEPENDENCY_DATABASE_UNAVAILABLE = "dependency.database_unavailable"
     DEPENDENCY_LLM_UNAVAILABLE = "dependency.llm_unavailable"
     REQUEST_CSRF_FAILED = "request.csrf_failed"

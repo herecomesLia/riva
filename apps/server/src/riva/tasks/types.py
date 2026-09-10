@@ -1,7 +1,11 @@
 from dataclasses import dataclass
 from enum import StrEnum
 
-from riva.errors import ErrorCode
+
+class TaskErrorCode(StrEnum):
+    INVALID_OUTPUT = "invalid_output"
+    LLM_UNAVAILABLE = "llm_unavailable"
+    INTERNAL_ERROR = "internal_error"
 
 
 class JobStatus(StrEnum):
@@ -25,4 +29,4 @@ class TaskStatus(StrEnum):
 @dataclass(frozen=True, slots=True)
 class TaskState:
     status: TaskStatus
-    error_code: ErrorCode | None = None
+    error_code: TaskErrorCode | None = None

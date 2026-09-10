@@ -5,10 +5,16 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.ai.target_roles import JobDescriptionExtractor
-from riva.errors import ErrorCode
 from riva.llm.errors import LLMOutputError, LLMUnavailableError
 from riva.models.target_role import JobDescription, JobDescriptionContent, TargetRole
-from riva.tasks import JobStatus, Task, app, get_job_status, get_task_resources
+from riva.tasks import (
+    JobStatus,
+    Task,
+    TaskErrorCode,
+    app,
+    get_job_status,
+    get_task_resources,
+)
 from riva.utils import utc_now
 
 
@@ -41,11 +47,11 @@ async def extract_jd_text(
             await session.commit()
     except Exception as exc:
         if isinstance(exc, LLMOutputError):
-            error_code = ErrorCode.AI_INVALID_OUTPUT
+            error_code = TaskErrorCode.INVALID_OUTPUT
         elif isinstance(exc, LLMUnavailableError):
-            error_code = ErrorCode.DEPENDENCY_LLM_UNAVAILABLE
+            error_code = TaskErrorCode.LLM_UNAVAILABLE
         else:
-            error_code = ErrorCode.SERVER_INTERNAL_ERROR
+            error_code = TaskErrorCode.INTERNAL_ERROR
         async with resources.database.sessionmaker() as session:
             jd = await session.get(JobDescription, role_id, with_for_update=True)
             if jd is not None and await _can_write_jd_extraction(

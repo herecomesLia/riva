@@ -5,12 +5,13 @@ from riva.tasks.core.schema import reset_task_schema, setup_task_schema
 from riva.tasks.core.worker import run_worker
 from riva.tasks.errors import TaskError
 from riva.tasks.registry import Task
-from riva.tasks.types import JobStatus, TaskState, TaskStatus
+from riva.tasks.types import JobStatus, TaskErrorCode, TaskState, TaskStatus
 
 __all__ = [
     "JobStatus",
     "Task",
     "TaskError",
+    "TaskErrorCode",
     "TaskResources",
     "TaskState",
     "TaskStatus",
