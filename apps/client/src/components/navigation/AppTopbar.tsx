@@ -13,10 +13,10 @@ export function AppTopbar() {
   return (
     <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b bg-card px-4 md:pr-8 lg:pr-10">
       <div className="flex min-w-0 items-center gap-2">
-        <SidebarTrigger aria-label={t("appShell.openNavigation")} className="-ml-1" />
+        <SidebarTrigger aria-label={t("appShell.openNavigation")} className="-ml-1 md:hidden" />
         <Separator
           orientation="vertical"
-          className="mr-2 data-vertical:h-4 data-vertical:self-auto"
+          className="mr-2 data-vertical:h-4 data-vertical:self-auto md:hidden"
         />
         <h1 className="truncate text-sm font-medium text-muted-foreground">{today}</h1>
       </div>

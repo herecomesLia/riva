@@ -28,7 +28,7 @@ const SIDEBAR_WIDTH = 13
 const SIDEBAR_MIN_WIDTH = 12
 const SIDEBAR_MAX_WIDTH = 22
 const SIDEBAR_WIDTH_MOBILE = "15rem"
-const SIDEBAR_WIDTH_ICON = "3rem"
+const SIDEBAR_WIDTH_ICON = "4rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContextProps = {

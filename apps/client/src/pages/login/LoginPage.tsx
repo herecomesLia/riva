@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "@tanstack/react-router"
-import { SparklesIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useMedia } from "react-use"
 
+import rivaLogoDark from "@/assets/riva.dark.png"
+import rivaLogo from "@/assets/riva.png"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { ThemeSwitcher } from "@/components/common/ThemeSwitcher"
 import { LoginForm } from "@/pages/login/LoginForm"
@@ -27,11 +28,13 @@ export function LoginPage({ mode = "login" }: { mode?: LoginPageMode }) {
     <LoginHeroesProvider>
       <main className="grid min-h-dvh bg-background text-foreground lg:grid-cols-2">
         <section className="relative hidden overflow-hidden bg-primary/10 p-12 text-foreground lg:flex lg:flex-col lg:gap-5">
-          <div className="relative flex items-center gap-3 text-lg font-semibold">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-foreground">
-              <SparklesIcon aria-hidden className="size-4" />
-            </div>
-            <span>{t("login.brand")}</span>
+          <div className="relative flex h-8 shrink-0 items-center overflow-hidden">
+            <img alt={t("login.brand")} className="w-32 shrink-0 dark:hidden" src={rivaLogo} />
+            <img
+              alt={t("login.brand")}
+              className="hidden w-32 shrink-0 dark:block"
+              src={rivaLogoDark}
+            />
           </div>
 
           <div className="relative flex flex-1 items-end justify-center">
@@ -53,11 +56,13 @@ export function LoginPage({ mode = "login" }: { mode?: LoginPageMode }) {
 
         <section className="flex min-h-dvh flex-col gap-8 bg-card px-4 py-8 sm:p-8 lg:p-12">
           <div className="flex items-center justify-between lg:justify-end">
-            <div className="flex items-center gap-3 text-lg font-semibold lg:hidden">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-muted">
-                <SparklesIcon aria-hidden className="size-4 text-foreground" />
-              </div>
-              <span>{t("login.brand")}</span>
+            <div className="flex h-8 items-center overflow-hidden lg:hidden">
+              <img alt={t("login.brand")} className="w-32 shrink-0 dark:hidden" src={rivaLogo} />
+              <img
+                alt={t("login.brand")}
+                className="hidden w-32 shrink-0 dark:block"
+                src={rivaLogoDark}
+              />
             </div>
             <div className="flex items-center gap-2">
               <ThemeSwitcher />

@@ -1,6 +1,5 @@
 import { Link, useMatchRoute, useNavigate } from "@tanstack/react-router"
 import {
-  BriefcaseBusinessIcon,
   ChevronsUpDownIcon,
   ClipboardListIcon,
   HistoryIcon,
@@ -14,6 +13,8 @@ import {
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 
+import rivaLogoDark from "@/assets/riva.dark.png"
+import rivaLogo from "@/assets/riva.png"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -35,6 +36,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Spinner } from "@/components/ui/spinner"
@@ -85,7 +87,7 @@ const appNavigationItems: AppNavigationItem[] = [
 export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="py-3">
+      <SidebarHeader className="py-3 pl-3">
         <AppSidebarHeader />
       </SidebarHeader>
       <SidebarContent>
@@ -104,7 +106,7 @@ function NavigationList() {
   const { t } = useTranslation()
 
   return (
-    <SidebarGroup>
+    <SidebarGroup className="pl-3">
       <SidebarGroupContent>
         <SidebarMenu className="gap-1.5">
           {appNavigationItems.map((item) => {
@@ -136,28 +138,30 @@ function AppSidebarHeader() {
   const { t } = useTranslation()
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <SidebarMenuButton
-          className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
-          render={<Link to="/dashboard" />}
-          size="lg"
-          tooltip={t("app.name")}
-        >
-          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <BriefcaseBusinessIcon />
-          </div>
-          <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate text-lg font-semibold tracking-tight text-foreground">
-              {t("app.name")}
-            </span>
-            <span className="truncate text-xs text-muted-foreground">
-              {t("appShell.appDescription")}
-            </span>
-          </div>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    </SidebarMenu>
+    <div className="flex h-12 min-w-0 items-center">
+      <SidebarMenu className="min-w-0 flex-1 overflow-hidden transition-[flex-grow] duration-200 ease-linear group-data-[collapsible=icon]:invisible group-data-[collapsible=icon]:grow-0">
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            className="data-open:bg-sidebar-accent data-open:text-sidebar-accent-foreground"
+            render={<Link aria-label={t("app.name")} to="/dashboard" />}
+            size="lg"
+            tooltip={t("app.name")}
+          >
+            <img
+              alt=""
+              className="w-22 max-w-full shrink-0 -translate-x-3 dark:hidden"
+              src={rivaLogo}
+            />
+            <img
+              alt=""
+              className="hidden w-22 max-w-full shrink-0 -translate-x-3 dark:block"
+              src={rivaLogoDark}
+            />
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+      <SidebarTrigger className="hidden size-9 shrink-0 md:inline-flex" />
+    </div>
   )
 }
 
