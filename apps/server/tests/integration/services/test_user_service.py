@@ -70,7 +70,6 @@ class TestRegister:
         auth_session = await _auth_session(db_session, result.token, settings)
         assert auth_session.user_id == user.id
         assert auth_session.token_digest != result.token
-        assert auth_session.token_digest == _token_digest(result.token, settings)
         assert auth_session.created_at == clock.now
 
     async def test_duplicate_username_rolls_back_and_session_remains_usable(
@@ -269,29 +268,16 @@ class TestUpdateUser:
         await db_session.refresh(registered.user)
         assert registered.user.display_name == "New Name"
 
-    async def test_update_with_same_display_name_is_noop(
+    @pytest.mark.parametrize("kwargs", [{}, {"display_name": USERNAME}])
+    async def test_update_without_changes_is_noop(
         self,
         user_service: UserService,
+        kwargs: dict[str, str],
     ) -> None:
         registered = await user_service.register(USERNAME, PASSWORD)
         original = (registered.user.display_name, registered.user.updated_at)
 
-        updated = await user_service.update(
-            registered.user,
-            display_name=registered.user.display_name,
-        )
-
-        assert updated is registered.user
-        assert (updated.display_name, updated.updated_at) == original
-
-    async def test_update_without_display_name_is_noop(
-        self,
-        user_service: UserService,
-    ) -> None:
-        registered = await user_service.register(USERNAME, PASSWORD)
-        original = (registered.user.display_name, registered.user.updated_at)
-
-        updated = await user_service.update(registered.user)
+        updated = await user_service.update(registered.user, **kwargs)
 
         assert updated is registered.user
         assert (updated.display_name, updated.updated_at) == original

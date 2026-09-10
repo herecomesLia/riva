@@ -1,7 +1,7 @@
 import os
 from collections.abc import Iterator
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 import uvicorn
@@ -16,18 +16,11 @@ runner = CliRunner()
 
 @pytest.fixture(autouse=True)
 def restore_riva_environment() -> Iterator[None]:
-    original = {
-        key: value for key, value in os.environ.items() if key.startswith("RIVA_")
-    }
-    for key in original:
-        os.environ.pop(key)
-
-    yield
-
-    for key in list(os.environ):
-        if key.startswith("RIVA_"):
-            os.environ.pop(key)
-    os.environ.update(original)
+    with patch.dict(os.environ):
+        for key in list(os.environ):
+            if key.startswith("RIVA_"):
+                os.environ.pop(key)
+        yield
 
 
 @pytest.fixture

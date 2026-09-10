@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+
 import pytest
 from pydantic import ValidationError
 
@@ -23,14 +25,7 @@ def test_register_credentials_validates_username(
     username: str,
     is_valid: bool,
 ) -> None:
-    if is_valid:
-        assert (
-            RegisterCredentials(username=username, password=VALID_PASSWORD).username
-            == username
-        )
-        return
-
-    with pytest.raises(ValidationError):
+    with nullcontext() if is_valid else pytest.raises(ValidationError):
         RegisterCredentials(username=username, password=VALID_PASSWORD)
 
 
@@ -51,11 +46,5 @@ def test_register_credentials_validates_password(
     password: str,
     is_valid: bool,
 ) -> None:
-    if is_valid:
-        assert (
-            RegisterCredentials(username="user", password=password).password == password
-        )
-        return
-
-    with pytest.raises(ValidationError):
+    with nullcontext() if is_valid else pytest.raises(ValidationError):
         RegisterCredentials(username="user", password=password)

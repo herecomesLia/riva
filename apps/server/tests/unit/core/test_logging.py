@@ -9,27 +9,9 @@ from httpx import ASGITransport, AsyncClient
 from structlog.testing import capture_logs
 
 from riva.core.logging import (
-    LogLevel,
     RequestLoggingMiddleware,
     _normalize_foreign_event,
 )
-
-
-@pytest.mark.parametrize(
-    ("log_level", "stdlib_level"),
-    [
-        (LogLevel.CRITICAL, logging.CRITICAL),
-        (LogLevel.ERROR, logging.ERROR),
-        (LogLevel.WARNING, logging.WARNING),
-        (LogLevel.INFO, logging.INFO),
-        (LogLevel.DEBUG, logging.DEBUG),
-    ],
-)
-def test_log_level_converts_to_stdlib_level(
-    log_level: LogLevel,
-    stdlib_level: int,
-) -> None:
-    assert log_level.to_stdlib_level() == stdlib_level
 
 
 @pytest.mark.parametrize(

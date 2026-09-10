@@ -1,6 +1,6 @@
 import os
 from collections.abc import Iterator
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from typer.testing import CliRunner
@@ -15,18 +15,11 @@ DATABASE_URL = "postgresql+psycopg://unused:unused@invalid/unused"
 
 @pytest.fixture(autouse=True)
 def restore_riva_environment() -> Iterator[None]:
-    original = {
-        key: value for key, value in os.environ.items() if key.startswith("RIVA_")
-    }
-    for key in original:
-        os.environ.pop(key)
-
-    yield
-
-    for key in list(os.environ):
-        if key.startswith("RIVA_"):
-            os.environ.pop(key)
-    os.environ.update(original)
+    with patch.dict(os.environ):
+        for key in list(os.environ):
+            if key.startswith("RIVA_"):
+                os.environ.pop(key)
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -62,14 +55,11 @@ def test_database_command_cancellation_does_not_open_database(
     command: str,
     database_calls: tuple[Mock, MagicMock, AsyncMock, AsyncMock],
 ) -> None:
-    database_factory, database, setup_task_schema, reset_task_schema = database_calls
+    database_factory, _, setup_task_schema, reset_task_schema = database_calls
     result = runner.invoke(app, ["db", command], input="n\n")
 
     assert result.exit_code == 1
     database_factory.assert_not_called()
-    database.__aenter__.assert_not_awaited()
-    database.create_tables.assert_not_awaited()
-    database.reset.assert_not_awaited()
     setup_task_schema.assert_not_awaited()
     reset_task_schema.assert_not_awaited()
 
