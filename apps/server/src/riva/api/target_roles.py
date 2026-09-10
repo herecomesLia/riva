@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
 from fastapi.exceptions import RequestValidationError
 
 from riva.api.csrf import csrf_guard
@@ -14,11 +14,18 @@ from riva.api.errors.openapi import error_responses
 from riva.models.target_role import TargetRole
 from riva.schemas.target_role import (
     CreateTargetRoleRequest,
+    JDTextExtractionRequest,
     SetActiveTargetRoleRequest,
     TargetRoleListResponse,
     TargetRoleResponse,
     UpdateJobDescriptionRequest,
     UpdateTargetRoleRequest,
+)
+from riva.schemas.tasks import (
+    TaskErrorBody,
+    TaskFailureResponse,
+    TaskStateResponse,
+    TaskStatusResponse,
 )
 from riva.services.errors import (
     ConflictError,
@@ -26,6 +33,7 @@ from riva.services.errors import (
     NotFoundError,
     SessionExpiredError,
 )
+from riva.tasks import TaskErrorCode, TaskStatus
 
 router = APIRouter(
     prefix="/target-roles",
@@ -159,11 +167,11 @@ async def restore_target_role(
 
 @router.patch(
     "/{target_role_id}/jd",
-    operation_id="update-target-role-jd",
+    operation_id="update-jd",
     response_model=TargetRoleResponse,
     responses=error_responses(NotFoundError, ConflictError, RequestValidationError),
 )
-async def update_target_role_jd(
+async def update_jd(
     target_role_id: UUID,
     payload: UpdateJobDescriptionRequest,
     current_user: CurrentUserDep,
@@ -173,3 +181,85 @@ async def update_target_role_jd(
     role = await target_role_service.get(current_user, target_role_id)
     changes = {field: getattr(payload, field) for field in payload.model_fields_set}
     return await job_description_service.update(role, **changes)
+
+
+@router.post(
+    "/{target_role_id}/jd/extraction/text",
+    operation_id="extract-jd-from-text",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_class=Response,
+    responses=error_responses(NotFoundError, RequestValidationError),
+)
+async def extract_jd_from_text(
+    target_role_id: UUID,
+    payload: JDTextExtractionRequest,
+    current_user: CurrentUserDep,
+    target_role_service: TargetRoleServiceDep,
+    job_description_service: JobDescriptionServiceDep,
+) -> Response:
+    role = await target_role_service.get(current_user, target_role_id)
+    await job_description_service.extract_text(role, text=payload.text)
+    return Response(status_code=status.HTTP_202_ACCEPTED)
+
+
+@router.get(
+    "/{target_role_id}/jd/extraction",
+    operation_id="get-jd-extraction-state",
+    response_model=TaskStateResponse,
+    responses=error_responses(NotFoundError, RequestValidationError),
+)
+async def get_jd_extraction_state(
+    target_role_id: UUID,
+    current_user: CurrentUserDep,
+    target_role_service: TargetRoleServiceDep,
+    job_description_service: JobDescriptionServiceDep,
+) -> TaskStateResponse:
+    role = await target_role_service.get(current_user, target_role_id)
+    state = await job_description_service.get_extraction_state(role)
+    if state.status is TaskStatus.FAILED:
+        error = TaskErrorBody(
+            code=state.error_code,
+            message={
+                TaskErrorCode.INVALID_OUTPUT: "Unable to complete the task.",
+                TaskErrorCode.LLM_UNAVAILABLE: "LLM service is temporarily unavailable.",
+                TaskErrorCode.INTERNAL_ERROR: "Unable to complete the task.",
+            }[state.error_code],
+        )
+        return TaskFailureResponse(status=state.status, error=error)
+    return TaskStatusResponse(status=state.status, error=None)
+
+
+@router.post(
+    "/{target_role_id}/jd/extraction/retry",
+    operation_id="retry-jd-extraction",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_class=Response,
+    responses=error_responses(NotFoundError, ConflictError, RequestValidationError),
+)
+async def retry_jd_extraction(
+    target_role_id: UUID,
+    current_user: CurrentUserDep,
+    target_role_service: TargetRoleServiceDep,
+    job_description_service: JobDescriptionServiceDep,
+) -> Response:
+    role = await target_role_service.get(current_user, target_role_id)
+    await job_description_service.retry_extraction(role)
+    return Response(status_code=status.HTTP_202_ACCEPTED)
+
+
+@router.post(
+    "/{target_role_id}/jd/extraction/abort",
+    operation_id="abort-jd-extraction",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_class=Response,
+    responses=error_responses(NotFoundError, ConflictError, RequestValidationError),
+)
+async def abort_jd_extraction(
+    target_role_id: UUID,
+    current_user: CurrentUserDep,
+    target_role_service: TargetRoleServiceDep,
+    job_description_service: JobDescriptionServiceDep,
+) -> Response:
+    role = await target_role_service.get(current_user, target_role_id)
+    await job_description_service.abort_extraction(role)
+    return Response(status_code=status.HTTP_202_ACCEPTED)

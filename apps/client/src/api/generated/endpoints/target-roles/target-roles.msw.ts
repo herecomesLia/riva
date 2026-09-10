@@ -7,14 +7,20 @@
 import { HttpResponse, http } from "msw"
 import type { RequestHandlerOptions } from "msw"
 
-import type { TargetRoleListResponse, TargetRoleResponse } from "../../models"
+import type {
+  TargetRoleListResponse,
+  TargetRoleResponse,
+  TaskFailureResponse,
+  TaskStatusResponse,
+} from "../../models"
 
 import {
   getArchiveTargetRoleResponseMock,
   getCreateTargetRoleResponseMock,
+  getGetJdExtractionStateResponseMock,
   getListTargetRolesResponseMock,
   getRestoreTargetRoleResponseMock,
-  getUpdateTargetRoleJdResponseMock,
+  getUpdateJdResponseMock,
   getUpdateTargetRoleResponseMock,
 } from "./target-roles.faker"
 
@@ -24,7 +30,8 @@ export {
   getUpdateTargetRoleResponseMock,
   getArchiveTargetRoleResponseMock,
   getRestoreTargetRoleResponseMock,
-  getUpdateTargetRoleJdResponseMock,
+  getUpdateJdResponseMock,
+  getGetJdExtractionStateResponseMock,
 } from "./target-roles.faker"
 
 export const getListTargetRolesMockHandler = (
@@ -183,7 +190,7 @@ export const getRestoreTargetRoleMockHandler = (
   )
 }
 
-export const getUpdateTargetRoleJdMockHandler = (
+export const getUpdateJdMockHandler = (
   overrideResponse?:
     | TargetRoleResponse
     | ((
@@ -199,9 +206,91 @@ export const getUpdateTargetRoleJdMockHandler = (
           ? typeof overrideResponse === "function"
             ? await overrideResponse(info)
             : overrideResponse
-          : getUpdateTargetRoleJdResponseMock(),
+          : getUpdateJdResponseMock(),
         { status: 200 },
       )
+    },
+    options,
+  )
+}
+
+export const getExtractJdFromTextMockHandler = (
+  overrideResponse?:
+    void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/target-roles/:targetRoleId/jd/extraction/text",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      if (typeof overrideResponse === "function") {
+        await overrideResponse(info)
+      }
+
+      return new HttpResponse(null, { status: 202 })
+    },
+    options,
+  )
+}
+
+export const getGetJdExtractionStateMockHandler = (
+  overrideResponse?:
+    | TaskStatusResponse
+    | TaskFailureResponse
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) =>
+        | Promise<TaskStatusResponse | TaskFailureResponse>
+        | TaskStatusResponse
+        | TaskFailureResponse),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/target-roles/:targetRoleId/jd/extraction",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetJdExtractionStateResponseMock(),
+        { status: 200 },
+      )
+    },
+    options,
+  )
+}
+
+export const getRetryJdExtractionMockHandler = (
+  overrideResponse?:
+    void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/target-roles/:targetRoleId/jd/extraction/retry",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      if (typeof overrideResponse === "function") {
+        await overrideResponse(info)
+      }
+
+      return new HttpResponse(null, { status: 202 })
+    },
+    options,
+  )
+}
+
+export const getAbortJdExtractionMockHandler = (
+  overrideResponse?:
+    void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/target-roles/:targetRoleId/jd/extraction/abort",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      if (typeof overrideResponse === "function") {
+        await overrideResponse(info)
+      }
+
+      return new HttpResponse(null, { status: 202 })
     },
     options,
   )
@@ -214,5 +303,9 @@ export const getTargetRolesMock = () => [
   getSetActiveTargetRoleMockHandler(),
   getArchiveTargetRoleMockHandler(),
   getRestoreTargetRoleMockHandler(),
-  getUpdateTargetRoleJdMockHandler(),
+  getUpdateJdMockHandler(),
+  getExtractJdFromTextMockHandler(),
+  getGetJdExtractionStateMockHandler(),
+  getRetryJdExtractionMockHandler(),
+  getAbortJdExtractionMockHandler(),
 ]

@@ -101,6 +101,10 @@ class SetActiveTargetRoleRequest(RequestModel):
     )
 
 
+class JDTextExtractionRequest(RequestModel):
+    text: NonBlankStr = Field(description="Source job description text to extract.")
+
+
 class UpdateJobDescriptionRequest(NonEmptyPartialUpdateRequest):
     """Replace supplied sections in full, without reparsing the source JD.
 

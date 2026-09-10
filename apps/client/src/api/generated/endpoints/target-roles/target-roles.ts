@@ -6,9 +6,12 @@
  */
 import type {
   CreateTargetRoleRequest,
+  JDTextExtractionRequest,
   SetActiveTargetRoleRequest,
   TargetRoleListResponse,
   TargetRoleResponse,
+  TaskFailureResponse,
+  TaskStatusResponse,
   UpdateJobDescriptionRequest,
   UpdateTargetRoleRequest,
 } from "../../models"
@@ -111,9 +114,9 @@ export const restoreTargetRole = (
   )
 }
 /**
- * @summary Update Target Role Jd
+ * @summary Update Jd
  */
-export const updateTargetRoleJd = (
+export const updateJd = (
   targetRoleId: string,
   updateJobDescriptionRequest: UpdateJobDescriptionRequest,
   options?: SecondParameter<typeof request<TargetRoleResponse>>,
@@ -128,6 +131,60 @@ export const updateTargetRoleJd = (
     options,
   )
 }
+/**
+ * @summary Extract Jd From Text
+ */
+export const extractJdFromText = (
+  targetRoleId: string,
+  jDTextExtractionRequest: JDTextExtractionRequest,
+  options?: SecondParameter<typeof request<void>>,
+) => {
+  return request<void>(
+    {
+      url: `/api/target-roles/${targetRoleId}/jd/extraction/text`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: jDTextExtractionRequest,
+    },
+    options,
+  )
+}
+/**
+ * @summary Get Jd Extraction State
+ */
+export const getJdExtractionState = (
+  targetRoleId: string,
+  options?: SecondParameter<typeof request<TaskStatusResponse | TaskFailureResponse>>,
+) => {
+  return request<TaskStatusResponse | TaskFailureResponse>(
+    { url: `/api/target-roles/${targetRoleId}/jd/extraction`, method: "GET" },
+    options,
+  )
+}
+/**
+ * @summary Retry Jd Extraction
+ */
+export const retryJdExtraction = (
+  targetRoleId: string,
+  options?: SecondParameter<typeof request<void>>,
+) => {
+  return request<void>(
+    { url: `/api/target-roles/${targetRoleId}/jd/extraction/retry`, method: "POST" },
+    options,
+  )
+}
+/**
+ * @summary Abort Jd Extraction
+ */
+export const abortJdExtraction = (
+  targetRoleId: string,
+  options?: SecondParameter<typeof request<void>>,
+) => {
+  return request<void>(
+    { url: `/api/target-roles/${targetRoleId}/jd/extraction/abort`, method: "POST" },
+    options,
+  )
+}
 export type ListTargetRolesResult = NonNullable<Awaited<ReturnType<typeof listTargetRoles>>>
 export type CreateTargetRoleResult = NonNullable<Awaited<ReturnType<typeof createTargetRole>>>
 export type UpdateTargetRoleResult = NonNullable<Awaited<ReturnType<typeof updateTargetRole>>>
@@ -135,4 +192,10 @@ export type DeleteTargetRoleResult = NonNullable<Awaited<ReturnType<typeof delet
 export type SetActiveTargetRoleResult = NonNullable<Awaited<ReturnType<typeof setActiveTargetRole>>>
 export type ArchiveTargetRoleResult = NonNullable<Awaited<ReturnType<typeof archiveTargetRole>>>
 export type RestoreTargetRoleResult = NonNullable<Awaited<ReturnType<typeof restoreTargetRole>>>
-export type UpdateTargetRoleJdResult = NonNullable<Awaited<ReturnType<typeof updateTargetRoleJd>>>
+export type UpdateJdResult = NonNullable<Awaited<ReturnType<typeof updateJd>>>
+export type ExtractJdFromTextResult = NonNullable<Awaited<ReturnType<typeof extractJdFromText>>>
+export type GetJdExtractionStateResult = NonNullable<
+  Awaited<ReturnType<typeof getJdExtractionState>>
+>
+export type RetryJdExtractionResult = NonNullable<Awaited<ReturnType<typeof retryJdExtraction>>>
+export type AbortJdExtractionResult = NonNullable<Awaited<ReturnType<typeof abortJdExtraction>>>

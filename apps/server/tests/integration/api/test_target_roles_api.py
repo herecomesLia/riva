@@ -1,12 +1,14 @@
 from typing import Any
 from uuid import UUID
 
+import pytest
 from httpx import AsyncClient
+from sqlalchemy import text
 
 from riva.db import Database
 from riva.models.target_role import TargetRole
 from riva.services.job_descriptions import JobDescriptionService
-from riva.tasks import reset_task_schema
+from riva.tasks import TaskErrorCode, reset_task_schema
 from tests.support.assertions import assert_error_response
 from tests.support.auth import ORIGIN_HEADERS, register_user
 
@@ -191,3 +193,115 @@ async def test_jd_patch_rejects_active_extraction(
         code="resource.conflict",
         message="Abort the active extraction before updating the JD.",
     )
+
+
+async def _fail_extraction(
+    database: Database, role_id: str, code: TaskErrorCode
+) -> None:
+    async with database.sessionmaker() as session:
+        role = await session.get(TargetRole, UUID(role_id))
+        assert role is not None
+        role.jd.extraction_error_code = code
+        # The job status triggers need Procrastinate's schema on the search path.
+        search_path = await session.scalar(text("SHOW search_path"))
+        await session.execute(text("SET LOCAL search_path TO procrastinate, public"))
+        await session.execute(
+            text("UPDATE procrastinate_jobs SET status = 'failed' WHERE id = :id"),
+            {"id": role.jd.extraction_job_id},
+        )
+        await session.execute(
+            text("SELECT set_config('search_path', :path, true)"),
+            {"path": search_path},
+        )
+        await session.commit()
+
+
+async def test_jd_extraction_http_lifecycle(
+    client: AsyncClient, database: Database
+) -> None:
+    await reset_task_schema(database)
+    await register_user(client)
+    role = await _create_role(client, "Engineer")
+    path = f"/api/target-roles/{role['id']}/jd/extraction"
+
+    response = await client.post(f"{path}/retry", headers=ORIGIN_HEADERS)
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "resource.conflict"
+
+    response = await client.post(
+        f"{path}/text", headers=ORIGIN_HEADERS, json={"text": "Build APIs"}
+    )
+    assert response.status_code == 202
+    response = await client.get(path)
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued"
+
+    response = await client.post(f"{path}/abort", headers=ORIGIN_HEADERS)
+    assert response.status_code == 202
+    response = await client.get(path)
+    assert response.json()["status"] == "idle"
+
+    response = await client.post(
+        f"{path}/text", headers=ORIGIN_HEADERS, json={"text": "Maintain APIs"}
+    )
+    assert response.status_code == 202
+    await _fail_extraction(database, role["id"], TaskErrorCode.INVALID_OUTPUT)
+    response = await client.post(f"{path}/retry", headers=ORIGIN_HEADERS)
+    assert response.status_code == 202
+    response = await client.get(path)
+    assert response.json()["status"] == "queued"
+
+
+@pytest.mark.parametrize(
+    ("code", "message"),
+    [
+        (TaskErrorCode.INVALID_OUTPUT, "Unable to complete the task."),
+        (TaskErrorCode.INTERNAL_ERROR, "Unable to complete the task."),
+        (TaskErrorCode.LLM_UNAVAILABLE, "LLM service is temporarily unavailable."),
+    ],
+)
+async def test_jd_failure_is_returned_as_state_with_public_message(
+    client: AsyncClient, database: Database, code: TaskErrorCode, message: str
+) -> None:
+    await reset_task_schema(database)
+    await register_user(client)
+    role = await _create_role(client, "Engineer")
+    async with database.sessionmaker() as session:
+        stored = await session.get(TargetRole, UUID(role["id"]))
+        await JobDescriptionService(session).extract_text(stored, text="Build APIs")
+    await _fail_extraction(database, role["id"], code)
+
+    response = await client.get(f"/api/target-roles/{role['id']}/jd/extraction")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "failed"
+    assert body["error"]["code"] == code.value
+    assert body["error"]["message"] == message
+
+
+@pytest.mark.parametrize(
+    ("method", "suffix", "payload"),
+    [
+        ("POST", "/text", {"text": "Build APIs"}),
+        ("GET", "", None),
+        ("POST", "/retry", None),
+        ("POST", "/abort", None),
+    ],
+)
+async def test_jd_extraction_hides_other_users_roles(
+    client: AsyncClient, method: str, suffix: str, payload: dict[str, str] | None
+) -> None:
+    await register_user(client)
+    role = await _create_role(client, "Private")
+    await register_user(client, username="OtherUser")
+
+    response = await client.request(
+        method,
+        f"/api/target-roles/{role['id']}/jd/extraction{suffix}",
+        headers=ORIGIN_HEADERS,
+        json=payload,
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "resource.not_found"

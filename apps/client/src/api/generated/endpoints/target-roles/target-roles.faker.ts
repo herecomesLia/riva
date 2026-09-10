@@ -6,8 +6,13 @@
  */
 import { faker } from "@faker-js/faker"
 
-import { RecruitmentTrack } from "../../models"
-import type { TargetRoleListResponse, TargetRoleResponse } from "../../models"
+import { RecruitmentTrack, TaskErrorCode } from "../../models"
+import type {
+  TargetRoleListResponse,
+  TargetRoleResponse,
+  TaskFailureResponse,
+  TaskStatusResponse,
+} from "../../models"
 
 export const getListTargetRolesResponseMock = (
   overrideResponse: Partial<Extract<TargetRoleListResponse, object>> = {},
@@ -472,7 +477,7 @@ export const getRestoreTargetRoleResponseMock = (
   ...overrideResponse,
 })
 
-export const getUpdateTargetRoleJdResponseMock = (
+export const getUpdateJdResponseMock = (
   overrideResponse: Partial<Extract<TargetRoleResponse, object>> = {},
 ): TargetRoleResponse => ({
   id: faker.string.uuid(),
@@ -561,3 +566,32 @@ export const getUpdateTargetRoleJdResponseMock = (
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
 })
+
+export const getGetJdExtractionStateResponseTaskStatusResponseMock = (
+  overrideResponse: Partial<TaskStatusResponse> = {},
+): TaskStatusResponse => ({
+  ...{
+    status: faker.helpers.arrayElement(["idle", "queued", "running", "aborting"] as const),
+    error: null,
+  },
+  ...overrideResponse,
+})
+
+export const getGetJdExtractionStateResponseTaskFailureResponseMock = (
+  overrideResponse: Partial<TaskFailureResponse> = {},
+): TaskFailureResponse => ({
+  ...{
+    status: "failed",
+    error: {
+      code: faker.helpers.arrayElement(Object.values(TaskErrorCode)),
+      message: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    },
+  },
+  ...overrideResponse,
+})
+
+export const getGetJdExtractionStateResponseMock = (): TaskStatusResponse | TaskFailureResponse =>
+  faker.helpers.arrayElement([
+    { ...getGetJdExtractionStateResponseTaskStatusResponseMock() },
+    { ...getGetJdExtractionStateResponseTaskFailureResponseMock() },
+  ])
