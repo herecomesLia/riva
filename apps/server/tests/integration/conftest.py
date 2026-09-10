@@ -9,16 +9,18 @@ from asgi_lifespan import LifespanManager
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from psycopg import sql
+from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from riva.core.app import create_app, wrap_cors
 from riva.core.config import DatabaseSettings, Settings
 from riva.db import Database
+from riva.db.base import Base
 from riva.models import User
 from riva.models.target_role import JobDescription, TargetRole
 from riva.services.users import UserService
-from riva.tasks import reset_task_schema
+from riva.tasks import setup_task_schema
 from tests.support.clock import Clock
 from tests.support.settings import TEST_ORIGIN, make_test_settings
 
@@ -64,6 +66,7 @@ async def _initialize_database(database_url: str) -> None:
     database = Database(DatabaseSettings(url=database_url))
     try:
         await database.reset()
+        await setup_task_schema(database)
     finally:
         await database.dispose()
 
@@ -97,7 +100,9 @@ async def database(
 
 
 @pytest.fixture
-async def resettable_database(test_database_url: str) -> AsyncIterator[Database]:
+async def resettable_database(
+    test_database_url: str, initialized_database: None
+) -> AsyncIterator[Database]:
     test_database = Database(DatabaseSettings(url=test_database_url))
     try:
         await test_database.reset()
@@ -116,10 +121,27 @@ async def db_session(database: Database) -> AsyncIterator[AsyncSession]:
 
 
 @pytest.fixture
-async def extraction_database(resettable_database: Database) -> Database:
+async def extraction_database(
+    test_database_url: str, initialized_database: None
+) -> AsyncIterator[Database]:
     # Worker and request transactions need independent connections and real commits.
-    await reset_task_schema(resettable_database)
-    return resettable_database
+    async with Database(DatabaseSettings(url=test_database_url)) as database:
+        quote = database.engine.dialect.identifier_preparer.quote
+        tables = [
+            f"public.{quote(table.name)}" for table in Base.metadata.tables.values()
+        ]
+        tables.extend(
+            ["procrastinate.procrastinate_jobs", "procrastinate.procrastinate_workers"]
+        )
+        # CASCADE also clears task events and periodic deferrals.
+        truncate = text(f"TRUNCATE {', '.join(tables)} RESTART IDENTITY CASCADE")
+        try:
+            async with database.engine.begin() as connection:
+                await connection.execute(truncate)
+            yield database
+        finally:
+            async with database.engine.begin() as connection:
+                await connection.execute(truncate)
 
 
 @pytest.fixture

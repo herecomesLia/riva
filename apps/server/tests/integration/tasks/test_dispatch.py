@@ -12,7 +12,6 @@ from riva.tasks.core import (
     cancel_job,
     defer_job,
     get_job_status,
-    reset_task_schema,
     retry_job,
 )
 from riva.tasks.errors import TaskError
@@ -77,7 +76,6 @@ async def _create_user_and_job(
 
 
 async def test_defer_commits_with_business_write(database: Database) -> None:
-    await reset_task_schema(database)
 
     user_id, job_id = await _create_user_and_job(database, username="CommitDefer")
 
@@ -127,7 +125,6 @@ async def test_get_job_status_maps_uncommitted_state(
     abort_requested: bool,
     expected: JobStatus,
 ) -> None:
-    await reset_task_schema(database)
     async with database.sessionmaker() as session:
         job_id = await defer_job(session, TRANSACTIONAL_TASK)
         await _set_job_status(session, job_id, status, abort_requested=abort_requested)
@@ -138,7 +135,6 @@ async def test_get_job_status_maps_uncommitted_state(
 
 
 async def test_get_job_status_rejects_missing_job(database: Database) -> None:
-    await reset_task_schema(database)
     async with database.sessionmaker() as session:
         with pytest.raises(TaskError, match="Job -1 was not found"):
             await get_job_status(session, -1)
@@ -148,7 +144,6 @@ async def test_get_job_status_rejects_missing_job(database: Database) -> None:
 async def test_retry_is_atomic_with_business_write(
     database: Database, commit: bool
 ) -> None:
-    await reset_task_schema(database)
     user_id, job_id = await _create_user_and_job(database, username="RetryJob")
     async with database.sessionmaker() as session:
         await _set_job_status(session, job_id, "failed")
@@ -176,7 +171,6 @@ async def test_retry_is_atomic_with_business_write(
 
 
 async def test_defer_rolls_back_with_business_write(database: Database) -> None:
-    await reset_task_schema(database)
     async with database.sessionmaker() as session:
         user = _user("RollbackDefer")
         session.add(user)
@@ -193,7 +187,6 @@ async def test_defer_rolls_back_with_business_write(database: Database) -> None:
 
 
 async def test_cancel_commits_with_business_write(database: Database) -> None:
-    await reset_task_schema(database)
     user_id, job_id = await _create_user_and_job(database, username="CommitCancel")
 
     async with database.sessionmaker() as session:
@@ -209,7 +202,6 @@ async def test_cancel_commits_with_business_write(database: Database) -> None:
 
 
 async def test_cancel_rolls_back_with_business_write(database: Database) -> None:
-    await reset_task_schema(database)
     user_id, job_id = await _create_user_and_job(database, username="RollbackCancel")
 
     async with database.sessionmaker() as session:

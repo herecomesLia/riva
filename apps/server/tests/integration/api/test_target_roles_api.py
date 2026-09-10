@@ -8,7 +8,7 @@ from sqlalchemy import text
 from riva.db import Database
 from riva.models.target_role import TargetRole
 from riva.services.job_descriptions import JobDescriptionService
-from riva.tasks import TaskErrorCode, reset_task_schema
+from riva.tasks import TaskErrorCode
 from tests.support.assertions import assert_error_response
 from tests.support.auth import ORIGIN_HEADERS, register_user
 
@@ -176,7 +176,6 @@ async def test_cross_user_target_role_access_is_not_found(
 async def test_jd_patch_rejects_active_extraction(
     client: AsyncClient, database: Database
 ) -> None:
-    await reset_task_schema(database)
     await register_user(client)
     role = await _create_role(client, "Engineer")
     async with database.sessionmaker() as session:
@@ -219,7 +218,6 @@ async def _fail_extraction(
 async def test_jd_extraction_http_lifecycle(
     client: AsyncClient, database: Database
 ) -> None:
-    await reset_task_schema(database)
     await register_user(client)
     role = await _create_role(client, "Engineer")
     path = f"/api/target-roles/{role['id']}/jd/extraction"
@@ -263,7 +261,6 @@ async def test_jd_extraction_http_lifecycle(
 async def test_jd_failure_is_returned_as_state_with_public_message(
     client: AsyncClient, database: Database, code: TaskErrorCode, message: str
 ) -> None:
-    await reset_task_schema(database)
     await register_user(client)
     role = await _create_role(client, "Engineer")
     async with database.sessionmaker() as session:
