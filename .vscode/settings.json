@@ -1,5 +1,5 @@
 {
-  "python.testing.pytestArgs": ["apps/server/tests"],
+  "python.testing.pytestArgs": ["apps/server/tests", "-n", "4"],
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true
 }

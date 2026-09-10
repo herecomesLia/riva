@@ -2,13 +2,15 @@ import asyncio
 from collections.abc import AsyncIterator, Iterator
 from uuid import UUID
 
+import psycopg
 import pytest
 import structlog
 from asgi_lifespan import LifespanManager
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from psycopg import sql
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from testcontainers.community.postgres import PostgresContainer
 
 from riva.core.app import create_app, wrap_cors
 from riva.core.config import DatabaseSettings, Settings
@@ -19,8 +21,6 @@ from riva.services.users import UserService
 from riva.tasks import reset_task_schema
 from tests.support.clock import Clock
 from tests.support.settings import TEST_ORIGIN, make_test_settings
-
-POSTGRES_IMAGE = "postgres:18-alpine"
 
 
 class _NoopLogger:
@@ -47,14 +47,17 @@ def disable_request_logging() -> Iterator[None]:
 
 
 @pytest.fixture(scope="session")
-def postgres_container() -> Iterator[PostgresContainer]:
-    with PostgresContainer(POSTGRES_IMAGE, driver="psycopg") as postgres:
-        yield postgres
-
-
-@pytest.fixture(scope="session")
-def test_database_url(postgres_container: PostgresContainer) -> str:
-    return postgres_container.get_connection_url()
+def test_database_url(postgres_url: str, worker_id: str) -> str:
+    url = make_url(postgres_url)
+    database_name = f"riva_test_{worker_id}"
+    with psycopg.connect(
+        url.set(drivername="postgresql").render_as_string(hide_password=False),
+        autocommit=True,
+    ) as connection:
+        connection.execute(
+            sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name))
+        )
+    return url.set(database=database_name).render_as_string(hide_password=False)
 
 
 async def _initialize_database(database_url: str) -> None:
