@@ -12,6 +12,7 @@ from riva.db import Database
 from riva.llm import LLMClient
 from riva.models import User
 from riva.services.career_profiles import CareerProfileService
+from riva.services.job_descriptions import JobDescriptionService
 from riva.services.target_roles import TargetRoleService
 from riva.services.users import UserService
 
@@ -97,4 +98,14 @@ async def get_target_role_service(
 TargetRoleServiceDep = Annotated[
     TargetRoleService,
     Depends(get_target_role_service),
+]
+
+
+async def get_job_description_service(session: DbSessionDep) -> JobDescriptionService:
+    return JobDescriptionService(session)
+
+
+JobDescriptionServiceDep = Annotated[
+    JobDescriptionService,
+    Depends(get_job_description_service),
 ]

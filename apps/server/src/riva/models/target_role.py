@@ -3,12 +3,13 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
-from sqlalchemy import DateTime, Enum, ForeignKey, String, text
+from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Uuid
 
 from riva.db.base import Base
 from riva.db.types import PydanticJSONB
+from riva.errors import ErrorCode
 from riva.models.types import NonBlankStr
 from riva.utils import utc_now
 
@@ -113,6 +114,15 @@ class JobDescription(Base):
         Uuid(as_uuid=True),
         ForeignKey("target_roles.id", ondelete="CASCADE"),
         primary_key=True,
+    )
+    extraction_job_id: Mapped[int | None] = mapped_column(BigInteger)
+    extraction_error_code: Mapped[ErrorCode | None] = mapped_column(
+        Enum(
+            ErrorCode,
+            values_callable=lambda enum: [member.value for member in enum],
+            native_enum=False,
+            validate_strings=True,
+        ),
     )
     responsibilities: Mapped[list[NonBlankStr]] = mapped_column(
         PydanticJSONB(list[NonBlankStr]),

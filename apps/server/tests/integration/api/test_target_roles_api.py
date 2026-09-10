@@ -1,7 +1,12 @@
 from typing import Any
+from uuid import UUID
 
 from httpx import AsyncClient
 
+from riva.db import Database
+from riva.models.target_role import TargetRole
+from riva.services.job_descriptions import JobDescriptionService
+from riva.tasks import reset_task_schema
 from tests.support.assertions import assert_error_response
 from tests.support.auth import ORIGIN_HEADERS, register_user
 
@@ -163,4 +168,26 @@ async def test_cross_user_target_role_access_is_not_found(
         status_code=404,
         code="resource.not_found",
         message="Target role was not found.",
+    )
+
+
+async def test_jd_patch_rejects_active_extraction(
+    client: AsyncClient, database: Database
+) -> None:
+    await reset_task_schema(database)
+    await register_user(client)
+    role = await _create_role(client, "Engineer")
+    async with database.sessionmaker() as session:
+        stored = await session.get(TargetRole, UUID(role["id"]))
+        await JobDescriptionService(session).extract_text(stored, text="Build APIs")
+    response = await client.patch(
+        f"/api/target-roles/{role['id']}/jd",
+        headers=ORIGIN_HEADERS,
+        json={"responsibilities": ["Manual"]},
+    )
+    assert_error_response(
+        response,
+        status_code=409,
+        code="resource.conflict",
+        message="Abort the active extraction before updating the JD.",
     )

@@ -4,7 +4,11 @@ from fastapi import APIRouter, status
 from fastapi.exceptions import RequestValidationError
 
 from riva.api.csrf import csrf_guard
-from riva.api.deps import CurrentUserDep, TargetRoleServiceDep
+from riva.api.deps import (
+    CurrentUserDep,
+    JobDescriptionServiceDep,
+    TargetRoleServiceDep,
+)
 from riva.api.errors import AuthRequiredError, CsrfFailedError
 from riva.api.errors.openapi import error_responses
 from riva.models.target_role import TargetRole
@@ -157,13 +161,15 @@ async def restore_target_role(
     "/{target_role_id}/jd",
     operation_id="update-target-role-jd",
     response_model=TargetRoleResponse,
-    responses=error_responses(NotFoundError, RequestValidationError),
+    responses=error_responses(NotFoundError, ConflictError, RequestValidationError),
 )
 async def update_target_role_jd(
     target_role_id: UUID,
     payload: UpdateJobDescriptionRequest,
     current_user: CurrentUserDep,
     target_role_service: TargetRoleServiceDep,
+    job_description_service: JobDescriptionServiceDep,
 ) -> TargetRole:
+    role = await target_role_service.get(current_user, target_role_id)
     changes = {field: getattr(payload, field) for field in payload.model_fields_set}
-    return await target_role_service.update_jd(current_user, target_role_id, **changes)
+    return await job_description_service.update(role, **changes)

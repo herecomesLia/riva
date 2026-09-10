@@ -165,42 +165,6 @@ async def test_update_clears_nullable_field_without_changing_others(
     assert reloaded.location == "Remote"
 
 
-async def test_update_jd_preserves_untouched_modules_and_refreshes_parent_timestamp(
-    target_role_service: TargetRoleService,
-    database: Database,
-    user_service: UserService,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    user = await _new_user(user_service)
-    role = await target_role_service.create(
-        user,
-        title="Backend Engineer",
-        jd=JobDescription(
-            responsibilities=["Old responsibility"],
-            soft_skills=["Communication"],
-            business_domains=["SaaS"],
-        ),
-    )
-    role.updated_at = datetime(2025, 1, 1, tzinfo=UTC)
-    await target_role_service.session.commit()
-    next_updated_at = datetime(2025, 1, 2, tzinfo=UTC)
-    monkeypatch.setattr("riva.services.target_roles.utc_now", lambda: next_updated_at)
-
-    await target_role_service.update_jd(
-        user,
-        role.id,
-        responsibilities=["New responsibility"],
-        soft_skills=[],
-    )
-    reloaded = await _reload_role(database, role.id)
-
-    assert reloaded is not None
-    assert reloaded.jd.responsibilities == ["New responsibility"]
-    assert reloaded.jd.soft_skills == []
-    assert reloaded.jd.business_domains == ["SaaS"]
-    assert reloaded.updated_at == next_updated_at
-
-
 async def test_active_archive_restore_state_machine_has_no_partial_writes(
     target_role_service: TargetRoleService,
     database: Database,

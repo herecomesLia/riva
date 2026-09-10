@@ -8,13 +8,13 @@ from langchain_core.runnables import RunnableLambda
 from openai import BadRequestError
 from pydantic import ValidationError
 
-from riva.ai.target_roles import JobDescriptionBuilder
+from riva.ai.target_roles import JobDescriptionExtractor
 from riva.llm import LLMClient
 from riva.llm.errors import LLMOutputError, LLMRequestError
 from riva.models.target_role import JobDescriptionContent
 
 
-def _builder(responses: list[object]) -> tuple[JobDescriptionBuilder, AsyncMock]:
+def _extractor(responses: list[object]) -> tuple[JobDescriptionExtractor, AsyncMock]:
     invoke = AsyncMock(side_effect=responses)
 
     async def generate(messages: list) -> object:
@@ -24,7 +24,7 @@ def _builder(responses: list[object]) -> tuple[JobDescriptionBuilder, AsyncMock]
     client.chat_model.return_value.with_structured_output.return_value = RunnableLambda(
         generate
     )
-    return JobDescriptionBuilder(client), invoke
+    return JobDescriptionExtractor(client), invoke
 
 
 def _response(parsed: object, *, raw: AIMessage | None = None, error=None) -> dict:
@@ -40,16 +40,18 @@ async def test_provider_request_failure_is_not_repaired() -> None:
     failure = BadRequestError(
         "invalid request", response=httpx.Response(400, request=request), body=None
     )
-    builder, invoke = _builder([failure])
+    extractor, invoke = _extractor([failure])
     with pytest.raises(LLMRequestError) as raised:
-        await builder.from_text("Job description")
+        await extractor.from_text("Job description")
     assert raised.value.__cause__ is failure
     invoke.assert_awaited_once()
 
 
 async def test_success_returns_content_without_repair() -> None:
-    builder, invoke = _builder([_response({"responsibilities": ["Maintain services"]})])
-    result = await builder.from_text("Maintain services")
+    extractor, invoke = _extractor(
+        [_response({"responsibilities": ["Maintain services"]})]
+    )
+    result = await extractor.from_text("Maintain services")
     assert isinstance(result, JobDescriptionContent)
     assert result.responsibilities == ["Maintain services"]
     invoke.assert_awaited_once()
@@ -59,19 +61,19 @@ async def test_validation_feedback_preserves_source_and_is_isolated_between_call
     None
 ):
     raw = AIMessage(content='{"responsibilities": [""]}')
-    builder, invoke = _builder(
+    extractor, invoke = _extractor(
         [
             _response({"responsibilities": [""]}, raw=raw),
             _response({"responsibilities": ["Maintain services"]}),
             _response({"responsibilities": ["Analyze data"]}),
         ]
     )
-    await builder.from_text("Maintain services")
+    await extractor.from_text("Maintain services")
     repair = invoke.await_args_list[1].args[0]
     assert repair[1].content == "Maintain services"
     assert repair[2] is raw
     assert "responsibilities.0" in repair[3].content
-    await builder.from_text("Analyze data")
+    await extractor.from_text("Analyze data")
     fresh = invoke.await_args_list[2].args[0]
     assert len(fresh) == 2
     assert fresh[1].content == "Analyze data"
@@ -79,7 +81,7 @@ async def test_validation_feedback_preserves_source_and_is_isolated_between_call
 
 async def test_parser_feedback_requests_valid_json_without_private_details() -> None:
     raw = AIMessage(content="invalid JSON")
-    builder, invoke = _builder(
+    extractor, invoke = _extractor(
         [
             _response(
                 None, raw=raw, error=OutputParserException("private parser detail")
@@ -87,7 +89,7 @@ async def test_parser_feedback_requests_valid_json_without_private_details() -> 
             _response({}),
         ]
     )
-    await builder.from_text("Job description")
+    await extractor.from_text("Job description")
     repair = invoke.await_args_list[1].args[0]
     assert repair[2] is raw
     assert isinstance(repair[3], HumanMessage)
@@ -96,18 +98,18 @@ async def test_parser_feedback_requests_valid_json_without_private_details() -> 
 
 
 async def test_validation_failure_stops_after_one_repair() -> None:
-    builder, invoke = _builder([_response({"responsibilities": [""]})] * 2)
+    extractor, invoke = _extractor([_response({"responsibilities": [""]})] * 2)
     with pytest.raises(LLMOutputError) as raised:
-        await builder.from_text("Job description")
+        await extractor.from_text("Job description")
     assert isinstance(raised.value.__cause__, ValidationError)
     assert invoke.await_count == 2
 
 
 async def test_parser_failure_stops_after_one_repair() -> None:
     failure = OutputParserException("invalid JSON")
-    builder, invoke = _builder([_response(None, error=failure)] * 2)
+    extractor, invoke = _extractor([_response(None, error=failure)] * 2)
     with pytest.raises(LLMOutputError) as raised:
-        await builder.from_text("Job description")
+        await extractor.from_text("Job description")
     assert raised.value.__cause__ is failure
     assert invoke.await_count == 2
 
@@ -115,7 +117,7 @@ async def test_parser_failure_stops_after_one_repair() -> None:
 @pytest.mark.parametrize("has_error", [False, True])
 async def test_refusal_is_not_repaired(has_error: bool) -> None:
     failure = ValueError("provider refusal") if has_error else None
-    builder, invoke = _builder(
+    extractor, invoke = _extractor(
         [
             _response(
                 None,
@@ -125,7 +127,7 @@ async def test_refusal_is_not_repaired(has_error: bool) -> None:
         ]
     )
     with pytest.raises(LLMOutputError) as raised:
-        await builder.from_text("Job description")
+        await extractor.from_text("Job description")
     assert raised.value.__cause__ is failure
     invoke.assert_awaited_once()
 
@@ -133,18 +135,18 @@ async def test_refusal_is_not_repaired(has_error: bool) -> None:
 @pytest.mark.parametrize("returned", [False, True])
 async def test_unknown_failure_is_not_repaired(returned: bool) -> None:
     failure = ValueError("unexpected failure")
-    builder, invoke = _builder(
+    extractor, invoke = _extractor(
         [_response(None, error=failure) if returned else failure]
     )
     with pytest.raises(ValueError) as raised:
-        await builder.from_text("Job description")
+        await extractor.from_text("Job description")
     assert raised.value is failure
     invoke.assert_awaited_once()
 
 
 @pytest.mark.parametrize("finish", ["length", "content_filter"])
 async def test_incomplete_output_is_not_repaired(finish: str) -> None:
-    builder, invoke = _builder(
+    extractor, invoke = _extractor(
         [
             _response(
                 {},
@@ -153,5 +155,5 @@ async def test_incomplete_output_is_not_repaired(finish: str) -> None:
         ]
     )
     with pytest.raises(LLMOutputError, match="refused or truncated"):
-        await builder.from_text("Job description")
+        await extractor.from_text("Job description")
     invoke.assert_awaited_once()

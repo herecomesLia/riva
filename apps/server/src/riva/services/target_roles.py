@@ -5,16 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from riva.models.target_role import (
-    HardSkills,
     JobDescription,
-    JobRequirements,
     RecruitmentTrack,
     TargetRole,
 )
 from riva.models.user import User
 from riva.services.errors import ConflictError, NotFoundError
 from riva.services.types import UNSET
-from riva.utils import utc_now
+from riva.tasks import cancel_job
 
 
 class TargetRoleService:
@@ -110,36 +108,17 @@ class TargetRoleService:
 
     async def delete(self, user: User, target_role_id: UUID) -> None:
         role = await self.get(user, target_role_id)
+        jd = await self.session.get(
+            JobDescription,
+            role.id,
+            with_for_update=True,
+            populate_existing=True,
+        )
+        if jd is None:
+            raise NotFoundError("Target role was not found.")
+        if jd.extraction_job_id is not None:
+            await cancel_job(self.session, jd.extraction_job_id, abort=True)
         if user.active_target_role_id == role.id:
             user.active_target_role_id = None
         await self.session.delete(role)
         await self.session.commit()
-
-    async def update_jd(
-        self,
-        user: User,
-        target_role_id: UUID,
-        *,
-        responsibilities: list[str] | UNSET = UNSET,
-        requirements: JobRequirements | UNSET = UNSET,
-        hard_skills: HardSkills | UNSET = UNSET,
-        soft_skills: list[str] | UNSET = UNSET,
-        preferred_qualifications: list[str] | UNSET = UNSET,
-        business_domains: list[str] | UNSET = UNSET,
-    ) -> TargetRole:
-        role = await self.get(user, target_role_id)
-        if responsibilities is not UNSET:
-            role.jd.responsibilities = responsibilities
-        if requirements is not UNSET:
-            role.jd.requirements = requirements
-        if hard_skills is not UNSET:
-            role.jd.hard_skills = hard_skills
-        if soft_skills is not UNSET:
-            role.jd.soft_skills = soft_skills
-        if preferred_qualifications is not UNSET:
-            role.jd.preferred_qualifications = preferred_qualifications
-        if business_domains is not UNSET:
-            role.jd.business_domains = business_domains
-        role.updated_at = utc_now()
-        await self.session.commit()
-        return role

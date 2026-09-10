@@ -45,7 +45,7 @@ complete JSON object. Apply the same rules when correcting a previous answer.
 """
 
 
-class JobDescriptionBuilder:
+class JobDescriptionExtractor:
     def __init__(self, client: LLMClient) -> None:
         # Parse locally so validation failures retain the raw answer for feedback.
         schema = convert_to_openai_tool(JobDescriptionContent, strict=True)["function"]

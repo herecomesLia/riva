@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterator, Iterator
+from uuid import UUID
 
 import pytest
 import structlog
@@ -12,7 +13,10 @@ from testcontainers.community.postgres import PostgresContainer
 from riva.core.app import create_app, wrap_cors
 from riva.core.config import DatabaseSettings, Settings
 from riva.db import Database
+from riva.models import User
+from riva.models.target_role import JobDescription, TargetRole
 from riva.services.users import UserService
+from riva.tasks import reset_task_schema
 from tests.support.clock import Clock
 from tests.support.settings import TEST_ORIGIN, make_test_settings
 
@@ -106,6 +110,29 @@ async def resettable_database(test_database_url: str) -> AsyncIterator[Database]
 async def db_session(database: Database) -> AsyncIterator[AsyncSession]:
     async with database.sessionmaker() as session:
         yield session
+
+
+@pytest.fixture
+async def extraction_database(resettable_database: Database) -> Database:
+    # Worker and request transactions need independent connections and real commits.
+    await reset_task_schema(resettable_database)
+    return resettable_database
+
+
+@pytest.fixture
+async def extraction_role(extraction_database: Database) -> UUID:
+    async with extraction_database.sessionmaker() as session:
+        user = User(username="JDUser", password_hash="unused", display_name="JD User")
+        session.add(user)
+        await session.flush()
+        role = TargetRole(
+            user_id=user.id,
+            title="Engineer",
+            jd=JobDescription(responsibilities=["Original"], soft_skills=["Teamwork"]),
+        )
+        session.add(role)
+        await session.commit()
+        return role.id
 
 
 @pytest.fixture
