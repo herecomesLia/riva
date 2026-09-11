@@ -19,7 +19,7 @@ import {
   FieldError,
   FieldLabel,
 } from "@/components/ui/field"
-import { normalizeSkillName, parseSkillNames } from "@/models/profile-text"
+import { normalizeSkillName, parseSkillNames } from "../skill-names"
 
 type SkillTagInputProps = {
   availableSkills: string[]

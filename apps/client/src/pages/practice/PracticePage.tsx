@@ -6,9 +6,9 @@ import {
   usePracticeAnsweringActions,
   usePracticeActionLock,
 } from "./hooks/usePracticeAnsweringActions"
-import { usePracticeEvaluationPolling } from "./hooks/usePracticeEvaluationPolling"
 import { usePracticeFollowUpActions } from "./hooks/usePracticeFollowUpActions"
-import { usePracticeGenerationPolling } from "./hooks/usePracticeGenerationPolling"
+import { usePracticeStageRequest } from "./hooks/usePracticeStageRequest"
+import { getQuestionGenerationStatus, getPracticeEvaluationStatus } from "@/services/practice"
 import { usePracticeReviewActions } from "./hooks/usePracticeReviewActions"
 import { usePracticeSession } from "./hooks/usePracticeSession"
 import { PracticeView } from "./PracticeView"
@@ -25,8 +25,14 @@ export function PracticePage() {
     historyEntryResolution,
     retryHistoryEntry,
   } = usePracticeSession(entrySearch)
-  const generation = usePracticeGenerationPolling(practiceQuery.data)
-  const evaluation = usePracticeEvaluationPolling(practiceQuery.data)
+  const generation = usePracticeStageRequest(
+    practiceQuery.data?.session.status === "generatingQuestion",
+    getQuestionGenerationStatus,
+  )
+  const evaluation = usePracticeStageRequest(
+    practiceQuery.data?.session.status === "evaluating",
+    getPracticeEvaluationStatus,
+  )
   const runAction = usePracticeActionLock()
   const answering = usePracticeAnsweringActions(runAction)
   const followUp = usePracticeFollowUpActions(runAction)
@@ -53,16 +59,16 @@ export function PracticePage() {
           status: "ready",
           data: practiceQuery.data,
         }}
-        evaluationError={evaluation.evaluationError}
+        evaluationError={evaluation.error}
         followUpActions={followUp.actions}
         followUpPending={followUp.pending}
-        generationError={generation.generationError}
-        isEvaluationRetrying={evaluation.isEvaluationRetrying}
-        isGenerationRetrying={generation.isGenerationRetrying}
+        generationError={generation.error}
+        isEvaluationRetrying={evaluation.isRetrying}
+        isGenerationRetrying={generation.isRetrying}
         isStarting={isStarting}
         historyEntryResolution={historyEntryResolution}
-        onRetryEvaluation={evaluation.retryEvaluation}
-        onRetryGeneration={generation.retryGeneration}
+        onRetryEvaluation={evaluation.retry}
+        onRetryGeneration={generation.retry}
         onStart={start}
         reviewActions={review.actions}
         reviewPending={review.pending}

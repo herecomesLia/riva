@@ -1,4 +1,4 @@
-function normalizeWhitespace(value: string) {
+export function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim()
 }
 
@@ -47,43 +47,6 @@ export function parseBulletItems(input: string): string[] {
   return uniqueItems(candidates.map(withoutListPrefix).map(normalizeWhitespace))
 }
 
-export function normalizeSkillName(value: string) {
-  return normalizeWhitespace(value).toLocaleLowerCase("en-US")
-}
-
-export function parseSkillNames(input: string): string[] {
-  const seen = new Set<string>()
-
-  return input
-    .split(/[,，;；\r\n]+/)
-    .map(normalizeWhitespace)
-    .filter((item) => {
-      const normalized = normalizeSkillName(item)
-      if (!normalized || seen.has(normalized)) return false
-      seen.add(normalized)
-      return true
-    })
-}
-
 export function normalizeBulletItems(items: string[]) {
   return uniqueItems(items.map(normalizeWhitespace))
-}
-
-export function normalizeSkillIds(ids: string[]) {
-  return uniqueItems(ids.map(normalizeWhitespace))
-}
-
-export function normalizeTechnologyStack(technologies: string[]) {
-  const seen = new Set<string>()
-
-  return technologies.map(normalizeWhitespace).filter((technology) => {
-    const normalized = normalizeSkillName(technology)
-    if (!normalized || seen.has(normalized)) return false
-    seen.add(normalized)
-    return true
-  })
-}
-
-export function parseTechnologyNames(input: string) {
-  return normalizeTechnologyStack(input.split(/[,，;；\r\n]+/))
 }

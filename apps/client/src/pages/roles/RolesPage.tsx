@@ -24,8 +24,8 @@ import { RolesView, type RolesViewActions } from "./RolesView"
 import {
   ROLES_QUERY_KEY,
   useJdExtractionSynchronization,
-} from "./hooks/useJdExtractionSynchronization"
-import { useMatchingAnalysisSynchronization } from "./hooks/useMatchingAnalysisSynchronization"
+  useMatchingAnalysisSynchronization,
+} from "./hooks/useRoleSynchronization"
 import { RolesActionError } from "./roles-errors"
 
 export function RolesPage() {

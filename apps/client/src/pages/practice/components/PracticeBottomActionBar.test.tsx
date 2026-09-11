@@ -20,7 +20,7 @@ describe("PracticeBottomActionBar", () => {
     )
 
     const actionBar = screen.getByTestId("action-bar")
-    expect(actionBar).toHaveClass("fixed", "inset-x-0", "bottom-0", "z-40", "border-t")
+    expect(actionBar).toHaveClass("fixed", "inset-x-0", "bottom-0", "z-20", "border-t")
     expect(actionBar).toHaveClass(
       "md:left-(--sidebar-width)",
       "md:group-has-data-[collapsible=icon]/sidebar-wrapper:left-(--sidebar-width-icon)",

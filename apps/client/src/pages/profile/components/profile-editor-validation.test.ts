@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest"
 
-import {
-  educationItemSchema,
-  projectItemSchema,
-  skillSchema,
-  workItemSchema,
-} from "@/schemas/profile"
+import { educationItemSchema, projectItemSchema, workItemSchema } from "./ProfileSectionEditor"
+import { skillSchema } from "./SkillsEditor"
 
 const schemas: Array<[string, any, Record<string, unknown>]> = [
   [

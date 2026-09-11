@@ -28,18 +28,10 @@ describe("PracticeQuestionActions", () => {
     vi.clearAllMocks()
   })
 
-  it("renders all actions in a fixed, responsive action bar", () => {
+  it("renders all question actions", () => {
     renderWithProviders(<PracticeQuestionActions {...defaultProps} />, { router: false })
 
-    const actionBar = screen.getByTestId("practice-question-actions-bar")
-    expect(actionBar).toHaveClass("fixed", "inset-x-0", "bottom-0", "z-40", "border-t")
-    expect(actionBar).toHaveClass("bg-background/95", "backdrop-blur")
-    expect(actionBar).toHaveClass(
-      "md:left-(--sidebar-width)",
-      "md:group-has-data-[collapsible=icon]/sidebar-wrapper:left-(--sidebar-width-icon)",
-    )
     const actionGroup = screen.getByTestId("practice-question-actions")
-    expect(actionGroup).toHaveClass("sm:flex", "sm:flex-wrap")
     for (const name of [
       i18n.t("practice.questionActions.save"),
       i18n.t("practice.questionActions.markWeak"),

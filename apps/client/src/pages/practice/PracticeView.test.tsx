@@ -277,12 +277,6 @@ describe("PracticeView", () => {
     expect(review).toHaveClass("pb-80", "min-[360px]:pb-52", "sm:pb-40", "lg:pb-28")
 
     const actionBar = screen.getByTestId("practice-review-actions-bar")
-    expect(actionBar).toHaveClass("fixed", "inset-x-0", "bottom-0", "z-40", "border-t")
-    expect(actionBar).toHaveClass("bg-background/95", "backdrop-blur")
-    expect(actionBar).toHaveClass(
-      "md:left-(--sidebar-width)",
-      "md:group-has-data-[collapsible=icon]/sidebar-wrapper:left-(--sidebar-width-icon)",
-    )
     expect(actionBar.closest("[data-slot='card']")).not.toBeInTheDocument()
 
     const actions = within(actionBar)

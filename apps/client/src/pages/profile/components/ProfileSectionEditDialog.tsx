@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog"
 import type { CareerProfileResponse, UpdateCareerProfileRequest } from "@/api/generated/models"
 
-import { ProfileAdditionalSectionEditor } from "./ProfileAdditionalSectionEditor"
+import { SkillsEditor } from "./SkillsEditor"
 import { ProfileSectionEditor } from "./ProfileSectionEditor"
 import type { ProfileSection } from "./ProfileSectionCard"
 
@@ -64,13 +64,12 @@ export function ProfileSectionEditDialog({
                 section={section}
               />
             ) : (
-              <ProfileAdditionalSectionEditor
+              <SkillsEditor
                 key={section}
                 onCancel={() => onOpenChange(false)}
                 onDirtyChange={onDirtyChange}
                 onSave={onSave}
                 profile={profile}
-                section={section}
               />
             )}
           </>

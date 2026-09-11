@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldControl, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
-import { parseBulletItems } from "@/models/profile-text"
+import { parseBulletItems } from "@/lib/text"
 
 type JobDescriptionBulletListEditorProps = {
   description?: string

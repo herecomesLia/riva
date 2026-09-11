@@ -12,11 +12,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import {
-  normalizeSkillName,
-  normalizeTechnologyStack,
-  parseTechnologyNames,
-} from "@/models/profile-text"
+import { normalizeSkillName, normalizeSkillNames, parseSkillNames } from "../skill-names"
 
 type TechnologyStackInputProps = {
   description: string
@@ -36,7 +32,7 @@ export function TechnologyStackInput({
   const [inputValue, setInputValue] = useState("")
 
   function addInputTechnologies() {
-    const inputTechnologies = parseTechnologyNames(inputValue)
+    const inputTechnologies = parseSkillNames(inputValue)
     const existingTechnologies = new Set(technologies.map(normalizeSkillName))
 
     if (
@@ -48,7 +44,7 @@ export function TechnologyStackInput({
       return
     }
 
-    onChange(normalizeTechnologyStack([...technologies, ...inputTechnologies]))
+    onChange(normalizeSkillNames([...technologies, ...inputTechnologies]))
     setHasDuplicate(false)
     setInputValue("")
   }

@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState } from "react"
-import type { PracticeData } from "@/models/practice-workflow"
-import { getQuestionGenerationStatus } from "@/services/practice"
+import type { PracticeSession } from "@/models/practice-workflow"
 import { usePracticeMutation } from "./usePracticeSession"
 
-export function usePracticeGenerationPolling(data: PracticeData | undefined) {
-  const active = data?.session.status === "generatingQuestion"
+export function usePracticeStageRequest(active: boolean, request: () => Promise<PracticeSession>) {
   const requested = useRef(false)
   const retryLock = useRef(false)
   const [failed, setFailed] = useState(false)
-  const { mutate, reset, isError, isPending } = usePracticeMutation(getQuestionGenerationStatus)
+  const { mutate, reset, isError, isPending } = usePracticeMutation(request)
   useEffect(() => {
     if (!active) {
       requested.current = false
@@ -23,9 +21,9 @@ export function usePracticeGenerationPolling(data: PracticeData | undefined) {
     if (isError) setFailed(true)
   }, [isError])
   return {
-    generationError: failed || isError,
-    isGenerationRetrying: isPending,
-    retryGeneration: () => {
+    error: failed || isError,
+    isRetrying: isPending,
+    retry: () => {
       if (!active || isPending || retryLock.current) return
       retryLock.current = true
       mutate(undefined, {

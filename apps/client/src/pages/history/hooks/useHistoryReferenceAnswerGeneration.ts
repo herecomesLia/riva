@@ -30,26 +30,7 @@ function toTarget(
   recordId: string,
   subject: HistoryReferenceAnswerSubject,
 ): TrainingRecordReferenceAnswerTarget {
-  if (kind === "targetedPractice") {
-    return subject.subject === "mainQuestion"
-      ? { kind, recordId, questionId: subject.questionId, subject: subject.subject }
-      : {
-          kind,
-          recordId,
-          questionId: subject.questionId,
-          subject: subject.subject,
-          followUpId: subject.followUpId,
-        }
-  }
-  return subject.subject === "mainQuestion"
-    ? { kind, recordId, questionId: subject.questionId, subject: subject.subject }
-    : {
-        kind,
-        recordId,
-        questionId: subject.questionId,
-        subject: subject.subject,
-        followUpId: subject.followUpId,
-      }
+  return { kind, recordId, ...subject }
 }
 
 function applyReferenceAnswer<TRecord extends TrainingRecordDetail>(

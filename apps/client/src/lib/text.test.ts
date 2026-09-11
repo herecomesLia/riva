@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { normalizeSkillName, parseBulletItems, parseSkillNames } from "@/models/profile-text"
+import { parseBulletItems } from "./text"
 
 describe("parseBulletItems", () => {
   it("parses explicit multiline bullet and numbered lists", () => {
@@ -35,27 +35,5 @@ describe("parseBulletItems", () => {
 
   it("normalizes whitespace and removes exact duplicates without changing order", () => {
     expect(parseBulletItems("-  第一项\n- 第一项\n-  第二项  ")).toEqual(["第一项", "第二项"])
-  })
-})
-
-describe("parseSkillNames", () => {
-  it("supports supported separators without splitting spaces in names", () => {
-    expect(parseSkillNames("React, TypeScript；Design systems\nMachine learning")).toEqual([
-      "React",
-      "TypeScript",
-      "Design systems",
-      "Machine learning",
-    ])
-  })
-
-  it("preserves punctuation in skill names and deduplicates case-insensitively", () => {
-    expect(parseSkillNames("C++, C#, .NET, Next.js, react, React")).toEqual([
-      "C++",
-      "C#",
-      ".NET",
-      "Next.js",
-      "react",
-    ])
-    expect(normalizeSkillName("  Design   Systems ")).toBe("design systems")
   })
 })
