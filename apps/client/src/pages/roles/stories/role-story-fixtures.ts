@@ -1,5 +1,5 @@
 import type { JobDescriptionResponse } from "@/api/generated/models"
-import { matchResultFixture, parsedJdFixture } from "@/mocks/fixtures/target-role"
+import { jdFailReason, matchResultFixture, extractedJdFixture } from "@/mocks/fixtures/target-role"
 import type { JdState, MatchState, RolesData, RoleView } from "@/models/target-role-workflow"
 
 export type RolesStoryScenario =
@@ -10,9 +10,9 @@ export type RolesStoryScenario =
   | "multipleRolesCurrentMissing"
   | "multipleRolesJdMissing"
   | "rolesWithoutCurrent"
-  | "roleWithJobDescriptionParsing"
+  | "roleWithJobDescriptionExtracting"
   | "roleWithJobDescriptionFailed"
-  | "roleWithParsedJobDescription"
+  | "roleWithExtractedJobDescription"
   | "profileMissing"
   | "profileIncomplete"
   | "matchingAnalysisGenerating"
@@ -47,8 +47,6 @@ const emptyJd = {
 } satisfies JobDescriptionResponse
 
 const completeProfile = { exists: true, complete: true }
-const failedJdReason =
-  "We could not extract structured requirements from this JD. Please submit it again."
 const failedMatchReason =
   "The matching analysis could not be generated right now. Your profile and JD are preserved; please try again."
 
@@ -63,7 +61,10 @@ function createRole(
     matchState?: MatchState
   } = {},
 ): RoleView {
-  const jdState = options.jdState ?? { status: "ready", result: structuredClone(parsedJdFixture) }
+  const jdState = options.jdState ?? {
+    status: "ready",
+    result: structuredClone(extractedJdFixture),
+  }
   return {
     id,
     title,
@@ -132,8 +133,8 @@ const scenarios: Record<RolesStoryScenario, RolesData> = {
     activeRoleId: null,
     profile: completeProfile,
   },
-  roleWithJobDescriptionParsing: {
-    roles: [frontendRole({ jdState: { status: "parsing" } })],
+  roleWithJobDescriptionExtracting: {
+    roles: [frontendRole({ jdState: { status: "extracting", phase: "running" } })],
     activeRoleId: "role_frontend_bytedance",
     profile: completeProfile,
   },
@@ -141,13 +142,13 @@ const scenarios: Record<RolesStoryScenario, RolesData> = {
     roles: [
       createRole("role_frontend_tiktok", "Frontend Engineer", {
         company: "TikTok",
-        jdState: { status: "failed", reason: failedJdReason },
+        jdState: { status: "failed", reason: jdFailReason },
       }),
     ],
     activeRoleId: "role_frontend_tiktok",
     profile: completeProfile,
   },
-  roleWithParsedJobDescription: {
+  roleWithExtractedJobDescription: {
     roles: [frontendRole()],
     activeRoleId: "role_frontend_bytedance",
     profile: completeProfile,
@@ -233,7 +234,7 @@ export function createManyRolesResponse() {
 }
 
 export function createLongJobDescriptionResponse() {
-  const response = createRoleStoryResponse("roleWithParsedJobDescription")
+  const response = createRoleStoryResponse("roleWithExtractedJobDescription")
   response.roles[0]!.jd.responsibilities.push(
     "Define measurable frontend reliability and performance standards across product teams.",
     "Lead cross-functional technical planning for multi-quarter platform initiatives.",
@@ -258,8 +259,8 @@ export function createLongMatchingAnalysisResponse() {
   return response
 }
 
-export function createStaleWhileParsingResponse() {
+export function createStaleWhileExtractingResponse() {
   const response = createRoleStoryResponse("matchingAnalysisStale")
-  response.roles[0]!.jdState = { status: "parsing" }
+  response.roles[0]!.jdState = { status: "extracting", phase: "running" }
   return response
 }

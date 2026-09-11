@@ -6,7 +6,7 @@ export const profile = {
   completenessShort: "Completeness",
   processingStatus: {
     uploaded: "Uploaded, waiting to be recognized",
-    parsing: "Recognizing",
+    recognizing: "Recognizing",
     succeeded: "Recognition complete",
     failed: "Recognition failed",
   },
@@ -58,7 +58,7 @@ export const profile = {
       description:
         "Once it finishes uploading, we will recognize it and update your structured profile.",
     },
-    parsing: {
+    recognizing: {
       title: "Recognizing your resume",
       description: "Riva is extracting experience and skills from your resume.",
     },

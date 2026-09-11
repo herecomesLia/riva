@@ -5,6 +5,9 @@ import type {
   JobDescriptionResponse,
   JobRequirementsRequest,
   JobRequirementsResponse,
+  JDTextExtractionRequest,
+  TaskStatusResponse,
+  TaskFailureResponse,
   SetActiveTargetRoleRequest,
   TargetRoleListResponse,
   TargetRoleResponse,
@@ -12,19 +15,18 @@ import type {
   UpdateTargetRoleRequest,
 } from "@/api/generated/models"
 import type {
-  JdState,
   MatchingAnalysisResult,
   MatchState,
   RecognizeRoleInput,
 } from "@/models/target-role-workflow"
 import {
-  imageRoleFixture,
   jdFailInput,
   jdFailReason,
   matchResultFixture,
-  parsedJdFixture,
+  extractedJdFixture,
   roleListFixture,
   textRoleFixture,
+  imageRoleFixture,
   urlRoleFixture,
 } from "@/mocks/fixtures/target-role"
 import { createMockApiError } from "@/mocks/utils"
@@ -54,10 +56,15 @@ const emptyJd = {
   businessDomains: [],
 } satisfies JobDescriptionResponse
 
-type TaskRecord<T> =
-  | { status: "running"; result: T | string }
-  | { status: "success"; result: T }
-  | { status: "failed"; result: string }
+const JD_QUEUE_DURATION_MS = 500
+const JD_PROCESSING_DURATION_MS = 2000
+const JD_ABORT_DURATION_MS = 500
+
+type JdExtractionMock = {
+  startedAt: number
+  outcome: "success" | "failed"
+  abortStartedAt?: number
+}
 
 type MatchRecord =
   | {
@@ -72,31 +79,6 @@ type MatchRecord =
       status: "stale"
       result: MatchingAnalysisResult
     }
-
-function hasJdContent(jd: JobDescriptionResponse) {
-  return (
-    jd.responsibilities.length > 0 ||
-    Object.values(jd.requirements).some((items) => items.length > 0) ||
-    Object.values(jd.hardSkills).some((items) => items.length > 0) ||
-    jd.softSkills.length > 0 ||
-    jd.preferredQualifications.length > 0 ||
-    jd.businessDomains.length > 0
-  )
-}
-
-function toJdState(
-  task: TaskRecord<JobDescriptionResponse> | undefined,
-  jd: JobDescriptionResponse,
-): JdState {
-  if (!task) {
-    return hasJdContent(jd)
-      ? { status: "ready", result: structuredClone(jd) }
-      : { status: "missing" }
-  }
-  if (task.status === "running") return { status: "parsing" }
-  if (task.status === "failed") return { status: "failed", reason: task.result }
-  return { status: "ready", result: structuredClone(task.result) }
-}
 
 function toMatchState(match: MatchRecord | undefined): MatchState {
   if (!match) return { status: "none" }
@@ -133,7 +115,7 @@ function normalizeHardSkills(input: HardSkillsRequest): HardSkillsResponse {
 
 export function createRoleFaker(initialState: TargetRoleListResponse) {
   let state = structuredClone(initialState)
-  const jdTasks = new Map<string, TaskRecord<JobDescriptionResponse>>()
+  const jdExtractions = new Map<string, JdExtractionMock>()
   const matches = new Map<string, MatchRecord>()
   let roleSeq = 0
   let timeSeq = 0
@@ -164,20 +146,42 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
     return structuredClone(storedRole)
   }
 
-  function startJdTask(roleId: string, text?: string) {
-    const result = text === jdFailInput ? jdFailReason : structuredClone(parsedJdFixture)
-    const task = { status: "running", result } satisfies TaskRecord<JobDescriptionResponse>
-    jdTasks.set(roleId, task)
+  function getExtractionState(roleId: string): TaskStatusResponse | TaskFailureResponse {
+    const role = requireRole(roleId)
+    const extraction = jdExtractions.get(roleId)
+    if (!extraction) return { status: "idle", error: null }
+    if (extraction.abortStartedAt !== undefined) {
+      if (Date.now() - extraction.abortStartedAt < JD_ABORT_DURATION_MS) {
+        return { status: "aborting", error: null }
+      }
+      jdExtractions.delete(roleId)
+      return { status: "idle", error: null }
+    }
+    const elapsed = Date.now() - extraction.startedAt
+    if (elapsed < JD_QUEUE_DURATION_MS) return { status: "queued", error: null }
+    if (elapsed < JD_QUEUE_DURATION_MS + JD_PROCESSING_DURATION_MS) {
+      return { status: "running", error: null }
+    }
+    if (extraction.outcome === "failed") {
+      return { status: "failed", error: { code: "invalid_output", message: jdFailReason } }
+    }
+    replaceRole({ ...role, jd: extractedJdFixture, updatedAt: nextTime() })
+    jdExtractions.delete(roleId)
+    return { status: "idle", error: null }
   }
 
   async function staleMatch(roleId: string) {
     const match = matches.get(roleId)
+    if (match?.status === "running") {
+      matches.delete(roleId)
+      return
+    }
     if (match?.status !== "success") return
     matches.set(roleId, { status: "stale", result: structuredClone(match.result) })
   }
 
   async function clear(roleId: string) {
-    jdTasks.delete(roleId)
+    jdExtractions.delete(roleId)
     matches.delete(roleId)
   }
 
@@ -216,58 +220,53 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
 
     create,
 
-    async recognize(input: RecognizeRoleInput): Promise<CreateTargetRoleRequest> {
-      let fixture: CreateTargetRoleRequest
-      switch (input.sourceType) {
-        case "text":
-          fixture = textRoleFixture
-          break
-        case "image":
-          fixture = imageRoleFixture
-          break
-        case "url":
-          fixture = urlRoleFixture
+    async recognizeRole(input: RecognizeRoleInput): Promise<TargetRoleResponse> {
+      const fixture =
+        input.sourceType === "text"
+          ? textRoleFixture
+          : input.sourceType === "image"
+            ? imageRoleFixture
+            : urlRoleFixture
+      const role = await create(fixture)
+      return replaceRole({ ...role, jd: extractedJdFixture })
+    },
+
+    async extractJd(roleId: string, input: JDTextExtractionRequest): Promise<void> {
+      getExtractionState(roleId)
+      jdExtractions.set(roleId, {
+        startedAt: Date.now(),
+        outcome: input.text === jdFailInput ? "failed" : "success",
+      })
+    },
+
+    async getJdExtractionState(roleId: string): Promise<TaskStatusResponse | TaskFailureResponse> {
+      return getExtractionState(roleId)
+    },
+
+    async retryJdExtraction(roleId: string): Promise<void> {
+      if (getExtractionState(roleId).status !== "failed") {
+        throw createMockApiError("resource.conflict", "Only a failed JD extraction can be retried.")
       }
-
-      return structuredClone(fixture)
+      jdExtractions.set(roleId, { startedAt: Date.now(), outcome: "success" })
     },
 
-    async parseJd(roleId: string, text: string): Promise<JdState> {
-      await staleMatch(roleId)
-      startJdTask(roleId, text)
-      return { status: "parsing" }
-    },
-
-    async getJd(role: TargetRoleResponse): Promise<JdState> {
-      return toJdState(jdTasks.get(role.id), role.jd)
-    },
-
-    async pollJd(role: TargetRoleResponse): Promise<JdState> {
-      const task = jdTasks.get(role.id)
-      if (!task || task.status !== "running") return toJdState(task, role.jd)
-
-      if (typeof task.result === "string") {
-        const failedTask = {
-          status: "failed",
-          result: task.result,
-        } satisfies TaskRecord<JobDescriptionResponse>
-        jdTasks.set(role.id, failedTask)
-        return toJdState(failedTask, role.jd)
+    async abortJdExtraction(roleId: string): Promise<void> {
+      const { status } = getExtractionState(roleId)
+      if (status === "aborting") return
+      if (status !== "queued" && status !== "running") {
+        throw createMockApiError(
+          "resource.conflict",
+          "Only an active JD extraction can be aborted.",
+        )
       }
-
-      const doneTask = {
-        status: "success",
-        result: task.result,
-      } satisfies TaskRecord<JobDescriptionResponse>
-      jdTasks.set(role.id, doneTask)
-      return toJdState(doneTask, role.jd)
+      jdExtractions.get(roleId)!.abortStartedAt = Date.now()
     },
 
     async match(roleId: string): Promise<MatchState> {
       const task = {
         status: "running",
         result: structuredClone(matchResultFixture),
-      } satisfies TaskRecord<MatchingAnalysisResult>
+      } satisfies MatchRecord
       matches.set(roleId, task)
       return { status: "generating" }
     },
@@ -283,7 +282,7 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
       const doneMatch = {
         status: "success",
         result: structuredClone(match.result),
-      } satisfies TaskRecord<MatchingAnalysisResult>
+      } satisfies MatchRecord
       matches.set(roleId, doneMatch)
       return toMatchState(doneMatch)
     },
@@ -343,6 +342,13 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
       roleId: string,
       input: UpdateJobDescriptionRequest,
     ): Promise<TargetRoleResponse> {
+      const { status } = getExtractionState(roleId)
+      if (status === "queued" || status === "running" || status === "aborting") {
+        throw createMockApiError(
+          "resource.conflict",
+          "Abort the active extraction before updating the JD.",
+        )
+      }
       const role = requireRole(roleId)
       const updatedRole = replaceRole({
         ...role,
@@ -367,6 +373,7 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
         },
         updatedAt: nextTime(),
       })
+      jdExtractions.delete(roleId)
       return updatedRole
     },
   }

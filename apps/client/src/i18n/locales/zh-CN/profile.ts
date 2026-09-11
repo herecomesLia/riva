@@ -6,7 +6,7 @@ export const profile = {
   completenessShort: "档案完整度",
   processingStatus: {
     uploaded: "已上传，等待识别",
-    parsing: "正在识别",
+    recognizing: "正在识别",
     succeeded: "识别完成",
     failed: "识别失败",
   },
@@ -53,7 +53,7 @@ export const profile = {
       title: "简历正在上传",
       description: "上传完成后，我们会开始识别并更新结构化档案。",
     },
-    parsing: { title: "正在识别简历", description: "Riva 正在提取简历中的经历与技能信息。" },
+    recognizing: { title: "正在识别简历", description: "Riva 正在提取简历中的经历与技能信息。" },
     failed: {
       title: "简历识别失败",
       description: "我们无法完成这份简历的识别。请稍后更新简历或重新识别。",

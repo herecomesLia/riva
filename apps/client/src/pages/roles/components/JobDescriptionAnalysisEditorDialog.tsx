@@ -22,7 +22,7 @@ import type {
 } from "@/api/generated/models"
 import type { JdField, RoleView } from "@/models/target-role-workflow"
 
-import { getRolesActionErrorCode } from "../roles-errors"
+import { getRolesActionErrorCode, type RolesActionErrorCode } from "../roles-errors"
 import { JobDescriptionBulletListEditor } from "./JobDescriptionBulletListEditor"
 
 const qualificationFields = [
@@ -110,7 +110,7 @@ function JobDescriptionAnalysisEditorForm({
   title: string
 }) {
   const { t } = useTranslation()
-  const [saveError, setSaveError] = useState<"requestFailed" | null>(null)
+  const [saveError, setSaveError] = useState<RolesActionErrorCode | null>(null)
   const form = useForm({
     defaultValues: initialValues,
     onSubmit: async ({ value }) => {

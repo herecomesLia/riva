@@ -8,15 +8,18 @@ import {
   restoreTargetRole,
   setActiveTargetRole,
   updateTargetRole,
-  updateTargetRoleJd,
+  updateJd as updateJdRequest,
+  extractJdFromText,
+  getJdExtractionState as getJdExtractionStateRequest,
+  retryJdExtraction as retryJdExtractionRequest,
+  abortJdExtraction as abortJdExtractionRequest,
 } from "@/api/generated/endpoints/target-roles/target-roles"
 import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 import {
   matchResultFixture,
-  parsedJdFixture,
+  extractedJdFixture,
   roleListFixture,
   targetRoleFixture,
-  textRoleFixture,
 } from "@/mocks/fixtures/target-role"
 import { targetRoleFaker } from "@/mocks/fakers/target-role"
 import { getProfile } from "@/services/profile"
@@ -26,8 +29,10 @@ import {
   deleteRole,
   getRoles,
   match,
-  parseJd,
-  pollJd,
+  extractJd,
+  getJdExtractionState,
+  retryJdExtraction,
+  abortJdExtraction,
   pollMatch,
   recognizeRole,
   restoreRole,
@@ -44,19 +49,20 @@ vi.mock("@/api/generated/endpoints/target-roles/target-roles", () => ({
   restoreTargetRole: vi.fn(),
   setActiveTargetRole: vi.fn(),
   updateTargetRole: vi.fn(),
-  updateTargetRoleJd: vi.fn(),
+  updateJd: vi.fn(),
+  extractJdFromText: vi.fn(),
+  getJdExtractionState: vi.fn(),
+  retryJdExtraction: vi.fn(),
+  abortJdExtraction: vi.fn(),
 }))
 
 vi.mock("@/mocks/fakers/target-role", () => ({
   targetRoleFaker: {
     clear: vi.fn(),
-    getJd: vi.fn(),
     getMatch: vi.fn(),
     match: vi.fn(),
-    parseJd: vi.fn(),
-    pollJd: vi.fn(),
     pollMatch: vi.fn(),
-    recognize: vi.fn(),
+    recognizeRole: vi.fn(),
     staleMatch: vi.fn(),
   },
 }))
@@ -67,11 +73,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(listTargetRoles).mockResolvedValue(structuredClone(roleListFixture))
   vi.mocked(getProfile).mockResolvedValue(structuredClone(careerProfileFixture))
-  vi.mocked(targetRoleFaker.getJd).mockImplementation(async (role) =>
-    role.id === targetRoleFixture.id
-      ? { status: "ready", result: structuredClone(role.jd) }
-      : { status: "missing" },
-  )
+  vi.mocked(getJdExtractionStateRequest).mockResolvedValue({ status: "idle", error: null })
   vi.mocked(targetRoleFaker.getMatch).mockResolvedValue({ status: "none" })
 })
 
@@ -95,8 +97,7 @@ describe("roles service", () => {
       activeRoleId: targetRoleFixture.id,
       profile: { exists: true, complete: true },
     })
-    expect(targetRoleFaker.getJd).toHaveBeenCalledTimes(2)
-    expect(targetRoleFaker.pollJd).not.toHaveBeenCalled()
+    expect(getJdExtractionStateRequest).toHaveBeenCalledTimes(2)
     expect(targetRoleFaker.pollMatch).not.toHaveBeenCalled()
   })
 
@@ -141,60 +142,51 @@ describe("roles service", () => {
     expect(targetRoleFaker.clear).not.toHaveBeenCalled()
   })
 
-  it("recognizes fixture data, creates the formal role, and starts JD parsing", async () => {
-    const input = { sourceType: "text", text: "Unstored source text" } as const
-    vi.mocked(targetRoleFaker.recognize).mockResolvedValue(textRoleFixture)
-    vi.mocked(createTargetRole).mockResolvedValue(targetRoleFixture)
-    vi.mocked(targetRoleFaker.parseJd).mockResolvedValue({ status: "parsing" })
-
+  it.each([
+    { sourceType: "text" as const, text: "Job posting" },
+    { sourceType: "image" as const, images: [new File(["posting"], "posting.png")] },
+    { sourceType: "url" as const, url: "https://example.com/jobs/1" },
+  ])("keeps $sourceType creation entirely behind the faker", async (input) => {
+    vi.mocked(targetRoleFaker.recognizeRole).mockResolvedValue(targetRoleFixture)
     await expect(recognizeRole(input)).resolves.toBe(targetRoleFixture)
-    expect(createTargetRole).toHaveBeenCalledWith(textRoleFixture)
-    expect(targetRoleFaker.parseJd).toHaveBeenCalledWith(targetRoleFixture.id, input.text)
+    expect(targetRoleFaker.recognizeRole).toHaveBeenCalledWith(input)
+    expect(createTargetRole).not.toHaveBeenCalled()
+    expect(extractJdFromText).not.toHaveBeenCalled()
   })
 
-  it("persists a completed JD poll through the generated API", async () => {
-    const role = {
-      ...targetRoleFixture,
-      jdState: { status: "parsing" as const },
-      matchState: { status: "none" as const },
-    }
-    const updatedRole = { ...targetRoleFixture, updatedAt: "2026-08-02T08:00:00Z" }
-    vi.mocked(targetRoleFaker.pollJd).mockResolvedValue({
-      status: "ready",
-      result: parsedJdFixture,
+  it("reads the latest JD after an idle state without writing it back", async () => {
+    const updated = structuredClone(roleListFixture)
+    updated.targetRoles[0]!.jd = extractedJdFixture
+    vi.mocked(listTargetRoles).mockResolvedValueOnce(roleListFixture).mockResolvedValueOnce(updated)
+    const response = await getRoles()
+    expect(response.roles[0]?.jdState).toEqual({ status: "ready", result: extractedJdFixture })
+    expect(updateJdRequest).not.toHaveBeenCalled()
+  })
+
+  it("maps an active extraction over the previous saved JD", async () => {
+    vi.mocked(getJdExtractionStateRequest).mockResolvedValue({ status: "queued", error: null })
+    const response = await getRoles()
+    expect(response.roles[0]).toMatchObject({
+      jd: targetRoleFixture.jd,
+      jdState: { status: "extracting", phase: "queued" },
     })
-    vi.mocked(updateTargetRoleJd).mockResolvedValue(updatedRole)
-
-    await expect(pollJd(role)).resolves.toEqual({
-      ...updatedRole,
-      jdState: { status: "ready", result: parsedJdFixture },
-      matchState: { status: "none" },
-    })
-    expect(updateTargetRoleJd).toHaveBeenCalledWith(role.id, parsedJdFixture)
+    expect(listTargetRoles).toHaveBeenCalledTimes(1)
   })
 
-  it("does not write formal JD data when polling has not completed", async () => {
-    const role = {
-      ...targetRoleFixture,
-      jdState: { status: "parsing" as const },
-      matchState: { status: "none" as const },
-    }
-    vi.mocked(targetRoleFaker.pollJd).mockResolvedValue({ status: "parsing" })
-
-    await expect(pollJd(role)).resolves.toMatchObject({ jdState: { status: "parsing" } })
-    expect(updateTargetRoleJd).not.toHaveBeenCalled()
-  })
-
-  it("keeps API-less workflows behind the Faker boundary", async () => {
-    vi.mocked(targetRoleFaker.parseJd).mockResolvedValue({ status: "parsing" })
+  it("delegates extraction lifecycle to generated operations and invalidates matching after accepted writes", async () => {
+    await extractJd(targetRoleFixture.id, "JD text")
+    await retryJdExtraction(targetRoleFixture.id)
+    await abortJdExtraction(targetRoleFixture.id)
+    await getJdExtractionState(targetRoleFixture.id)
+    expect(extractJdFromText).toHaveBeenCalledWith(targetRoleFixture.id, { text: "JD text" })
+    expect(retryJdExtractionRequest).toHaveBeenCalledWith(targetRoleFixture.id)
+    expect(abortJdExtractionRequest).toHaveBeenCalledWith(targetRoleFixture.id)
+    expect(getJdExtractionStateRequest).toHaveBeenCalledWith(targetRoleFixture.id)
+    expect(targetRoleFaker.staleMatch).toHaveBeenCalledTimes(2)
     vi.mocked(targetRoleFaker.match).mockResolvedValue({ status: "generating" })
     vi.mocked(targetRoleFaker.pollMatch).mockResolvedValue({
       status: "current",
       result: matchResultFixture,
-    })
-
-    await expect(parseJd(targetRoleFixture.id, "JD text")).resolves.toEqual({
-      status: "parsing",
     })
     await expect(match(targetRoleFixture.id)).resolves.toEqual({ status: "generating" })
     await expect(pollMatch(targetRoleFixture.id)).resolves.toEqual({
@@ -205,11 +197,11 @@ describe("roles service", () => {
 
   it("marks matching stale after a direct structured-JD update", async () => {
     const input = { responsibilities: ["Updated responsibility"] }
-    vi.mocked(updateTargetRoleJd).mockResolvedValue(targetRoleFixture)
+    vi.mocked(updateJdRequest).mockResolvedValue(targetRoleFixture)
     vi.mocked(targetRoleFaker.staleMatch).mockResolvedValue(undefined)
 
     await expect(updateJd(targetRoleFixture.id, input)).resolves.toBe(targetRoleFixture)
-    expect(updateTargetRoleJd).toHaveBeenCalledWith(targetRoleFixture.id, input)
+    expect(updateJdRequest).toHaveBeenCalledWith(targetRoleFixture.id, input)
     expect(targetRoleFaker.staleMatch).toHaveBeenCalledWith(targetRoleFixture.id)
   })
 })

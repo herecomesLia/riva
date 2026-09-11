@@ -50,7 +50,9 @@ export type RolesViewActions = {
   retryMatchSynchronization: (roleId: string) => Promise<unknown>
   recognizeRole: (input: RecognizeRoleInput) => Promise<TargetRoleResponse>
   restoreRole: (roleId: string) => Promise<unknown>
-  parseJd: (roleId: string, text: string) => Promise<unknown>
+  extractJd: (roleId: string, text: string) => Promise<unknown>
+  retryJdExtraction: (roleId: string) => Promise<unknown>
+  abortJdExtraction: (roleId: string) => Promise<unknown>
   setActiveRole: (roleId: string) => Promise<unknown>
   updateJd: (roleId: string, input: UpdateJobDescriptionRequest) => Promise<unknown>
   updateRole: (roleId: string, input: UpdateTargetRoleRequest) => Promise<unknown>
@@ -266,8 +268,16 @@ function RolesReadyView({
                             void runAction(() => actions.match(selectedRole.id))
                           },
                           retryJdSynchronization: () => {
-                            if (selectedRole.jdState.status !== "parsing") return
+                            if (selectedRole.jdState.status !== "extracting") return
                             void runAction(() => actions.retryJdSynchronization(selectedRole.id))
+                          },
+                          retryJdExtraction: () => {
+                            if (selectedRole.jdState.status !== "failed") return
+                            void runAction(() => actions.retryJdExtraction(selectedRole.id))
+                          },
+                          abortJdExtraction: () => {
+                            if (selectedRole.jdState.status !== "extracting") return
+                            void runAction(() => actions.abortJdExtraction(selectedRole.id))
                           },
                           retryMatchSynchronization: () => {
                             if (selectedRole.matchState.status !== "generating") return
@@ -344,7 +354,7 @@ function RolesReadyView({
             onDirtyChange={handleDirtyChange}
             onOpenChange={(open) => !open && requestCloseEditor()}
             onSave={async (roleId, text) => {
-              await actions.parseJd(roleId, text)
+              await actions.extractJd(roleId, text)
             }}
             onSaved={closeEditor}
             open={isJobDescriptionEditorOpen}

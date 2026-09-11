@@ -112,11 +112,11 @@ export function ProfileProcessingState({
 }: {
   isRetrying?: boolean
   onRetry?: () => void
-  status: "uploadingResume" | "parsingResume"
+  status: "uploadingResume" | "recognizingResume"
   synchronizationError?: "initialRecognition" | "resumeUpdate" | null
 }) {
   const { t } = useTranslation()
-  const stateKey = status === "uploadingResume" ? "uploading" : "parsing"
+  const stateKey = status === "uploadingResume" ? "uploading" : "recognizing"
 
   return (
     <Card data-testid="profile-processing-state">

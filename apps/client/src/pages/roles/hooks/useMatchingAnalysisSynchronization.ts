@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import type { RolesData } from "@/models/target-role-workflow"
 import { pollMatch } from "@/services/roles"
 
-import { ROLES_QUERY_KEY } from "./useJobDescriptionSynchronization"
+import { ROLES_QUERY_KEY } from "./useJdExtractionSynchronization"
 
 export const MATCHING_ANALYSIS_POLL_INTERVAL_MS = 1000
 

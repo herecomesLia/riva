@@ -105,9 +105,10 @@ export const roles = {
   errors: {
     actionTitle: "操作未完成",
     requestFailed: "暂时无法保存本次修改，请稍后重试。表单和现有岗位数据均已保留。",
-    versionConflict: "岗位已在其他位置更新。请关闭表单，查看最新内容后再试。",
+    stateConflict: "当前岗位或任务状态不允许此操作。请查看最新状态后重试。",
   },
   jd: {
+    aborting: "正在取消 JD 解析……",
     cardDescription: "粘贴岗位 JD，并查看结构化解析结果。",
     actions: {
       add: "粘贴岗位 JD",
@@ -117,6 +118,8 @@ export const roles = {
       saveCorrection: "保存修改",
       savingCorrection: "正在保存",
       resynchronize: "重新同步状态",
+      retryExtraction: "重试解析",
+      abortExtraction: "取消解析",
     },
     editor: {
       addTitle: "粘贴岗位 JD",
@@ -133,7 +136,7 @@ export const roles = {
     },
     synchronization: {
       title: "暂时无法获取解析结果",
-      description: "JD 已保存并仍处于解析中。可以重新同步，不会重复创建解析任务。",
+      description: "暂时无法确认解析状态或读取最新 JD。可以重新同步，不会重复创建解析任务。",
     },
     emptyHints: {
       responsibilities: "填写该岗位负责的工作内容与预期成果。",
@@ -217,7 +220,7 @@ export const roles = {
           title: "请先添加岗位 JD",
           description: "保存并解析 JD 后，才能分析岗位要求与档案的匹配情况。",
         },
-        parsing: {
+        extracting: {
           title: "正在等待 JD 解析",
           description: "JD 解析完成后即可生成匹配分析。",
         },
@@ -317,7 +320,7 @@ export const roles = {
       label: "未添加",
       description: "尚未保存岗位 JD。",
     },
-    parsing: {
+    extracting: {
       label: "解析中",
       description: "正在提取职责、技能和业务要求。",
     },
@@ -327,7 +330,7 @@ export const roles = {
     },
     failed: {
       label: "解析失败",
-      description: "请重新提交一份完整 JD。",
+      description: "可以重试解析，或提交新的 JD。",
     },
   },
   matchingAnalysisStatus: {

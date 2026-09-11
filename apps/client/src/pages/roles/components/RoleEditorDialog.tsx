@@ -33,7 +33,7 @@ import type {
 } from "@/api/generated/models"
 import type { RoleView } from "@/models/target-role-workflow"
 
-import { getRolesActionErrorCode } from "../roles-errors"
+import { getRolesActionErrorCode, type RolesActionErrorCode } from "../roles-errors"
 
 export type RoleDraft = {
   title: string
@@ -106,7 +106,7 @@ export function RoleEditorForm({
   role,
 }: Omit<RoleEditorDialogProps, "open"> & { footerStart?: ReactNode; initialDraft?: RoleDraft }) {
   const { t } = useTranslation()
-  const [saveError, setSaveError] = useState<"requestFailed" | null>(null)
+  const [saveError, setSaveError] = useState<RolesActionErrorCode | null>(null)
   const form = useForm({
     defaultValues: initialDraft ?? createRoleDraft(role),
     validators: { onSubmit: roleDraftSchema },

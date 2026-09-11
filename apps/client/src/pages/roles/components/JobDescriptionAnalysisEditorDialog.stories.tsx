@@ -23,7 +23,7 @@ function dialogArgs(
     onOpenChange: fn(),
     onSave: fn(async () => undefined),
     onSaved: fn(),
-    role: createRoleStoryResponse("roleWithParsedJobDescription").roles[0]!,
+    role: createRoleStoryResponse("roleWithExtractedJobDescription").roles[0]!,
   }
 }
 

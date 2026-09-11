@@ -11,7 +11,7 @@ const meta = preview.meta({
 })
 
 export const Recognizing = meta.story({
-  render: () => <ProfileProcessingState status="parsingResume" />,
+  render: () => <ProfileProcessingState status="recognizingResume" />,
 })
 
 export const RecognitionFailure = meta.story({

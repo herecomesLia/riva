@@ -29,22 +29,37 @@ export const Missing = meta.story({
   },
 })
 
-export const Parsing = meta.story({
-  args: { role: roleFor("roleWithJobDescriptionParsing"), synchronizationError: false },
+export const Extracting = meta.story({
+  args: {
+    onAbortExtraction: fn(),
+    role: roleFor("roleWithJobDescriptionExtracting"),
+    synchronizationError: false,
+  },
+})
+
+export const Aborting = meta.story({
+  args: {
+    onAbortExtraction: fn(),
+    role: {
+      ...roleFor("roleWithJobDescriptionExtracting"),
+      jdState: { status: "extracting", phase: "aborting" },
+    },
+    synchronizationError: false,
+  },
 })
 
 export const SynchronizationError = meta.story({
   args: {
     onRetrySynchronization: fn(),
-    role: roleFor("roleWithJobDescriptionParsing"),
+    role: roleFor("roleWithJobDescriptionExtracting"),
     synchronizationError: true,
   },
 })
 
 function SynchronizationRetryHarness() {
-  const parsing = createRoleStoryResponse("roleWithJobDescriptionParsing")
-  const ready = createRoleStoryResponse("roleWithParsedJobDescription")
-  const [role, setRole] = useState<RoleView>(parsing.roles[0]!)
+  const extracting = createRoleStoryResponse("roleWithJobDescriptionExtracting")
+  const ready = createRoleStoryResponse("roleWithExtractedJobDescription")
+  const [role, setRole] = useState<RoleView>(extracting.roles[0]!)
   const [synchronizationError, setSynchronizationError] = useState(true)
   return (
     <JobDescriptionCard
@@ -68,6 +83,7 @@ export const SynchronizationRetry = meta.story({
 
 export const Failed = meta.story({
   args: {
+    onRetryExtraction: fn(),
     onEdit: fn(),
     role: roleFor("roleWithJobDescriptionFailed"),
     synchronizationError: false,
@@ -77,7 +93,7 @@ export const Failed = meta.story({
 export const Ready = meta.story({
   args: {
     onEdit: fn(),
-    role: roleFor("roleWithParsedJobDescription"),
+    role: roleFor("roleWithExtractedJobDescription"),
     synchronizationError: false,
   },
 })
@@ -88,7 +104,7 @@ export const EditAnalysisModule = meta.story({
   args: {
     onEdit: fn(),
     onEditAnalysisModule,
-    role: roleFor("roleWithParsedJobDescription"),
+    role: roleFor("roleWithExtractedJobDescription"),
     synchronizationError: false,
   },
   play: async ({ userEvent }) => {
@@ -109,7 +125,7 @@ export const LongContent = meta.story({
 
 export const InternshipJobDescription = meta.story({
   args: (() => {
-    const role = roleFor("roleWithParsedJobDescription")
+    const role = roleFor("roleWithExtractedJobDescription")
     if (role.jd) {
       role.jd.requirements = {
         ...role.jd.requirements,
@@ -124,7 +140,7 @@ export const InternshipJobDescription = meta.story({
 
 export const CampusJobDescription = meta.story({
   args: (() => {
-    const role = roleFor("roleWithParsedJobDescription")
+    const role = roleFor("roleWithExtractedJobDescription")
     if (role.jd) {
       role.jd.requirements = {
         ...role.jd.requirements,
@@ -140,14 +156,14 @@ export const CampusJobDescription = meta.story({
 export const SocialRecruitmentJobDescription = meta.story({
   args: {
     onEditAnalysisModule: fn(),
-    role: roleFor("roleWithParsedJobDescription"),
+    role: roleFor("roleWithExtractedJobDescription"),
     synchronizationError: false,
   },
 })
 
 export const EmptyOptionalModules = meta.story({
   args: (() => {
-    const role = roleFor("roleWithParsedJobDescription")
+    const role = roleFor("roleWithExtractedJobDescription")
     if (role.jd) {
       role.jd.preferredQualifications = []
       role.jd.softSkills = []

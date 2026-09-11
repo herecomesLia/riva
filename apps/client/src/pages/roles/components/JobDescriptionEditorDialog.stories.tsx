@@ -40,7 +40,7 @@ export const Add = meta.story({
       "Lead reliable product delivery.",
     )
     await userEvent.click(
-      within(dialog).getByRole("button", { name: /保存并解析|save and parse/i }),
+      within(dialog).getByRole("button", { name: /保存并解析|submit and extract/i }),
     )
     await waitFor(() => expect(screen.getByRole("dialog")).toHaveAttribute("data-closed"))
   },
@@ -48,7 +48,7 @@ export const Add = meta.story({
 
 export const Replace = meta.story({
   render: () => (
-    <DialogHarness role={createRoleStoryResponse("roleWithParsedJobDescription").roles[0]!} />
+    <DialogHarness role={createRoleStoryResponse("roleWithExtractedJobDescription").roles[0]!} />
   ),
 })
 
@@ -64,7 +64,7 @@ export const ValidationError = meta.story({
   play: async ({ userEvent }) => {
     const dialog = await screen.findByRole("dialog")
     await userEvent.click(
-      within(dialog).getByRole("button", { name: /保存并解析|save and parse/i }),
+      within(dialog).getByRole("button", { name: /保存并解析|submit and extract/i }),
     )
     await expect(
       within(dialog).findByText(/请粘贴岗位 JD 文本|paste the job description/i),

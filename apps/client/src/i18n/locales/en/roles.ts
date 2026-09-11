@@ -112,12 +112,15 @@ export const roles = {
     actionTitle: "Action not completed",
     requestFailed:
       "We could not save this change. Try again later; your draft and current role data are preserved.",
-    versionConflict:
-      "This role changed elsewhere. Close the form, review the latest version, and try again.",
+    stateConflict:
+      "The current role or task state does not allow this action. Review the latest state and try again.",
   },
   jd: {
+    aborting: "Cancelling JD extraction…",
     cardDescription: "Paste the role JD and review its structured analysis.",
     actions: {
+      retryExtraction: "Retry extraction",
+      abortExtraction: "Cancel extraction",
       add: "Paste job description",
       replace: "Update JD",
       editModule: "Edit",
@@ -133,16 +136,16 @@ export const roles = {
       fieldLabel: "Job description text",
       placeholder: "Paste the full responsibilities, requirements, and preferred qualifications…",
       required: "Paste the job description text.",
-      save: "Save and parse",
+      save: "Submit and extract",
       saving: "Saving",
     },
     failed: {
-      title: "JD parsing did not complete",
+      title: "JD extraction did not complete",
     },
     synchronization: {
-      title: "Unable to retrieve the parsing result",
+      title: "Unable to retrieve the extracting result",
       description:
-        "The JD is saved and remains in parsing. Synchronizing again will not create another parsing job.",
+        "The extraction state or latest JD could not be retrieved. Synchronizing again will not create another extraction task.",
     },
     emptyHints: {
       responsibilities: "Describe the role’s responsibilities and expected outcomes.",
@@ -181,7 +184,7 @@ export const roles = {
     },
     analysisEditor: {
       listDescription:
-        "Edit each item or paste and organize a batch. This does not reparse the JD text.",
+        "Edit each item or paste and organize a batch. This does not run JD extraction again.",
       qualificationsDescription:
         "Edit each item. Qualifications must be required conditions; place preferred conditions under Preferred Qualifications.",
       preferredQualificationsDescription:
@@ -229,11 +232,11 @@ export const roles = {
       jd: {
         missing: {
           title: "Add the job description first",
-          description: "Save and parse the JD before comparing it with your profile.",
+          description: "Submit and extract the JD before comparing it with your profile.",
         },
-        parsing: {
-          title: "Waiting for JD parsing",
-          description: "Match analysis will be available after JD parsing completes.",
+        extracting: {
+          title: "Waiting for JD extraction",
+          description: "Match analysis will be available after JD extraction completes.",
         },
         failed: {
           title: "Submit the job description again",
@@ -304,7 +307,7 @@ export const roles = {
   },
   details: {
     title: "Role details",
-    description: "Review role information, JD parsing, and match-analysis status.",
+    description: "Review role information, JD extraction, and match-analysis status.",
     fields: {
       company: "Company",
       recruitmentType: "Recruitment type",
@@ -333,17 +336,17 @@ export const roles = {
       label: "Not added",
       description: "No job description has been saved yet.",
     },
-    parsing: {
-      label: "Parsing",
+    extracting: {
+      label: "Extracting",
       description: "Extracting responsibilities, skills, and business requirements.",
     },
     ready: {
-      label: "Parsed",
-      description: "The JD has been parsed into structured requirements.",
+      label: "Extracted",
+      description: "The JD has been extracted into structured requirements.",
     },
     failed: {
-      label: "Parsing failed",
-      description: "Submit a complete new JD.",
+      label: "Extraction failed",
+      description: "Retry extraction or submit a new JD.",
     },
   },
   matchingAnalysisStatus: {
@@ -370,7 +373,7 @@ export const roles = {
   },
   empty: {
     title: "No target roles yet",
-    description: "Add your first target role to continue with JD parsing and match analysis.",
+    description: "Add your first target role to continue with JD extraction and match analysis.",
   },
   noSelection: {
     title: "Select a role",

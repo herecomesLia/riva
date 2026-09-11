@@ -28,6 +28,8 @@ export function JobDescriptionCard({
   onEdit,
   onEditAnalysisModule,
   onRetrySynchronization,
+  onRetryExtraction,
+  onAbortExtraction,
   pending,
   role,
   synchronizationError,
@@ -35,6 +37,8 @@ export function JobDescriptionCard({
   onEdit?: () => void
   onEditAnalysisModule?: (field: JdField) => void
   onRetrySynchronization?: () => void
+  onRetryExtraction?: () => void
+  onAbortExtraction?: () => void
   pending?: boolean
   role: RoleView
   synchronizationError: boolean
@@ -70,15 +74,22 @@ export function JobDescriptionCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        {jdState.status === "parsing" && (
-          <ParsingState
+        {jdState.status === "extracting" && (
+          <ExtractingState
+            phase={jdState.phase}
+            onAbortExtraction={onAbortExtraction}
             onRetrySynchronization={onRetrySynchronization}
             pending={pending}
             synchronizationError={synchronizationError}
           />
         )}
         {jdState.status === "failed" && (
-          <FailedState failureReason={jdState.reason} onEdit={onEdit} pending={pending} />
+          <FailedState
+            failureReason={jdState.reason}
+            onEdit={onEdit}
+            onRetryExtraction={onRetryExtraction}
+            pending={pending}
+          />
         )}
         {showSections && (
           <JobDescriptionSections
@@ -92,11 +103,15 @@ export function JobDescriptionCard({
   )
 }
 
-function ParsingState({
+function ExtractingState({
+  phase,
+  onAbortExtraction,
   onRetrySynchronization,
   pending,
   synchronizationError,
 }: {
+  phase: "queued" | "running" | "aborting"
+  onAbortExtraction?: () => void
   onRetrySynchronization?: () => void
   pending?: boolean
   synchronizationError: boolean
@@ -123,8 +138,20 @@ function ParsingState({
     <div className="flex items-center gap-3" aria-live="polite">
       <Spinner />
       <p className="text-sm text-muted-foreground">
-        {t("roles.jobDescriptionStatus.parsing.description")}
+        {phase === "aborting"
+          ? t("roles.jd.aborting")
+          : t("roles.jobDescriptionStatus.extracting.description")}
       </p>
+      {onAbortExtraction && (
+        <Button
+          disabled={pending || phase === "aborting"}
+          onClick={onAbortExtraction}
+          size="sm"
+          variant="outline"
+        >
+          {t("roles.jd.actions.abortExtraction")}
+        </Button>
+      )}
     </div>
   )
 }
@@ -132,10 +159,12 @@ function ParsingState({
 function FailedState({
   failureReason,
   onEdit,
+  onRetryExtraction,
   pending,
 }: {
   failureReason: string
   onEdit?: () => void
+  onRetryExtraction?: () => void
   pending?: boolean
 }) {
   const { t } = useTranslation()
@@ -146,6 +175,12 @@ function FailedState({
         <AlertDescription>{failureReason}</AlertDescription>
       </Alert>
       <div className="flex flex-wrap gap-2">
+        {onRetryExtraction && (
+          <Button disabled={pending} onClick={onRetryExtraction} size="sm" variant="outline">
+            <RefreshCwIcon data-icon="inline-start" />
+            {t("roles.jd.actions.retryExtraction")}
+          </Button>
+        )}
         {onEdit && (
           <Button
             className="border-primary text-primary hover:bg-primary/10 hover:text-primary"

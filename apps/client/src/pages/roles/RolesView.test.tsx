@@ -24,13 +24,15 @@ function createActions(
     deleteRole: vi.fn(async () => data),
     match: vi.fn(async () => data),
     retryJdSynchronization: vi.fn(async () => data),
+    retryJdExtraction: vi.fn(async () => data),
+    abortJdExtraction: vi.fn(async () => data),
     retryMatchSynchronization: vi.fn(async () => data),
     recognizeRole: vi.fn(
       async (_input: RecognizeRoleInput) =>
-        data.roles[0] ?? createRoleStoryResponse("roleWithParsedJobDescription").roles[0]!,
+        data.roles[0] ?? createRoleStoryResponse("roleWithExtractedJobDescription").roles[0]!,
     ),
     restoreRole: vi.fn(async () => data),
-    parseJd: vi.fn(async () => data),
+    extractJd: vi.fn(async () => data),
     setActiveRole: vi.fn(async () => data),
     updateJd: vi.fn(async () => data),
     updateRole: vi.fn(async () => data),
@@ -293,7 +295,7 @@ describe("RolesView", () => {
   })
 
   it("defaults to overview and keeps inactive tab content out of the document", async () => {
-    const data = createRoleStoryResponse("roleWithParsedJobDescription")
+    const data = createRoleStoryResponse("roleWithExtractedJobDescription")
     renderReadyView(data)
 
     expect(await screen.findByTestId("target-role-overview")).toBeInTheDocument()
@@ -858,17 +860,37 @@ describe("RolesView", () => {
     expect(await within(dialog).findByText(i18n.t("roles.jd.editor.required"))).toBeInTheDocument()
   })
 
-  it("shows parsing without exposing structured results early", async () => {
-    const data = createRoleStoryResponse("roleWithJobDescriptionParsing")
-    renderReadyView(data, { initialActiveTab: "job-description" })
+  it.each(["queued", "running", "aborting"] as const)(
+    "shows extraction phase %s without exposing results early",
+    async (phase) => {
+      const user = userEvent.setup()
+      const data = createRoleStoryResponse("roleWithJobDescriptionExtracting")
+      data.roles[0]!.jdState = { status: "extracting", phase }
+      const actions = createActions(data)
+      renderReadyView(data, { actions, initialActiveTab: "job-description" })
 
-    const card = await screen.findByTestId("job-description-card")
-    expect(card).toHaveTextContent(i18n.t("roles.jobDescriptionStatus.parsing.description"))
-    expect(screen.queryByTestId("job-description-analysis")).not.toBeInTheDocument()
-  })
+      const card = await screen.findByTestId("job-description-card")
+      expect(card).toHaveTextContent(
+        i18n.t(
+          phase === "aborting"
+            ? "roles.jd.aborting"
+            : "roles.jobDescriptionStatus.extracting.description",
+        ),
+      )
+      expect(screen.queryByTestId("job-description-analysis")).not.toBeInTheDocument()
+      const cancel = within(card).getByRole("button", {
+        name: i18n.t("roles.jd.actions.abortExtraction"),
+      })
+      if (phase === "aborting") expect(cancel).toBeDisabled()
+      else {
+        await user.click(cancel)
+        expect(actions.abortJdExtraction).toHaveBeenCalledWith(data.roles[0]!.id)
+      }
+    },
+  )
 
   it("keeps a JD synchronization error accessible from the JD tab", async () => {
-    const data = createRoleStoryResponse("roleWithJobDescriptionParsing")
+    const data = createRoleStoryResponse("roleWithJobDescriptionExtracting")
     const role = data.roles[0]!
     renderReadyView(data, {
       initialActiveTab: "job-description",
@@ -883,19 +905,25 @@ describe("RolesView", () => {
   })
 
   it("shows the safe business failure and offers a new JD submission", async () => {
+    const user = userEvent.setup()
     const data = createRoleStoryResponse("roleWithJobDescriptionFailed")
     const role = data.roles[0]!
     if (role.jdState.status !== "failed") throw new Error("Expected a failed JD fixture.")
-    renderReadyView(data, { actions: createActions(data), initialActiveTab: "job-description" })
+    const actions = createActions(data)
+    renderReadyView(data, { actions, initialActiveTab: "job-description" })
 
     const card = await screen.findByTestId("job-description-card")
     expect(card).toHaveTextContent(role.jdState.reason!)
     expect(
       within(card).getByRole("button", { name: i18n.t("roles.jd.actions.replace") }),
     ).toBeEnabled()
+    await user.click(
+      within(card).getByRole("button", { name: i18n.t("roles.jd.actions.retryExtraction") }),
+    )
+    expect(actions.retryJdExtraction).toHaveBeenCalledWith(role.id)
   })
 
-  it("opens an empty JD editor after a parsing failure", async () => {
+  it("opens an empty JD editor after an extraction failure", async () => {
     const user = userEvent.setup()
     const data = createRoleStoryResponse("roleWithJobDescriptionFailed")
     renderReadyView(data, {
@@ -915,7 +943,7 @@ describe("RolesView", () => {
   })
 
   it("renders every structured section for a ready job description", async () => {
-    const data = createRoleStoryResponse("roleWithParsedJobDescription")
+    const data = createRoleStoryResponse("roleWithExtractedJobDescription")
     const analysis = data.roles[0]!.jd!
     renderReadyView(data, { initialActiveTab: "job-description" })
 
@@ -1002,7 +1030,7 @@ describe("RolesView", () => {
 
   it("keeps the bullet-paste editor header and footer fixed around its scrolling content", async () => {
     const user = userEvent.setup()
-    const data = createRoleStoryResponse("roleWithParsedJobDescription")
+    const data = createRoleStoryResponse("roleWithExtractedJobDescription")
     renderReadyView(data, { initialActiveTab: "job-description" })
 
     const moduleTitle = i18n.t("roles.jd.analysis.preferredQualifications")
@@ -1027,7 +1055,7 @@ describe("RolesView", () => {
   })
 
   it("renders only non-empty qualification and skill categories, while keeping preferred items semantic lists", async () => {
-    const data = createRoleStoryResponse("roleWithParsedJobDescription")
+    const data = createRoleStoryResponse("roleWithExtractedJobDescription")
     const analysis = data.roles[0]!.jd!
     analysis.requirements = {
       education: ["本科及以上"],
@@ -1072,7 +1100,7 @@ describe("RolesView", () => {
 
   it("prefills and submits all qualification categories together", async () => {
     const user = userEvent.setup()
-    const data = createRoleStoryResponse("roleWithParsedJobDescription")
+    const data = createRoleStoryResponse("roleWithExtractedJobDescription")
     const updateJd = vi.fn(async () => data)
     renderReadyView(data, {
       actions: createActions(data, { updateJd }),
@@ -1113,7 +1141,7 @@ describe("RolesView", () => {
 
   it("prefills and submits all required-skill categories together", async () => {
     const user = userEvent.setup()
-    const data = createRoleStoryResponse("roleWithParsedJobDescription")
+    const data = createRoleStoryResponse("roleWithExtractedJobDescription")
     const updateJd = vi.fn(async () => data)
     renderReadyView(data, {
       actions: createActions(data, { updateJd }),
@@ -1152,9 +1180,9 @@ describe("RolesView", () => {
     )
   })
 
-  it("does not show structured-module editors while JD parsing is running or failed", async () => {
+  it("does not show structured-module editors while JD extraction is running or failed", async () => {
     for (const scenario of [
-      "roleWithJobDescriptionParsing",
+      "roleWithJobDescriptionExtracting",
       "roleWithJobDescriptionFailed",
     ] as const) {
       const { unmount } = renderReadyView(createRoleStoryResponse(scenario), {
@@ -1171,11 +1199,11 @@ describe("RolesView", () => {
   it("keeps the pasted JD draft when saving fails", async () => {
     const user = userEvent.setup()
     const data = createRoleStoryResponse("singleRoleWithoutJobDescription")
-    const parseJd = vi.fn(async () => {
+    const extractJd = vi.fn(async () => {
       throw new Error("unsafe transport failure")
     })
     renderReadyView(data, {
-      actions: createActions(data, { parseJd }),
+      actions: createActions(data, { extractJd }),
       initialActiveTab: "job-description",
     })
 
@@ -1222,7 +1250,7 @@ describe("RolesView", () => {
 
   it.each([
     ["singleRoleWithoutJobDescription", "missing"],
-    ["roleWithJobDescriptionParsing", "parsing"],
+    ["roleWithJobDescriptionExtracting", "extracting"],
     ["roleWithJobDescriptionFailed", "failed"],
   ] as const)("blocks analysis for %s with the %s JD guidance", async (scenario, status) => {
     const data = createRoleStoryResponse(scenario)
@@ -1271,15 +1299,15 @@ describe("RolesView", () => {
     ).toBeEnabled()
   })
 
-  it("keeps stale results visible while a replacement JD is parsing", async () => {
+  it("keeps stale results visible while a replacement JD is extracting", async () => {
     const data = createRoleStoryResponse("matchingAnalysisStale")
     const analysis = data.roles[0]!.matchState
-    const parsingRole = createRoleStoryResponse("roleWithJobDescriptionParsing").roles[0]!
-    if (analysis?.status !== "stale" || parsingRole.jdState.status !== "parsing") {
-      throw new Error("Expected stale analysis and parsing JD fixtures.")
+    const extractingRole = createRoleStoryResponse("roleWithJobDescriptionExtracting").roles[0]!
+    if (analysis?.status !== "stale" || extractingRole.jdState.status !== "extracting") {
+      throw new Error("Expected stale analysis and extracting JD fixtures.")
     }
     data.roles[0] = {
-      ...parsingRole,
+      ...extractingRole,
       matchState: structuredClone(analysis),
     }
     renderReadyView(data, { initialActiveTab: "matching-analysis" })
@@ -1287,7 +1315,7 @@ describe("RolesView", () => {
     const card = await screen.findByTestId("matching-analysis-card")
     expect(card).toHaveTextContent(i18n.t("roles.matching.stale.title"))
     expect(card).toHaveTextContent(analysis.result.matchedCapabilities[0]!)
-    expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.jd.parsing.title"))
+    expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.jd.extracting.title"))
     expect(
       within(card).queryByRole("button", { name: i18n.t("roles.matching.actions.regenerate") }),
     ).not.toBeInTheDocument()
@@ -1326,7 +1354,7 @@ describe("RolesView", () => {
 
   it("prevents duplicate matching-analysis generation while pending", async () => {
     const user = userEvent.setup()
-    const data = createRoleStoryResponse("roleWithParsedJobDescription")
+    const data = createRoleStoryResponse("roleWithExtractedJobDescription")
     let resolveGeneration!: (response: RolesData) => void
     const match = vi.fn(
       () =>

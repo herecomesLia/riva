@@ -6,9 +6,9 @@ import type {
 } from "@/api/generated/models"
 import type { MatchingAnalysisResult } from "@/models/target-role-workflow"
 
-export const jdFailInput = "__RIVA_MOCK_JD_PARSING_FAILURE__"
+export const jdFailInput = "__RIVA_MOCK_JD_EXTRACTION_FAILURE__"
 
-export const jdFailReason = "We could not extract structured requirements from this JD."
+export const jdFailReason = "Unable to complete the task."
 
 export const textRoleFixture = {
   title: "Senior Frontend Engineer",
@@ -31,7 +31,7 @@ export const urlRoleFixture = {
   location: "Beijing",
 } satisfies CreateTargetRoleRequest
 
-export const parsedJdFixture = {
+export const extractedJdFixture = {
   responsibilities: [
     "Lead frontend architecture for merchant operations products.",
     "Partner with product and design teams to deliver accessible experiences.",
@@ -88,7 +88,7 @@ export const targetRoleFixture = {
   recruitmentTrack: "experienced",
   location: "Shanghai",
   isArchived: false,
-  jd: parsedJdFixture,
+  jd: extractedJdFixture,
   createdAt: "2026-07-15T08:00:00Z",
   updatedAt: "2026-07-15T08:00:00Z",
 } satisfies TargetRoleResponse

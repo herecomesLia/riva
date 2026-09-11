@@ -13,6 +13,8 @@ function createActions(overrides: Partial<RoleDetailsActions> = {}): RoleDetails
     editJd: fn(),
     generateMatch: fn(),
     retryJdSynchronization: fn(),
+    retryJdExtraction: fn(),
+    abortJdExtraction: fn(),
     retryMatchSynchronization: fn(),
     restore: fn(),
     setCurrent: fn(),

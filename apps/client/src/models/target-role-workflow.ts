@@ -14,7 +14,7 @@ export type MatchingAnalysisResult = {
 
 export type JdState =
   | { status: "missing" }
-  | { status: "parsing" }
+  | { status: "extracting"; phase: "queued" | "running" | "aborting" }
   | { status: "ready"; result: JobDescriptionResponse }
   | { status: "failed"; reason: string }
 

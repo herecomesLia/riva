@@ -5,11 +5,16 @@ import {
   getListTargetRolesMockHandler,
   getRestoreTargetRoleMockHandler,
   getSetActiveTargetRoleMockHandler,
-  getUpdateTargetRoleJdMockHandler,
+  getUpdateJdMockHandler,
+  getExtractJdFromTextMockHandler,
+  getGetJdExtractionStateMockHandler,
+  getRetryJdExtractionMockHandler,
+  getAbortJdExtractionMockHandler,
   getUpdateTargetRoleMockHandler,
 } from "@/api/generated/endpoints/target-roles/target-roles.msw"
 import type {
   CreateTargetRoleRequest,
+  JDTextExtractionRequest,
   SetActiveTargetRoleRequest,
   UpdateJobDescriptionRequest,
   UpdateTargetRoleRequest,
@@ -39,8 +44,21 @@ export const targetRoleHandlers = [
   }),
   getArchiveTargetRoleMockHandler(({ params }) => roleFaker.archive(params.targetRoleId as string)),
   getRestoreTargetRoleMockHandler(({ params }) => roleFaker.restore(params.targetRoleId as string)),
-  getUpdateTargetRoleJdMockHandler(async ({ params, request }) => {
+  getUpdateJdMockHandler(async ({ params, request }) => {
     const input = (await request.json()) as UpdateJobDescriptionRequest
     return roleFaker.updateJd(params.targetRoleId as string, input)
   }),
+  getExtractJdFromTextMockHandler(async ({ params, request }) => {
+    const input = (await request.json()) as JDTextExtractionRequest
+    return roleFaker.extractJd(params.targetRoleId as string, input)
+  }),
+  getGetJdExtractionStateMockHandler(({ params }) =>
+    roleFaker.getJdExtractionState(params.targetRoleId as string),
+  ),
+  getRetryJdExtractionMockHandler(({ params }) =>
+    roleFaker.retryJdExtraction(params.targetRoleId as string),
+  ),
+  getAbortJdExtractionMockHandler(({ params }) =>
+    roleFaker.abortJdExtraction(params.targetRoleId as string),
+  ),
 ]

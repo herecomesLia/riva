@@ -18,7 +18,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import type { RoleView } from "@/models/target-role-workflow"
 
-import { getRolesActionErrorCode } from "../roles-errors"
+import { getRolesActionErrorCode, type RolesActionErrorCode } from "../roles-errors"
 
 const jobDescriptionSchema = z.object({ text: z.string().trim().min(1, "required") })
 
@@ -54,7 +54,7 @@ export function JobDescriptionEditorDialog({
         </DialogHeader>
         {role && (
           <JobDescriptionEditorForm
-            key={`${role.id}-${role.jdState.status}`}
+            key={role.id}
             onDirtyChange={onDirtyChange}
             onOpenChange={onOpenChange}
             onSave={onSave}
@@ -81,7 +81,7 @@ function JobDescriptionEditorForm({
   role: RoleView
 }) {
   const { t } = useTranslation()
-  const [saveError, setSaveError] = useState<"requestFailed" | null>(null)
+  const [saveError, setSaveError] = useState<RolesActionErrorCode | null>(null)
   const form = useForm({
     defaultValues: { text: "" },
     validators: { onSubmit: jobDescriptionSchema },

@@ -20,6 +20,8 @@ export type RoleDetailsActions = {
   editJd: () => void
   editJdField: (field: JdField) => void
   retryJdSynchronization: () => void
+  retryJdExtraction: () => void
+  abortJdExtraction: () => void
   generateMatch: () => void
   retryMatchSynchronization: () => void
 }
@@ -110,6 +112,8 @@ export function RoleDetails({
                 onEdit={actions?.editJd}
                 onEditAnalysisModule={actions?.editJdField}
                 onRetrySynchronization={actions?.retryJdSynchronization}
+                onRetryExtraction={actions?.retryJdExtraction}
+                onAbortExtraction={actions?.abortJdExtraction}
                 pending={pending}
                 role={role}
                 synchronizationError={jdSynchronizationError}

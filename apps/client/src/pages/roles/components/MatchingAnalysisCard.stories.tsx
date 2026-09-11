@@ -8,7 +8,7 @@ import { withRouter } from "#storybook/decorators/with-router"
 import {
   createLongMatchingAnalysisResponse,
   createRoleStoryResponse,
-  createStaleWhileParsingResponse,
+  createStaleWhileExtractingResponse,
 } from "../stories/role-story-fixtures"
 import { MatchingAnalysisCard } from "./MatchingAnalysisCard"
 
@@ -33,9 +33,11 @@ export const ProfileIncomplete = meta.story({ args: argsFor("profileIncomplete")
 export const JobDescriptionMissing = meta.story({
   args: argsFor("singleRoleWithoutJobDescription"),
 })
-export const JobDescriptionParsing = meta.story({ args: argsFor("roleWithJobDescriptionParsing") })
+export const JobDescriptionExtracting = meta.story({
+  args: argsFor("roleWithJobDescriptionExtracting"),
+})
 export const None = meta.story({
-  args: { ...argsFor("roleWithParsedJobDescription"), onGenerate: fn() },
+  args: { ...argsFor("roleWithExtractedJobDescription"), onGenerate: fn() },
 })
 export const Generating = meta.story({ args: argsFor("matchingAnalysisGenerating") })
 export const SynchronizationError = meta.story({
@@ -79,12 +81,12 @@ export const Stale = meta.story({
 })
 export const Current = meta.story({ args: argsFor("matchingAnalysisCurrent") })
 
-const staleWhileParsing = createStaleWhileParsingResponse()
+const staleWhileExtracting = createStaleWhileExtractingResponse()
 
-export const StaleWhileJobDescriptionParsing = meta.story({
+export const StaleWhileJobDescriptionExtracting = meta.story({
   args: {
-    profile: staleWhileParsing.profile,
-    role: staleWhileParsing.roles[0]!,
+    profile: staleWhileExtracting.profile,
+    role: staleWhileExtracting.roles[0]!,
     synchronizationError: false,
   },
 })
@@ -119,7 +121,7 @@ function AnalysisFlowHarness({
 }
 
 export const Generate = meta.story({
-  render: () => <AnalysisFlowHarness initialScenario="roleWithParsedJobDescription" />,
+  render: () => <AnalysisFlowHarness initialScenario="roleWithExtractedJobDescription" />,
   play: async ({ userEvent }) => {
     await userEvent.click(
       screen.getByRole("button", { name: /生成匹配分析|generate match analysis/i }),

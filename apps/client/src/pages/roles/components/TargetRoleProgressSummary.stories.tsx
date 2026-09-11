@@ -14,14 +14,16 @@ function argsFor(scenario: Parameters<typeof createRoleStoryResponse>[0]) {
   return { isCurrent: role.id === response.activeRoleId, role }
 }
 
-export const ParsedJobDescription = meta.story({
-  args: argsFor("roleWithParsedJobDescription"),
+export const ExtractedJobDescription = meta.story({
+  args: argsFor("roleWithExtractedJobDescription"),
 })
 export const Complete = meta.story({ args: argsFor("matchingAnalysisCurrent") })
 export const JobDescriptionMissing = meta.story({
   args: argsFor("singleRoleWithoutJobDescription"),
 })
-export const JobDescriptionParsing = meta.story({ args: argsFor("roleWithJobDescriptionParsing") })
+export const JobDescriptionExtracting = meta.story({
+  args: argsFor("roleWithJobDescriptionExtracting"),
+})
 export const MatchingAnalysisGenerating = meta.story({
   args: argsFor("matchingAnalysisGenerating"),
 })
