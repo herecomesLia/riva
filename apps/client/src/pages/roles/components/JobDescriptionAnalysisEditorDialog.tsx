@@ -32,7 +32,6 @@ const qualificationFields = [
   "experience",
   "languages",
   "certifications",
-  "other",
 ] as const satisfies (keyof JobRequirementsRequest)[]
 
 const skillFields = [
@@ -215,7 +214,6 @@ function createRequirements(values: EditorValues): JobRequirementsRequest {
     experience: normalizeItems(values.experience ?? []),
     languages: normalizeItems(values.languages ?? []),
     certifications: normalizeItems(values.certifications ?? []),
-    other: normalizeItems(values.other ?? []),
   }
 }
 

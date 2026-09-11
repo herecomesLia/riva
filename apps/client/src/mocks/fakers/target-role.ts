@@ -40,7 +40,6 @@ const emptyJd = {
     experience: [],
     languages: [],
     certifications: [],
-    other: [],
   },
   hardSkills: {
     programmingLanguages: [],
@@ -97,7 +96,6 @@ function normalizeRequirements(input: JobRequirementsRequest): JobRequirementsRe
     experience: input.experience ?? [],
     languages: input.languages ?? [],
     certifications: input.certifications ?? [],
-    other: input.other ?? [],
   }
 }
 

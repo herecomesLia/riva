@@ -160,7 +160,6 @@ export const roles = {
         experience: "经验",
         languages: "语言",
         certifications: "证书",
-        other: "其他",
       },
       skillCategories: {
         programmingLanguages: "编程语言",

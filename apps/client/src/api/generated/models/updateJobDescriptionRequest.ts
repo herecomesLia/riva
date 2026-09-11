@@ -8,7 +8,7 @@ import type { HardSkillsRequest } from "./hardSkillsRequest"
 import type { JobRequirementsRequest } from "./jobRequirementsRequest"
 
 /**
- * Replace supplied sections in full, without extracting the source JD again.
+ * Replace supplied sections in full, without reparsing the source JD.
  *
  * Omitted sections stay unchanged; null is not accepted. Lists can be cleared
  * with []. Category objects are replaced, not recursively merged: omitted

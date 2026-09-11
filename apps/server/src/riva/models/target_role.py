@@ -44,10 +44,6 @@ class JobRequirements(BaseModel):
         default_factory=list,
         description="Required certificates or professional credentials.",
     )
-    other: list[NonBlankStr] = Field(
-        default_factory=list,
-        description="Other mandatory eligibility conditions not covered by the named categories.",
-    )
 
 
 class HardSkills(BaseModel):

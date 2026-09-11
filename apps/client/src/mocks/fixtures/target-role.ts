@@ -43,7 +43,6 @@ export const extractedJdFixture = {
     experience: ["Five years of frontend engineering experience."],
     languages: ["Professional working proficiency in English."],
     certifications: [],
-    other: [],
   },
   hardSkills: {
     programmingLanguages: ["TypeScript"],
@@ -109,7 +108,6 @@ export const secondaryRoleFixture = {
       experience: [],
       languages: [],
       certifications: [],
-      other: [],
     },
     hardSkills: {
       programmingLanguages: [],

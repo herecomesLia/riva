@@ -68,7 +68,6 @@ describe("targetRoleFaker", () => {
       experience: ["Three years"],
       languages: [],
       certifications: [],
-      other: [],
     })
     expect(withUpdatedJd.jd).toMatchObject({
       responsibilities: targetRoleFixture.jd.responsibilities,

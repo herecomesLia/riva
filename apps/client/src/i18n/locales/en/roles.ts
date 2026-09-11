@@ -170,7 +170,6 @@ export const roles = {
         experience: "Experience",
         languages: "Languages",
         certifications: "Certifications",
-        other: "Other",
       },
       skillCategories: {
         programmingLanguages: "Programming Languages",

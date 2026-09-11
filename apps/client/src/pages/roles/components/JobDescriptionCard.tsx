@@ -229,7 +229,6 @@ function JobDescriptionSections({
             experience: t("roles.jd.analysis.qualificationCategories.experience"),
             languages: t("roles.jd.analysis.qualificationCategories.languages"),
             certifications: t("roles.jd.analysis.qualificationCategories.certifications"),
-            other: t("roles.jd.analysis.qualificationCategories.other"),
           }}
           onEdit={canEditAnalysis ? onEditAnalysisModule : undefined}
           title={t("roles.jd.analysis.qualificationRequirements")}
@@ -333,7 +332,7 @@ function AnalysisCategorizedList({
   title: string
 }) {
   const { t } = useTranslation()
-  const entries = Object.keys(labels).filter((key) => groups[key as keyof typeof groups].length > 0)
+  const entries = Object.entries({ ...groups }).filter(([, items]) => items.length > 0)
   return (
     <AnalysisSection field={field} icon={icon} onEdit={onEdit} title={title}>
       {entries.length === 0 ? (
@@ -342,12 +341,12 @@ function AnalysisCategorizedList({
         </p>
       ) : (
         <dl className="grid grid-cols-[fit-content(40%)_minmax(0,1fr)] gap-x-6 gap-y-3 text-sm leading-6">
-          {entries.map((key) => (
+          {entries.map(([key, items]) => (
             <div className="col-span-2 grid grid-cols-subgrid" key={String(key)}>
               <dt className="min-w-0 wrap-anywhere text-muted-foreground">{labels[key]}</dt>
               <dd className="min-w-0 wrap-anywhere">
                 <ul className="flex flex-col gap-1">
-                  {groups[key as keyof typeof groups].map((item) => (
+                  {items.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>

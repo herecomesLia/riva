@@ -64,9 +64,6 @@ export const getListTargetRolesResponseMock = (
             { length: faker.number.int({ min: 1, max: 10 }) },
             (_, i) => i + 1,
           ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-          other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-            () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-          ),
         },
         hardSkills: {
           programmingLanguages: Array.from(
@@ -159,9 +156,6 @@ export const getCreateTargetRoleResponseMock = (
         { length: faker.number.int({ min: 1, max: 10 }) },
         (_, i) => i + 1,
       ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
     },
     hardSkills: {
       programmingLanguages: Array.from(
@@ -249,9 +243,6 @@ export const getUpdateTargetRoleResponseMock = (
         { length: faker.number.int({ min: 1, max: 10 }) },
         (_, i) => i + 1,
       ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
     },
     hardSkills: {
       programmingLanguages: Array.from(
@@ -339,9 +330,6 @@ export const getArchiveTargetRoleResponseMock = (
         { length: faker.number.int({ min: 1, max: 10 }) },
         (_, i) => i + 1,
       ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
     },
     hardSkills: {
       programmingLanguages: Array.from(
@@ -429,9 +417,6 @@ export const getRestoreTargetRoleResponseMock = (
         { length: faker.number.int({ min: 1, max: 10 }) },
         (_, i) => i + 1,
       ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
     },
     hardSkills: {
       programmingLanguages: Array.from(
@@ -519,9 +504,6 @@ export const getUpdateJdResponseMock = (
         { length: faker.number.int({ min: 1, max: 10 }) },
         (_, i) => i + 1,
       ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
     },
     hardSkills: {
       programmingLanguages: Array.from(

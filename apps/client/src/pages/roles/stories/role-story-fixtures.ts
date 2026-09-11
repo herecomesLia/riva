@@ -30,7 +30,6 @@ const emptyJd = {
     experience: [],
     languages: [],
     certifications: [],
-    other: [],
   },
   hardSkills: {
     programmingLanguages: [],

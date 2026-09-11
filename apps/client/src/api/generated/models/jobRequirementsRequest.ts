@@ -36,9 +36,4 @@ export interface JobRequirementsRequest {
    * @items.minLength 1
    */
   certifications?: string[]
-  /**
-   * Other mandatory eligibility conditions not covered by the named categories.
-   * @items.minLength 1
-   */
-  other?: string[]
 }

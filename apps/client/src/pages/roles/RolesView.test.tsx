@@ -1064,7 +1064,6 @@ describe("RolesView", () => {
       experience: [],
       languages: [],
       certifications: [],
-      other: [],
     }
     analysis.hardSkills = {
       programmingLanguages: ["TypeScript"],
