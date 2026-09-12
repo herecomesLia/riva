@@ -9,16 +9,12 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
 import { authUserFixture } from "@/mocks/fixtures/auth"
-import type { User } from "@/models/auth"
-import { useAuthStore } from "@/stores/auth"
+import { CURRENT_USER_QUERY_KEY } from "@/hooks/use-auth"
 import { createTestQueryClient } from "@/test/query-client"
 import { resetStores } from "@/test/stores"
 
-const userMock = {
-  ...authUserFixture,
-  avatarFallback: "R",
-  avatarUrl: undefined,
-} satisfies User
+const userMock = authUserFixture
+let queryClient = createTestQueryClient()
 
 vi.mock("@/services/training-records", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/services/training-records")>()
@@ -58,7 +54,7 @@ function renderRouterAt(path: string) {
 
   render(
     <I18nextProvider i18n={i18n}>
-      <QueryClientProvider client={createTestQueryClient()}>
+      <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <AppRouter />
         </TooltipProvider>
@@ -70,6 +66,8 @@ function renderRouterAt(path: string) {
 describe("app router auth redirects", () => {
   beforeEach(async () => {
     resetStores()
+    queryClient = createTestQueryClient()
+    queryClient.setQueryData(CURRENT_USER_QUERY_KEY, null)
     await i18n.changeLanguage(defaultLanguage)
   })
 
@@ -90,7 +88,7 @@ describe("app router auth redirects", () => {
   })
 
   it("redirects login to dashboard when signed in", async () => {
-    useAuthStore.getState().setCurrentUser(userMock)
+    queryClient.setQueryData(CURRENT_USER_QUERY_KEY, userMock)
 
     renderRouterAt("/login")
 
@@ -100,7 +98,7 @@ describe("app router auth redirects", () => {
   })
 
   it("renders the authenticated interview session route", async () => {
-    useAuthStore.getState().setCurrentUser(userMock)
+    queryClient.setQueryData(CURRENT_USER_QUERY_KEY, userMock)
 
     renderRouterAt("/interview/session/mock-session")
 
@@ -117,7 +115,7 @@ describe("app router auth redirects", () => {
   })
 
   it("renders the authenticated interview review route", async () => {
-    useAuthStore.getState().setCurrentUser(userMock)
+    queryClient.setQueryData(CURRENT_USER_QUERY_KEY, userMock)
 
     renderRouterAt("/interview/review/mock-session")
 
@@ -134,7 +132,7 @@ describe("app router auth redirects", () => {
   })
 
   it("renders the authenticated targeted-practice history detail route", async () => {
-    useAuthStore.getState().setCurrentUser(userMock)
+    queryClient.setQueryData(CURRENT_USER_QUERY_KEY, userMock)
 
     renderRouterAt("/history/practice/targeted-practice-record-001")
 
@@ -151,7 +149,7 @@ describe("app router auth redirects", () => {
   })
 
   it("renders the authenticated mock-interview history detail route", async () => {
-    useAuthStore.getState().setCurrentUser(userMock)
+    queryClient.setQueryData(CURRENT_USER_QUERY_KEY, userMock)
 
     renderRouterAt("/history/interview/mock-interview-record-001")
 
@@ -169,7 +167,7 @@ describe("app router auth redirects", () => {
 
   it("preserves list filters and pagination across detail navigation and return", async () => {
     const user = userEvent.setup()
-    useAuthStore.getState().setCurrentUser(userMock)
+    queryClient.setQueryData(CURRENT_USER_QUERY_KEY, userMock)
     const historySearch = "?kind=all&targetRoleId=all&timeRange=all&page=2"
 
     renderRouterAt(`/history${historySearch}`)
@@ -198,7 +196,7 @@ describe("app router auth redirects", () => {
 
   it("handles an unknown record ID opened directly and returns to the requested list state", async () => {
     const user = userEvent.setup()
-    useAuthStore.getState().setCurrentUser(userMock)
+    queryClient.setQueryData(CURRENT_USER_QUERY_KEY, userMock)
 
     renderRouterAt(
       "/history/interview/unknown-record?kind=mockInterview&targetRoleId=all&timeRange=last30Days&page=1",

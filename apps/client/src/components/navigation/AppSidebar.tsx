@@ -178,8 +178,8 @@ function AppSidebarUser() {
 
   const userName = currentUser.displayName
   const userDescription = currentUser.username
-  const avatarUrl = currentUser.avatarUrl
-  const avatarFallback = currentUser.avatarFallback
+  const avatarUrl = currentUser.avatarUrl ?? undefined
+  const avatarFallback = (userName.trim() || currentUser.username).charAt(0).toUpperCase()
 
   async function handleSignOut() {
     if (isLoggingOut) {

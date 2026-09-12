@@ -4,15 +4,15 @@ import { StrictMode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { AuthBootstrap } from "@/app/App"
-import { useAuth } from "@/hooks/use-auth"
+import { getCurrentUser } from "@/services/auth"
 import { i18n } from "@/i18n/i18n"
 import { renderWithProviders } from "@/test/render"
 
-vi.mock("@/hooks/use-auth", () => ({
-  useAuth: vi.fn(),
+vi.mock("@/services/auth", () => ({
+  getCurrentUser: vi.fn(),
 }))
 
-const restoreCurrentUserMock = vi.fn<() => Promise<null>>()
+const getCurrentUserMock = vi.mocked(getCurrentUser)
 
 function createDeferred() {
   let resolve!: (value: null) => void
@@ -38,26 +38,18 @@ function renderBootstrap() {
 
 describe("AuthBootstrap", () => {
   beforeEach(() => {
-    restoreCurrentUserMock.mockReset()
-    vi.mocked(useAuth).mockReturnValue({
-      currentUser: null,
-      isAuthenticated: false,
-      login: vi.fn(),
-      logout: vi.fn(),
-      register: vi.fn(),
-      restoreCurrentUser: restoreCurrentUserMock,
-    })
+    getCurrentUserMock.mockReset()
   })
 
   it("holds the router until the startup session restore completes", async () => {
     const request = createDeferred()
-    restoreCurrentUserMock.mockReturnValue(request.promise)
+    getCurrentUserMock.mockReturnValue(request.promise)
 
     renderBootstrap()
 
     expect(screen.getByRole("status")).toHaveTextContent(i18n.t("common.pageState.loading.title"))
     expect(screen.queryByText("App router")).not.toBeInTheDocument()
-    await waitFor(() => expect(restoreCurrentUserMock).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(getCurrentUserMock).toHaveBeenCalledTimes(1))
 
     await act(async () => request.resolve(null))
 
@@ -67,7 +59,7 @@ describe("AuthBootstrap", () => {
   it("shows a safe retry state when restoration fails", async () => {
     const user = userEvent.setup()
     const retry = createDeferred()
-    restoreCurrentUserMock
+    getCurrentUserMock
       .mockRejectedValueOnce(new Error("database unavailable"))
       .mockReturnValueOnce(retry.promise)
 
@@ -87,6 +79,6 @@ describe("AuthBootstrap", () => {
     await act(async () => retry.resolve(null))
 
     expect(await screen.findByText("App router")).toBeInTheDocument()
-    expect(restoreCurrentUserMock).toHaveBeenCalledTimes(2)
+    expect(getCurrentUserMock).toHaveBeenCalledTimes(2)
   })
 })

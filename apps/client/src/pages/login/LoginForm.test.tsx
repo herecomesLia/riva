@@ -74,13 +74,12 @@ function getPasswordInput() {
 describe("LoginForm", () => {
   beforeEach(() => {
     loginMock.mockReset()
-    vi.mocked(useAuth).mockReturnValue({
+    vi.mocked(useAuth, { partial: true }).mockReturnValue({
       currentUser: null,
       isAuthenticated: false,
       login: loginMock,
       logout: vi.fn(),
       register: vi.fn(),
-      restoreCurrentUser: vi.fn(),
     })
   })
 

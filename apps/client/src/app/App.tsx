@@ -1,5 +1,5 @@
 import { AlertCircleIcon } from "lucide-react"
-import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from "react"
+import type { PropsWithChildren } from "react"
 import { useTranslation } from "react-i18next"
 
 import { AppProviders } from "./providers"
@@ -9,37 +9,15 @@ import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/comp
 import { Spinner } from "@/components/ui/spinner"
 import { useAuth } from "@/hooks/use-auth"
 
-type AuthBootstrapStatus = "restoring" | "ready" | "error"
-
 export function AuthBootstrap({ children }: PropsWithChildren) {
   const { t } = useTranslation()
-  const { restoreCurrentUser } = useAuth()
-  const started = useRef(false)
-  const [status, setStatus] = useState<AuthBootstrapStatus>("restoring")
+  const { isError, isPending, retry } = useAuth()
 
-  const restore = useCallback(async () => {
-    setStatus("restoring")
-
-    try {
-      await restoreCurrentUser()
-      setStatus("ready")
-    } catch {
-      setStatus("error")
-    }
-  }, [restoreCurrentUser])
-
-  useEffect(() => {
-    if (started.current) return
-
-    started.current = true
-    void restore()
-  }, [restore])
-
-  if (status === "ready") {
+  if (!isPending && !isError) {
     return children
   }
 
-  if (status === "error") {
+  if (isError) {
     return (
       <main className="flex min-h-svh items-center justify-center bg-background p-6">
         <Card className="w-full max-w-md" role="alert">
@@ -51,7 +29,7 @@ export function AuthBootstrap({ children }: PropsWithChildren) {
             <CardDescription>{t("common.pageState.error.description")}</CardDescription>
           </CardHeader>
           <CardFooter>
-            <Button onClick={() => void restore()}>{t("common.pageState.error.retry")}</Button>
+            <Button onClick={() => void retry()}>{t("common.pageState.error.retry")}</Button>
           </CardFooter>
         </Card>
       </main>

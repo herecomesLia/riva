@@ -6,20 +6,17 @@ import { AppShell } from "@/components/layout/AppShell"
 import { i18n } from "@/i18n/i18n"
 import { defaultLanguage } from "@/i18n/resources"
 import { authUserFixture } from "@/mocks/fixtures/auth"
-import type { User } from "@/models/auth"
-import { useAuthStore } from "@/stores/auth"
+import { CURRENT_USER_QUERY_KEY } from "@/hooks/use-auth"
+import { createTestQueryClient } from "@/test/query-client"
 import { renderWithProviders } from "@/test/render"
 import { resetStores } from "@/test/stores"
 
-const userMock = {
-  ...authUserFixture,
-  avatarFallback: "R",
-  avatarUrl: undefined,
-} satisfies User
+const userMock = authUserFixture
 
 vi.mock("@/services/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/auth")>()),
   logout: vi.fn(),
+  getCurrentUser: vi.fn(async () => null),
 }))
 
 function t(key: string) {
@@ -122,12 +119,14 @@ describe("AppShell", () => {
     expect(await screen.findByRole("heading", { name: today })).toBeInTheDocument()
   })
 
-  it("clears auth store and navigates to login after sign out", async () => {
+  it("clears the current-user query and navigates to login after sign out", async () => {
     const user = userEvent.setup()
     const { logout } = await import("@/services/auth")
     vi.mocked(logout).mockResolvedValue()
-    useAuthStore.getState().setCurrentUser(userMock)
+    const queryClient = createTestQueryClient()
+    queryClient.setQueryData(CURRENT_USER_QUERY_KEY, userMock)
     const { router } = renderWithProviders(<AppShell />, {
+      queryClient,
       router: {
         initialEntries: ["/dashboard"],
       },
@@ -141,9 +140,7 @@ describe("AppShell", () => {
     await user.click(await screen.findByText(t("appShell.signOut")))
 
     await waitFor(() => {
-      expect(useAuthStore.getState()).toMatchObject({
-        currentUser: null,
-      })
+      expect(queryClient.getQueryData(CURRENT_USER_QUERY_KEY)).toBeNull()
       expect(router?.state.location.pathname).toBe("/login")
     })
   })

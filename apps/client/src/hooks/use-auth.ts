@@ -1,51 +1,62 @@
-import { useCallback } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 
+import type { UserResponse } from "@/api/generated/models"
 import * as authService from "@/services/auth"
-import { useAuthStore } from "@/stores/auth"
+
+export const CURRENT_USER_QUERY_KEY = ["auth", "current-user"] as const
 
 export function useAuth() {
-  const currentUser = useAuthStore((state) => state.currentUser)
-  const clearCurrentUser = useAuthStore((state) => state.clearCurrentUser)
-  const setCurrentUser = useAuthStore((state) => state.setCurrentUser)
+  const queryClient = useQueryClient()
+  const currentUserQuery = useQuery({
+    queryKey: CURRENT_USER_QUERY_KEY,
+    queryFn: ({ signal }) => authService.getCurrentUser(signal),
+    retry: false,
+    staleTime: Infinity,
+  })
+  const currentUser = currentUserQuery.data ?? null
   const isAuthenticated = currentUser !== null
+
+  async function resetSession(user: UserResponse | null) {
+    await queryClient.cancelQueries()
+    const authQuery = queryClient.getQueryCache().find({
+      queryKey: CURRENT_USER_QUERY_KEY,
+      exact: true,
+    })
+    queryClient.removeQueries({ predicate: (query) => query !== authQuery })
+    queryClient.setQueryData(CURRENT_USER_QUERY_KEY, user)
+  }
 
   async function login(input: authService.LoginCredentials) {
     const user = await authService.login(input)
 
-    setCurrentUser(user)
+    await resetSession(user)
     return user
   }
 
   async function logout() {
     await authService.logout()
-    clearCurrentUser()
+    await resetSession(null)
   }
 
   async function register(input: authService.RegisterCredentials) {
     const user = await authService.register(input)
 
-    setCurrentUser(user)
+    await resetSession(user)
     return user
   }
 
-  const restoreCurrentUser = useCallback(async () => {
-    const restoredUser = await authService.restoreCurrentUser()
-
-    if (restoredUser) {
-      setCurrentUser(restoredUser)
-      return restoredUser
-    }
-
-    clearCurrentUser()
-    return null
-  }, [clearCurrentUser, setCurrentUser])
+  async function retry() {
+    await currentUserQuery.refetch()
+  }
 
   return {
     currentUser,
     isAuthenticated,
+    isError: currentUserQuery.isError,
+    isPending: currentUserQuery.isPending,
     login,
     logout,
     register,
-    restoreCurrentUser,
+    retry,
   }
 }

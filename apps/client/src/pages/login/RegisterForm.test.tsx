@@ -60,13 +60,12 @@ function submit() {
 describe("RegisterForm", () => {
   beforeEach(async () => {
     registerMock.mockReset()
-    vi.mocked(useAuth).mockReturnValue({
+    vi.mocked(useAuth, { partial: true }).mockReturnValue({
       currentUser: null,
       isAuthenticated: false,
       login: vi.fn(),
       logout: vi.fn(),
       register: registerMock,
-      restoreCurrentUser: vi.fn(),
     })
     await i18n.changeLanguage(defaultLanguage)
   })
@@ -112,7 +111,7 @@ describe("RegisterForm", () => {
   it("submits only the API credentials and reports success", async () => {
     const user = userEvent.setup()
     registerMock.mockResolvedValue({
-      avatarFallback: "N",
+      avatarUrl: null,
       displayName: validCredentials.username,
       id: "00000000-0000-4000-8000-000000000001",
       username: validCredentials.username,
