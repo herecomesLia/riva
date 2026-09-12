@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import type {
   EvaluatingSession,
@@ -23,14 +22,17 @@ export function PracticeFollowUpReview({ exchanges, completion }: Props) {
   if (exchanges.length === 0 && !unanswered) return null
 
   return (
-    <Card className="min-w-0" data-testid="practice-follow-up-review">
-      <CardHeader>
-        <CardTitle>
-          <h2>{t("practice.followUpReview.title")}</h2>
-        </CardTitle>
-        <CardDescription>{t("practice.followUpReview.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex min-w-0 flex-col gap-5">
+    <section
+      className="flex min-w-0 flex-col gap-4 border-t pt-6"
+      data-testid="practice-follow-up-review"
+    >
+      <div className="flex flex-col gap-1">
+        <h3 className="font-heading font-medium">{t("practice.followUpReview.title")}</h3>
+        <p className="text-sm leading-6 text-muted-foreground">
+          {t("practice.followUpReview.description")}
+        </p>
+      </div>
+      <div className="flex min-w-0 flex-col gap-5 divide-y">
         {exchanges.map((exchange, index) => (
           <FollowUpReviewItem
             answer={exchange.answer.content}
@@ -42,8 +44,8 @@ export function PracticeFollowUpReview({ exchanges, completion }: Props) {
         {unanswered ? (
           <FollowUpReviewItem question={unanswered} order={exchanges.length + 1} />
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }
 
@@ -61,17 +63,17 @@ function FollowUpReviewItem({
   const reference = question.referenceAnswer
 
   return (
-    <article className="flex min-w-0 flex-col gap-4 rounded-lg border p-4">
+    <article className="flex min-w-0 flex-col gap-4 not-first:pt-5">
       <div className="flex min-w-0 flex-col gap-2">
-        <h3 className="font-heading font-medium">
+        <h4 className="font-heading font-medium">
           {t("practice.followUpReview.followUpNumber", { count: order })}
-        </h3>
+        </h4>
         <p className="break-words text-sm leading-6 [overflow-wrap:anywhere]">{question.prompt}</p>
       </div>
       <section className="flex min-w-0 flex-col gap-2">
-        <h4 className="font-heading text-sm font-medium">
+        <h5 className="font-heading text-sm font-medium">
           {t("practice.followUpReview.yourAnswer")}
-        </h4>
+        </h5>
         <p className="break-words text-sm leading-6 [overflow-wrap:anywhere]">
           {answer ?? t("practice.followUpAssistance.unanswered")}
         </p>
@@ -80,13 +82,15 @@ function FollowUpReviewItem({
         <Collapsible onOpenChange={setExpanded} open={expanded}>
           <div className="flex min-w-0 flex-col gap-3">
             <section className="flex min-w-0 flex-col gap-2">
-              <h4 className="font-heading text-sm font-medium">
+              <h5 className="font-heading text-sm font-medium">
                 {t("practice.followUpReview.assistanceUsed")}
-              </h4>
+              </h5>
               <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">
-                  {t(`practice.followUpAssistance.kind.${reference.content.kind}`)}
-                </Badge>
+                {reference.content.kind === "technicalReference" && (
+                  <Badge variant="secondary">
+                    {t("practice.followUpAssistance.kind.technicalReference")}
+                  </Badge>
+                )}
                 <Badge variant="outline">
                   {reference.viewedBeforeSubmission
                     ? t("practice.followUpAssistance.viewedBeforeSubmission")
@@ -135,7 +139,7 @@ function FollowUpReviewItem({
 function ReviewList({ items, title }: { items: string[]; title: string }) {
   return (
     <section className="flex flex-col gap-2">
-      <h4 className="font-heading text-sm font-medium">{title}</h4>
+      <h5 className="font-heading text-sm font-medium">{title}</h5>
       <ul className="list-disc pl-5 text-sm leading-6">
         {items.map((item) => (
           <li key={item}>{item}</li>

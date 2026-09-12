@@ -162,6 +162,11 @@ export const practice = {
     requestErrorDescription: "你的追问草稿仍然保留，请稍后重试。",
     unavailable: "内容暂不可用。",
   },
+  questionReview: {
+    title: "问题复盘",
+    description: "从主问题到追问，对照参考回答回顾表达方式与知识覆盖。",
+    mainQuestion: "主问题复盘",
+  },
   followUpReview: {
     title: "追问复盘",
     description: "逐题回看补充内容、作答辅助使用情况与 RIVA 参考补充。",

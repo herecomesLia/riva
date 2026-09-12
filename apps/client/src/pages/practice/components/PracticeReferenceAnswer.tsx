@@ -49,7 +49,6 @@ export function PracticeReferenceAnswer(props: Props) {
   const [confirmationOpen, setConfirmationOpen] = useState(false)
   const [requestError, setRequestError] = useState(false)
   const requestLock = useRef(false)
-  const [expanded, setExpanded] = useState(mode === "answering")
 
   async function confirmRequest() {
     if (mode !== "answering" || requestLock.current || isPending) return
@@ -101,61 +100,7 @@ export function PracticeReferenceAnswer(props: Props) {
           </Button>
         )}
 
-        {state.status === "unavailable" && (
-          <p className="text-sm text-muted-foreground" role="status">
-            {t("practice.referenceAnswer.unavailable")}
-          </p>
-        )}
-
-        {state.status === "revealed" && (
-          <Collapsible onOpenChange={setExpanded} open={expanded}>
-            <div className="flex min-w-0 flex-col gap-4">
-              <div className="flex flex-wrap items-center gap-2" aria-live="polite">
-                <Badge variant="secondary">
-                  {t(`practice.referenceAnswer.kind.${state.content.kind}`)}
-                </Badge>
-                {state.viewedBeforeSubmission && (
-                  <Badge variant="outline">
-                    {assistedRetry
-                      ? t("practice.referenceAnswer.assistedRetry")
-                      : t("practice.referenceAnswer.viewedBeforeSubmission")}
-                  </Badge>
-                )}
-              </div>
-              {mode !== "answering" && (
-                <CollapsibleTrigger
-                  render={<Button size="sm" variant="outline" />}
-                  aria-label={
-                    expanded
-                      ? t("practice.referenceAnswer.collapse")
-                      : t("practice.referenceAnswer.expand")
-                  }
-                >
-                  <ChevronDownIcon data-icon="inline-start" />
-                  {expanded
-                    ? t("practice.referenceAnswer.collapse")
-                    : t("practice.referenceAnswer.expand")}
-                </CollapsibleTrigger>
-              )}
-              <CollapsibleContent>
-                <div className="flex min-w-0 flex-col gap-5 break-words [overflow-wrap:anywhere]">
-                  <p className="whitespace-pre-wrap text-sm leading-7">{state.content.answer}</p>
-                  <ReferenceList
-                    items={state.content.keyPoints}
-                    title={t("practice.referenceAnswer.keyPoints")}
-                  />
-                  <ReferenceList
-                    items={state.content.commonMistakes}
-                    title={t("practice.referenceAnswer.commonMistakes")}
-                  />
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    {t(`practice.referenceAnswer.disclaimer.${state.content.kind}`)}
-                  </p>
-                </div>
-              </CollapsibleContent>
-            </div>
-          </Collapsible>
-        )}
+        <PracticeReferenceAnswerContent assistedRetry={assistedRetry} mode={mode} state={state} />
       </CardContent>
 
       <AlertDialog onOpenChange={setConfirmationOpen} open={confirmationOpen}>
@@ -183,10 +128,100 @@ export function PracticeReferenceAnswer(props: Props) {
   )
 }
 
-function ReferenceList({ items, title }: { items: string[]; title: string }) {
+export function PracticeReferenceAnswerContent({
+  state,
+  mode,
+  assistedRetry = false,
+  headingLevel = "h3",
+}: {
+  state: ReferenceAnswerState
+  mode: "answering" | "review" | "readonly"
+  assistedRetry?: boolean
+  headingLevel?: "h3" | "h4"
+}) {
+  const { t } = useTranslation()
+  const [expanded, setExpanded] = useState(mode === "answering")
+  const showKindBadge = mode !== "review" || state.content?.kind === "technicalReference"
+
+  return (
+    <>
+      {state.status === "unavailable" && (
+        <p className="text-sm text-muted-foreground" role="status">
+          {t("practice.referenceAnswer.unavailable")}
+        </p>
+      )}
+
+      {state.status === "revealed" && (
+        <Collapsible onOpenChange={setExpanded} open={expanded}>
+          <div className="flex min-w-0 flex-col gap-4">
+            {(showKindBadge || state.viewedBeforeSubmission) && (
+              <div className="flex flex-wrap items-center gap-2" aria-live="polite">
+                {showKindBadge && (
+                  <Badge variant="secondary">
+                    {t(`practice.referenceAnswer.kind.${state.content.kind}`)}
+                  </Badge>
+                )}
+                {state.viewedBeforeSubmission && (
+                  <Badge variant="outline">
+                    {assistedRetry
+                      ? t("practice.referenceAnswer.assistedRetry")
+                      : t("practice.referenceAnswer.viewedBeforeSubmission")}
+                  </Badge>
+                )}
+              </div>
+            )}
+            {mode !== "answering" && (
+              <CollapsibleTrigger
+                render={<Button size="sm" variant="outline" />}
+                aria-label={
+                  expanded
+                    ? t("practice.referenceAnswer.collapse")
+                    : t("practice.referenceAnswer.expand")
+                }
+              >
+                <ChevronDownIcon data-icon="inline-start" />
+                {expanded
+                  ? t("practice.referenceAnswer.collapse")
+                  : t("practice.referenceAnswer.expand")}
+              </CollapsibleTrigger>
+            )}
+            <CollapsibleContent>
+              <div className="flex min-w-0 flex-col gap-5 break-words [overflow-wrap:anywhere]">
+                <p className="whitespace-pre-wrap text-sm leading-7">{state.content.answer}</p>
+                <ReferenceList
+                  heading={headingLevel}
+                  items={state.content.keyPoints}
+                  title={t("practice.referenceAnswer.keyPoints")}
+                />
+                <ReferenceList
+                  heading={headingLevel}
+                  items={state.content.commonMistakes}
+                  title={t("practice.referenceAnswer.commonMistakes")}
+                />
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {t(`practice.referenceAnswer.disclaimer.${state.content.kind}`)}
+                </p>
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
+      )}
+    </>
+  )
+}
+
+function ReferenceList({
+  items,
+  title,
+  heading: Heading,
+}: {
+  items: string[]
+  title: string
+  heading: "h3" | "h4"
+}) {
   return (
     <section className="flex min-w-0 flex-col gap-2">
-      <h3 className="font-heading text-sm font-medium">{title}</h3>
+      <Heading className="font-heading text-sm font-medium">{title}</Heading>
       <ul className="list-disc pl-5 text-sm leading-6">
         {items.map((item) => (
           <li className="break-words [overflow-wrap:anywhere]" key={item}>

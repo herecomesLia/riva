@@ -173,6 +173,12 @@ export const practice = {
     requestErrorDescription: "Your follow-up draft is still here. Please try again shortly.",
     unavailable: "Content is temporarily unavailable.",
   },
+  questionReview: {
+    title: "Question review",
+    description:
+      "Review your expression and knowledge coverage with references for the main question and follow-ups.",
+    mainQuestion: "Main question review",
+  },
   followUpReview: {
     title: "Follow-up review",
     description: "Review each supplement, assistance usage, and RIVA reference supplement.",

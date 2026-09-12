@@ -53,7 +53,7 @@ import { PracticeSessionHeader } from "./components/PracticeSessionHeader"
 import { PracticeConversationTimeline } from "./components/PracticeConversationTimeline"
 import { PracticeFollowUpComposer } from "./components/PracticeFollowUpComposer"
 import { PracticeFollowUpAssistance } from "./components/PracticeFollowUpAssistance"
-import { PracticeFollowUpReview } from "./components/PracticeFollowUpReview"
+import { PracticeQuestionReview } from "./components/PracticeQuestionReview"
 import { PracticeEvaluationStatus } from "./components/PracticeEvaluationStatus"
 import { PracticeScoreOverview } from "./components/PracticeScoreOverview"
 import { PracticeDimensionScores } from "./components/PracticeDimensionScores"
@@ -470,13 +470,13 @@ function PracticeReviewView({
         mainAnswer={session.mainAnswer}
         question={session.question}
       />
-      <PracticeFollowUpReview
-        completion={session.followUpCompletion}
-        exchanges={session.followUps}
+      <PracticeQuestionReview
+        question={session.question}
+        followUpCompletion={session.followUpCompletion}
+        followUps={session.followUps}
       />
       <PracticeDimensionScores scores={session.evaluation.dimensionScores} />
       <PracticeReviewSummary review={session.review} />
-      <PracticeReferenceAnswer mode="review" state={session.question.referenceAnswer} />
       <PracticeReusableStructure items={session.review.reusableAnswerStructure} />
       <PracticeWeaknesses items={session.review.exposedWeaknesses} />
       <PracticeRecommendationCard recommendation={session.review.recommendation} />
