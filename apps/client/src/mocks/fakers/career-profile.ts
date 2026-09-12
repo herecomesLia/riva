@@ -13,8 +13,8 @@ import {
   careerProfileFixture,
   resumeImportedCareerProfileFixture,
 } from "@/mocks/fixtures/career-profile"
+import type { ResumeImportInput } from "@/mocks/models/profile"
 import { createMockApiError } from "@/mocks/utils"
-import type { ResumeImportInput } from "@/models/resume"
 
 const createdAt = "2025-01-15T08:00:00Z"
 const updatedAt = "2025-02-01T08:00:00Z"
