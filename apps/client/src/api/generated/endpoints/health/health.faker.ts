@@ -4,16 +4,15 @@
  * Riva API
  * OpenAPI spec version: 0.1.0
  */
-import { faker } from "@faker-js/faker"
-
-import { HealthStatus, ServiceHealthStatus } from "../../models"
 import type { HealthResponse } from "../../models"
+
+import { getHealthStatusMock, getServiceHealthStatusMock } from "../../models/index.faker"
 
 export const getCheckHealthResponseMock = (
   overrideResponse: Partial<Extract<HealthResponse, object>> = {},
 ): HealthResponse => ({
-  status: faker.helpers.arrayElement(Object.values(ServiceHealthStatus)),
-  database: faker.helpers.arrayElement(Object.values(HealthStatus)),
-  llm: faker.helpers.arrayElement(Object.values(HealthStatus)),
+  status: getServiceHealthStatusMock(),
+  database: getHealthStatusMock(),
+  llm: getHealthStatusMock(),
   ...overrideResponse,
 })

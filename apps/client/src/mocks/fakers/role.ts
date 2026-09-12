@@ -1,6 +1,6 @@
 import { ApiError } from "@/api/error"
-import { getCareerProfile } from "@/api/generated/endpoints/career-profile/career-profile"
-import { listRoles, getJdExtractionState } from "@/api/generated/endpoints/roles/roles"
+import { getCareerProfileApi } from "@/api/generated/endpoints/career-profile/career-profile"
+import { getRolesApi } from "@/api/generated/endpoints/roles/roles"
 import { hasJobDescription } from "@/lib/job-description"
 import { isCareerProfileComplete } from "@/lib/career-profile"
 import type {
@@ -63,6 +63,9 @@ const emptyJd = {
 const JD_QUEUE_DURATION_MS = 500
 const JD_PROCESSING_DURATION_MS = 2000
 const JD_ABORT_DURATION_MS = 500
+
+const careerProfileApi = getCareerProfileApi()
+const rolesApi = getRolesApi()
 
 type JdExtractionMock = {
   startedAt: number
@@ -191,10 +194,10 @@ export function createRoleFaker(initialState: RoleListResponse) {
 
   // Provisional matching API: prerequisites are aggregated here, not by the Role UI.
   async function getMatch(roleId: string): Promise<MatchingAnalysisState> {
-    const task = await getJdExtractionState(roleId)
+    const task = await rolesApi.getJdExtractionState(roleId)
     const [roles, profile] = await Promise.all([
-      listRoles(),
-      getCareerProfile().catch((error: unknown) => {
+      rolesApi.listRoles(),
+      careerProfileApi.getCareerProfile().catch((error: unknown) => {
         if (error instanceof ApiError && error.code === "resource.not_found") return null
         throw error
       }),

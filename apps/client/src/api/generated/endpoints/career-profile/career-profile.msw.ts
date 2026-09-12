@@ -92,7 +92,7 @@ export const getUpdateCareerProfileMockHandler = (
     options,
   )
 }
-export const getCareerProfileMock = () => [
+export const getCareerProfileApiMock = () => [
   getGetCareerProfileMockHandler(),
   getCreateCareerProfileMockHandler(),
   getUpdateCareerProfileMockHandler(),

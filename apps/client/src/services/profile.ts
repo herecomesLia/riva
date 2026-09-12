@@ -1,16 +1,14 @@
 import { ApiError } from "@/api/error"
-import {
-  createCareerProfile,
-  getCareerProfile,
-  updateCareerProfile,
-} from "@/api/generated/endpoints/career-profile/career-profile"
+import { getCareerProfileApi } from "@/api/generated/endpoints/career-profile/career-profile"
 import type { CareerProfileResponse, UpdateCareerProfileRequest } from "@/api/generated/models"
 import { careerProfileFaker } from "@/mocks/fakers/career-profile"
 import type { ResumeImportInput } from "@/mocks/models/profile"
 
+const careerProfileApi = getCareerProfileApi()
+
 export async function getProfile(): Promise<CareerProfileResponse | null> {
   try {
-    return await getCareerProfile()
+    return await careerProfileApi.getCareerProfile()
   } catch (error) {
     if (error instanceof ApiError && error.code === "resource.not_found") {
       return null
@@ -20,11 +18,11 @@ export async function getProfile(): Promise<CareerProfileResponse | null> {
 }
 
 export function createProfile(): Promise<CareerProfileResponse> {
-  return createCareerProfile({})
+  return careerProfileApi.createCareerProfile({})
 }
 
 export function updateProfile(input: UpdateCareerProfileRequest): Promise<CareerProfileResponse> {
-  return updateCareerProfile(input)
+  return careerProfileApi.updateCareerProfile(input)
 }
 
 export function importResume(input: ResumeImportInput): Promise<CareerProfileResponse> {

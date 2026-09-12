@@ -6,7 +6,6 @@
  */
 import { faker } from "@faker-js/faker"
 
-import { RecruitmentTrack, TaskErrorCode } from "../../models"
 import type {
   RoleListResponse,
   RoleResponse,
@@ -14,98 +13,19 @@ import type {
   TaskStatusResponse,
 } from "../../models"
 
+import {
+  getJobDescriptionResponseMock,
+  getRecruitmentTrackMock,
+  getRoleResponseMock,
+  getTaskFailureResponseMock,
+  getTaskStatusResponseMock,
+} from "../../models/index.faker"
+
 export const getListRolesResponseMock = (
   overrideResponse: Partial<Extract<RoleListResponse, object>> = {},
 ): RoleListResponse => ({
   roles: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({
-    id: faker.string.uuid(),
-    title: faker.string.alpha({ length: { min: 10, max: 20 } }),
-    company: faker.helpers.arrayElement([
-      faker.string.alpha({ length: { min: 10, max: 20 } }),
-      null,
-    ]),
-    recruitmentTrack: faker.helpers.arrayElement([
-      faker.helpers.arrayElement(Object.values(RecruitmentTrack)),
-      null,
-    ]),
-    location: faker.helpers.arrayElement([
-      faker.string.alpha({ length: { min: 10, max: 20 } }),
-      null,
-    ]),
-    isArchived: faker.datatype.boolean(),
-    jd: {
-      responsibilities: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      requirements: {
-        education: Array.from(
-          { length: faker.number.int({ min: 1, max: 10 }) },
-          (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-        graduationCohorts: Array.from(
-          { length: faker.number.int({ min: 1, max: 10 }) },
-          (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-        majors: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-          () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        experience: Array.from(
-          { length: faker.number.int({ min: 1, max: 10 }) },
-          (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-        languages: Array.from(
-          { length: faker.number.int({ min: 1, max: 10 }) },
-          (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-        certifications: Array.from(
-          { length: faker.number.int({ min: 1, max: 10 }) },
-          (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      },
-      hardSkills: {
-        programmingLanguages: Array.from(
-          { length: faker.number.int({ min: 1, max: 10 }) },
-          (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-        frameworksAndLibraries: Array.from(
-          { length: faker.number.int({ min: 1, max: 10 }) },
-          (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-        platforms: Array.from(
-          { length: faker.number.int({ min: 1, max: 10 }) },
-          (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-        tools: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-          () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-        conceptsAndMethods: Array.from(
-          { length: faker.number.int({ min: 1, max: 10 }) },
-          (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-        databasesAndMiddleware: Array.from(
-          { length: faker.number.int({ min: 1, max: 10 }) },
-          (_, i) => i + 1,
-        ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-        other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-          () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-        ),
-      },
-      softSkills: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      preferredQualifications: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      businessDomains: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    },
-    createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
-    updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
+    ...getRoleResponseMock(),
   })),
   activeRoleId: faker.helpers.arrayElement([faker.string.uuid(), null]),
   ...overrideResponse,
@@ -117,82 +37,13 @@ export const getCreateRoleResponseMock = (
   id: faker.string.uuid(),
   title: faker.string.alpha({ length: { min: 10, max: 20 } }),
   company: faker.helpers.arrayElement([faker.string.alpha({ length: { min: 10, max: 20 } }), null]),
-  recruitmentTrack: faker.helpers.arrayElement([
-    faker.helpers.arrayElement(Object.values(RecruitmentTrack)),
-    null,
-  ]),
+  recruitmentTrack: faker.helpers.arrayElement([getRecruitmentTrackMock(), null]),
   location: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     null,
   ]),
   isArchived: faker.datatype.boolean(),
-  jd: {
-    responsibilities: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    requirements: {
-      education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      graduationCohorts: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      majors: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      experience: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      languages: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      certifications: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    },
-    hardSkills: {
-      programmingLanguages: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      frameworksAndLibraries: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      platforms: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      tools: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      conceptsAndMethods: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      databasesAndMiddleware: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-    },
-    softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-      () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-    ),
-    preferredQualifications: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    businessDomains: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-  },
+  jd: { ...getJobDescriptionResponseMock() },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
@@ -204,82 +55,13 @@ export const getUpdateRoleResponseMock = (
   id: faker.string.uuid(),
   title: faker.string.alpha({ length: { min: 10, max: 20 } }),
   company: faker.helpers.arrayElement([faker.string.alpha({ length: { min: 10, max: 20 } }), null]),
-  recruitmentTrack: faker.helpers.arrayElement([
-    faker.helpers.arrayElement(Object.values(RecruitmentTrack)),
-    null,
-  ]),
+  recruitmentTrack: faker.helpers.arrayElement([getRecruitmentTrackMock(), null]),
   location: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     null,
   ]),
   isArchived: faker.datatype.boolean(),
-  jd: {
-    responsibilities: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    requirements: {
-      education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      graduationCohorts: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      majors: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      experience: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      languages: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      certifications: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    },
-    hardSkills: {
-      programmingLanguages: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      frameworksAndLibraries: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      platforms: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      tools: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      conceptsAndMethods: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      databasesAndMiddleware: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-    },
-    softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-      () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-    ),
-    preferredQualifications: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    businessDomains: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-  },
+  jd: { ...getJobDescriptionResponseMock() },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
@@ -291,82 +73,13 @@ export const getArchiveRoleResponseMock = (
   id: faker.string.uuid(),
   title: faker.string.alpha({ length: { min: 10, max: 20 } }),
   company: faker.helpers.arrayElement([faker.string.alpha({ length: { min: 10, max: 20 } }), null]),
-  recruitmentTrack: faker.helpers.arrayElement([
-    faker.helpers.arrayElement(Object.values(RecruitmentTrack)),
-    null,
-  ]),
+  recruitmentTrack: faker.helpers.arrayElement([getRecruitmentTrackMock(), null]),
   location: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     null,
   ]),
   isArchived: faker.datatype.boolean(),
-  jd: {
-    responsibilities: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    requirements: {
-      education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      graduationCohorts: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      majors: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      experience: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      languages: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      certifications: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    },
-    hardSkills: {
-      programmingLanguages: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      frameworksAndLibraries: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      platforms: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      tools: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      conceptsAndMethods: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      databasesAndMiddleware: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-    },
-    softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-      () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-    ),
-    preferredQualifications: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    businessDomains: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-  },
+  jd: { ...getJobDescriptionResponseMock() },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
@@ -378,82 +91,13 @@ export const getRestoreRoleResponseMock = (
   id: faker.string.uuid(),
   title: faker.string.alpha({ length: { min: 10, max: 20 } }),
   company: faker.helpers.arrayElement([faker.string.alpha({ length: { min: 10, max: 20 } }), null]),
-  recruitmentTrack: faker.helpers.arrayElement([
-    faker.helpers.arrayElement(Object.values(RecruitmentTrack)),
-    null,
-  ]),
+  recruitmentTrack: faker.helpers.arrayElement([getRecruitmentTrackMock(), null]),
   location: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     null,
   ]),
   isArchived: faker.datatype.boolean(),
-  jd: {
-    responsibilities: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    requirements: {
-      education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      graduationCohorts: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      majors: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      experience: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      languages: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      certifications: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    },
-    hardSkills: {
-      programmingLanguages: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      frameworksAndLibraries: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      platforms: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      tools: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      conceptsAndMethods: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      databasesAndMiddleware: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-    },
-    softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-      () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-    ),
-    preferredQualifications: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    businessDomains: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-  },
+  jd: { ...getJobDescriptionResponseMock() },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
@@ -465,112 +109,20 @@ export const getUpdateJdResponseMock = (
   id: faker.string.uuid(),
   title: faker.string.alpha({ length: { min: 10, max: 20 } }),
   company: faker.helpers.arrayElement([faker.string.alpha({ length: { min: 10, max: 20 } }), null]),
-  recruitmentTrack: faker.helpers.arrayElement([
-    faker.helpers.arrayElement(Object.values(RecruitmentTrack)),
-    null,
-  ]),
+  recruitmentTrack: faker.helpers.arrayElement([getRecruitmentTrackMock(), null]),
   location: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     null,
   ]),
   isArchived: faker.datatype.boolean(),
-  jd: {
-    responsibilities: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    requirements: {
-      education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      graduationCohorts: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      majors: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      experience: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      languages: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      certifications: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    },
-    hardSkills: {
-      programmingLanguages: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      frameworksAndLibraries: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      platforms: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      tools: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      conceptsAndMethods: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      databasesAndMiddleware: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      other: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-    },
-    softSkills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-      () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-    ),
-    preferredQualifications: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    businessDomains: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-  },
+  jd: { ...getJobDescriptionResponseMock() },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
 })
 
-export const getGetJdExtractionStateResponseTaskStatusResponseMock = (
-  overrideResponse: Partial<TaskStatusResponse> = {},
-): TaskStatusResponse => ({
-  ...{
-    status: faker.helpers.arrayElement(["idle", "queued", "running", "aborting"] as const),
-    error: null,
-  },
-  ...overrideResponse,
-})
-
-export const getGetJdExtractionStateResponseTaskFailureResponseMock = (
-  overrideResponse: Partial<TaskFailureResponse> = {},
-): TaskFailureResponse => ({
-  ...{
-    status: "failed",
-    error: {
-      code: faker.helpers.arrayElement(Object.values(TaskErrorCode)),
-      message: faker.string.alpha({ length: { min: 10, max: 20 } }),
-    },
-  },
-  ...overrideResponse,
-})
-
 export const getGetJdExtractionStateResponseMock = (): TaskStatusResponse | TaskFailureResponse =>
   faker.helpers.arrayElement([
-    { ...getGetJdExtractionStateResponseTaskStatusResponseMock() },
-    { ...getGetJdExtractionStateResponseTaskFailureResponseMock() },
+    { ...getTaskStatusResponseMock() },
+    { ...getTaskFailureResponseMock() },
   ])

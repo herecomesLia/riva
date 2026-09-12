@@ -295,7 +295,7 @@ export const getAbortJdExtractionMockHandler = (
     options,
   )
 }
-export const getRolesMock = () => [
+export const getRolesApiMock = () => [
   getListRolesMockHandler(),
   getCreateRoleMockHandler(),
   getUpdateRoleMockHandler(),

@@ -1,5 +1,3 @@
-import { getCareerProfile } from "@/api/generated/endpoints/career-profile/career-profile"
-import { listRoles, getJdExtractionState } from "@/api/generated/endpoints/roles/roles"
 import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
@@ -14,19 +12,24 @@ import {
   textRoleFixture,
 } from "@/mocks/fixtures/role"
 
-vi.mock("@/api/generated/endpoints/roles/roles", () => ({
+const careerProfileApi = vi.hoisted(() => ({ getCareerProfile: vi.fn() }))
+const rolesApi = vi.hoisted(() => ({
   listRoles: vi.fn(),
   getJdExtractionState: vi.fn(),
 }))
+
+vi.mock("@/api/generated/endpoints/roles/roles", () => ({
+  getRolesApi: () => rolesApi,
+}))
 vi.mock("@/api/generated/endpoints/career-profile/career-profile", () => ({
-  getCareerProfile: vi.fn(),
+  getCareerProfileApi: () => careerProfileApi,
 }))
 
 function createFaker(initial: Parameters<typeof createRoleFaker>[0]) {
   const faker = createRoleFaker(initial)
-  vi.mocked(listRoles).mockImplementation(faker.list)
-  vi.mocked(getJdExtractionState).mockImplementation(faker.getJdExtractionState)
-  vi.mocked(getCareerProfile).mockResolvedValue(careerProfileFixture)
+  vi.mocked(rolesApi.listRoles).mockImplementation(faker.list)
+  vi.mocked(rolesApi.getJdExtractionState).mockImplementation(faker.getJdExtractionState)
+  vi.mocked(careerProfileApi.getCareerProfile).mockResolvedValue(careerProfileFixture)
   return faker
 }
 

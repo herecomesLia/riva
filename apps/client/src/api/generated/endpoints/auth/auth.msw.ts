@@ -78,7 +78,7 @@ export const getLogoutMockHandler = (
     options,
   )
 }
-export const getAuthMock = () => [
+export const getAuthApiMock = () => [
   getRegisterMockHandler(),
   getLoginMockHandler(),
   getLogoutMockHandler(),

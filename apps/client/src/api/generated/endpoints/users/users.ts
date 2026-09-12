@@ -10,42 +10,53 @@ import { request } from "../../../http"
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-/**
- * @summary Get Current User
- */
-export const getCurrentUser = (options?: SecondParameter<typeof request<UserResponse>>) => {
-  return request<UserResponse>({ url: `/api/users/me`, method: "GET" }, options)
+export const getUsersApi = () => {
+  /**
+   * @summary Get Current User
+   */
+  const getCurrentUser = (options?: SecondParameter<typeof request<UserResponse>>) => {
+    return request<UserResponse>({ url: `/api/users/me`, method: "GET" }, options)
+  }
+  /**
+   * @summary Update Current User
+   */
+  const updateCurrentUser = (
+    updateCurrentUserRequest: UpdateCurrentUserRequest,
+    options?: SecondParameter<typeof request<UserResponse>>,
+  ) => {
+    return request<UserResponse>(
+      {
+        url: `/api/users/me`,
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        data: updateCurrentUserRequest,
+      },
+      options,
+    )
+  }
+  /**
+   * @summary Set Current User Avatar
+   */
+  const setUserAvatar = (options?: SecondParameter<typeof request<unknown>>) => {
+    return request<unknown>({ url: `/api/users/me/avatar`, method: "PUT" }, options)
+  }
+  /**
+   * @summary Delete Current User Avatar
+   */
+  const deleteUserAvatar = (options?: SecondParameter<typeof request<unknown>>) => {
+    return request<unknown>({ url: `/api/users/me/avatar`, method: "DELETE" }, options)
+  }
+  return { getCurrentUser, updateCurrentUser, setUserAvatar, deleteUserAvatar }
 }
-/**
- * @summary Update Current User
- */
-export const updateCurrentUser = (
-  updateCurrentUserRequest: UpdateCurrentUserRequest,
-  options?: SecondParameter<typeof request<UserResponse>>,
-) => {
-  return request<UserResponse>(
-    {
-      url: `/api/users/me`,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      data: updateCurrentUserRequest,
-    },
-    options,
-  )
-}
-/**
- * @summary Set Current User Avatar
- */
-export const setUserAvatar = (options?: SecondParameter<typeof request<unknown>>) => {
-  return request<unknown>({ url: `/api/users/me/avatar`, method: "PUT" }, options)
-}
-/**
- * @summary Delete Current User Avatar
- */
-export const deleteUserAvatar = (options?: SecondParameter<typeof request<unknown>>) => {
-  return request<unknown>({ url: `/api/users/me/avatar`, method: "DELETE" }, options)
-}
-export type GetCurrentUserResult = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
-export type UpdateCurrentUserResult = NonNullable<Awaited<ReturnType<typeof updateCurrentUser>>>
-export type SetUserAvatarResult = NonNullable<Awaited<ReturnType<typeof setUserAvatar>>>
-export type DeleteUserAvatarResult = NonNullable<Awaited<ReturnType<typeof deleteUserAvatar>>>
+export type GetCurrentUserResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getUsersApi>["getCurrentUser"]>>
+>
+export type UpdateCurrentUserResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getUsersApi>["updateCurrentUser"]>>
+>
+export type SetUserAvatarResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getUsersApi>["setUserAvatar"]>>
+>
+export type DeleteUserAvatarResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getUsersApi>["deleteUserAvatar"]>>
+>

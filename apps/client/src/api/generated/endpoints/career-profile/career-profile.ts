@@ -14,48 +14,55 @@ import { request } from "../../../http"
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-/**
- * @summary Get Career Profile
- */
-export const getCareerProfile = (
-  options?: SecondParameter<typeof request<CareerProfileResponse>>,
-) => {
-  return request<CareerProfileResponse>({ url: `/api/career-profile`, method: "GET" }, options)
+export const getCareerProfileApi = () => {
+  /**
+   * @summary Get Career Profile
+   */
+  const getCareerProfile = (options?: SecondParameter<typeof request<CareerProfileResponse>>) => {
+    return request<CareerProfileResponse>({ url: `/api/career-profile`, method: "GET" }, options)
+  }
+  /**
+   * @summary Create Career Profile
+   */
+  const createCareerProfile = (
+    createCareerProfileRequest: CreateCareerProfileRequest,
+    options?: SecondParameter<typeof request<CareerProfileResponse>>,
+  ) => {
+    return request<CareerProfileResponse>(
+      {
+        url: `/api/career-profile`,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        data: createCareerProfileRequest,
+      },
+      options,
+    )
+  }
+  /**
+   * @summary Update Career Profile
+   */
+  const updateCareerProfile = (
+    updateCareerProfileRequest: UpdateCareerProfileRequest,
+    options?: SecondParameter<typeof request<CareerProfileResponse>>,
+  ) => {
+    return request<CareerProfileResponse>(
+      {
+        url: `/api/career-profile`,
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        data: updateCareerProfileRequest,
+      },
+      options,
+    )
+  }
+  return { getCareerProfile, createCareerProfile, updateCareerProfile }
 }
-/**
- * @summary Create Career Profile
- */
-export const createCareerProfile = (
-  createCareerProfileRequest: CreateCareerProfileRequest,
-  options?: SecondParameter<typeof request<CareerProfileResponse>>,
-) => {
-  return request<CareerProfileResponse>(
-    {
-      url: `/api/career-profile`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: createCareerProfileRequest,
-    },
-    options,
-  )
-}
-/**
- * @summary Update Career Profile
- */
-export const updateCareerProfile = (
-  updateCareerProfileRequest: UpdateCareerProfileRequest,
-  options?: SecondParameter<typeof request<CareerProfileResponse>>,
-) => {
-  return request<CareerProfileResponse>(
-    {
-      url: `/api/career-profile`,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      data: updateCareerProfileRequest,
-    },
-    options,
-  )
-}
-export type GetCareerProfileResult = NonNullable<Awaited<ReturnType<typeof getCareerProfile>>>
-export type CreateCareerProfileResult = NonNullable<Awaited<ReturnType<typeof createCareerProfile>>>
-export type UpdateCareerProfileResult = NonNullable<Awaited<ReturnType<typeof updateCareerProfile>>>
+export type GetCareerProfileResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getCareerProfileApi>["getCareerProfile"]>>
+>
+export type CreateCareerProfileResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getCareerProfileApi>["createCareerProfile"]>>
+>
+export type UpdateCareerProfileResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getCareerProfileApi>["updateCareerProfile"]>>
+>

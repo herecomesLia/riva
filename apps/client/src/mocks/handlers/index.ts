@@ -1,4 +1,4 @@
-import { getHealthMock } from "@/api/generated/endpoints/index.msw"
+import { getHealthApiMock } from "@/api/generated/endpoints/health/health.msw"
 import {
   getDeleteUserAvatarMockHandler,
   getSetUserAvatarMockHandler,
@@ -12,7 +12,7 @@ export const handlers = [
   ...authHandlers,
   ...careerProfileHandlers,
   ...roleHandlers,
-  ...getHealthMock(),
+  ...getHealthApiMock(),
   getUpdateCurrentUserMockHandler(),
   getSetUserAvatarMockHandler(),
   getDeleteUserAvatarMockHandler(),

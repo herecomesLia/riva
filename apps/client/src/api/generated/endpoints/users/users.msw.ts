@@ -97,7 +97,7 @@ export const getDeleteUserAvatarMockHandler = (
     options,
   )
 }
-export const getUsersMock = () => [
+export const getUsersApiMock = () => [
   getGetCurrentUserMockHandler(),
   getUpdateCurrentUserMockHandler(),
   getSetUserAvatarMockHandler(),

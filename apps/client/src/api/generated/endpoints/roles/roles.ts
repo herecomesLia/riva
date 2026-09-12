@@ -20,165 +20,197 @@ import { request } from "../../../http"
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-/**
- * @summary List Roles
- */
-export const listRoles = (options?: SecondParameter<typeof request<RoleListResponse>>) => {
-  return request<RoleListResponse>({ url: `/api/roles`, method: "GET" }, options)
+export const getRolesApi = () => {
+  /**
+   * @summary List Roles
+   */
+  const listRoles = (options?: SecondParameter<typeof request<RoleListResponse>>) => {
+    return request<RoleListResponse>({ url: `/api/roles`, method: "GET" }, options)
+  }
+  /**
+   * @summary Create Role
+   */
+  const createRole = (
+    createRoleRequest: CreateRoleRequest,
+    options?: SecondParameter<typeof request<RoleResponse>>,
+  ) => {
+    return request<RoleResponse>(
+      {
+        url: `/api/roles`,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        data: createRoleRequest,
+      },
+      options,
+    )
+  }
+  /**
+   * @summary Update Role
+   */
+  const updateRole = (
+    roleId: string,
+    updateRoleRequest: UpdateRoleRequest,
+    options?: SecondParameter<typeof request<RoleResponse>>,
+  ) => {
+    return request<RoleResponse>(
+      {
+        url: `/api/roles/${roleId}`,
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        data: updateRoleRequest,
+      },
+      options,
+    )
+  }
+  /**
+   * @summary Delete Role
+   */
+  const deleteRole = (roleId: string, options?: SecondParameter<typeof request<void>>) => {
+    return request<void>({ url: `/api/roles/${roleId}`, method: "DELETE" }, options)
+  }
+  /**
+   * @summary Set Active Role
+   */
+  const setActiveRole = (
+    setActiveRoleRequest: SetActiveRoleRequest,
+    options?: SecondParameter<typeof request<void>>,
+  ) => {
+    return request<void>(
+      {
+        url: `/api/roles/active`,
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        data: setActiveRoleRequest,
+      },
+      options,
+    )
+  }
+  /**
+   * @summary Archive Role
+   */
+  const archiveRole = (roleId: string, options?: SecondParameter<typeof request<RoleResponse>>) => {
+    return request<RoleResponse>({ url: `/api/roles/${roleId}/archive`, method: "POST" }, options)
+  }
+  /**
+   * @summary Restore Role
+   */
+  const restoreRole = (roleId: string, options?: SecondParameter<typeof request<RoleResponse>>) => {
+    return request<RoleResponse>({ url: `/api/roles/${roleId}/restore`, method: "POST" }, options)
+  }
+  /**
+   * @summary Update Jd
+   */
+  const updateJd = (
+    roleId: string,
+    updateJobDescriptionRequest: UpdateJobDescriptionRequest,
+    options?: SecondParameter<typeof request<RoleResponse>>,
+  ) => {
+    return request<RoleResponse>(
+      {
+        url: `/api/roles/${roleId}/jd`,
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        data: updateJobDescriptionRequest,
+      },
+      options,
+    )
+  }
+  /**
+   * @summary Extract Jd From Text
+   */
+  const extractJdFromText = (
+    roleId: string,
+    jDTextExtractionRequest: JDTextExtractionRequest,
+    options?: SecondParameter<typeof request<void>>,
+  ) => {
+    return request<void>(
+      {
+        url: `/api/roles/${roleId}/jd/extraction/text`,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        data: jDTextExtractionRequest,
+      },
+      options,
+    )
+  }
+  /**
+   * @summary Get Jd Extraction State
+   */
+  const getJdExtractionState = (
+    roleId: string,
+    options?: SecondParameter<typeof request<TaskStatusResponse | TaskFailureResponse>>,
+  ) => {
+    return request<TaskStatusResponse | TaskFailureResponse>(
+      { url: `/api/roles/${roleId}/jd/extraction`, method: "GET" },
+      options,
+    )
+  }
+  /**
+   * @summary Retry Jd Extraction
+   */
+  const retryJdExtraction = (roleId: string, options?: SecondParameter<typeof request<void>>) => {
+    return request<void>(
+      { url: `/api/roles/${roleId}/jd/extraction/retry`, method: "POST" },
+      options,
+    )
+  }
+  /**
+   * @summary Abort Jd Extraction
+   */
+  const abortJdExtraction = (roleId: string, options?: SecondParameter<typeof request<void>>) => {
+    return request<void>(
+      { url: `/api/roles/${roleId}/jd/extraction/abort`, method: "POST" },
+      options,
+    )
+  }
+  return {
+    listRoles,
+    createRole,
+    updateRole,
+    deleteRole,
+    setActiveRole,
+    archiveRole,
+    restoreRole,
+    updateJd,
+    extractJdFromText,
+    getJdExtractionState,
+    retryJdExtraction,
+    abortJdExtraction,
+  }
 }
-/**
- * @summary Create Role
- */
-export const createRole = (
-  createRoleRequest: CreateRoleRequest,
-  options?: SecondParameter<typeof request<RoleResponse>>,
-) => {
-  return request<RoleResponse>(
-    {
-      url: `/api/roles`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: createRoleRequest,
-    },
-    options,
-  )
-}
-/**
- * @summary Update Role
- */
-export const updateRole = (
-  roleId: string,
-  updateRoleRequest: UpdateRoleRequest,
-  options?: SecondParameter<typeof request<RoleResponse>>,
-) => {
-  return request<RoleResponse>(
-    {
-      url: `/api/roles/${roleId}`,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      data: updateRoleRequest,
-    },
-    options,
-  )
-}
-/**
- * @summary Delete Role
- */
-export const deleteRole = (roleId: string, options?: SecondParameter<typeof request<void>>) => {
-  return request<void>({ url: `/api/roles/${roleId}`, method: "DELETE" }, options)
-}
-/**
- * @summary Set Active Role
- */
-export const setActiveRole = (
-  setActiveRoleRequest: SetActiveRoleRequest,
-  options?: SecondParameter<typeof request<void>>,
-) => {
-  return request<void>(
-    {
-      url: `/api/roles/active`,
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      data: setActiveRoleRequest,
-    },
-    options,
-  )
-}
-/**
- * @summary Archive Role
- */
-export const archiveRole = (
-  roleId: string,
-  options?: SecondParameter<typeof request<RoleResponse>>,
-) => {
-  return request<RoleResponse>({ url: `/api/roles/${roleId}/archive`, method: "POST" }, options)
-}
-/**
- * @summary Restore Role
- */
-export const restoreRole = (
-  roleId: string,
-  options?: SecondParameter<typeof request<RoleResponse>>,
-) => {
-  return request<RoleResponse>({ url: `/api/roles/${roleId}/restore`, method: "POST" }, options)
-}
-/**
- * @summary Update Jd
- */
-export const updateJd = (
-  roleId: string,
-  updateJobDescriptionRequest: UpdateJobDescriptionRequest,
-  options?: SecondParameter<typeof request<RoleResponse>>,
-) => {
-  return request<RoleResponse>(
-    {
-      url: `/api/roles/${roleId}/jd`,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      data: updateJobDescriptionRequest,
-    },
-    options,
-  )
-}
-/**
- * @summary Extract Jd From Text
- */
-export const extractJdFromText = (
-  roleId: string,
-  jDTextExtractionRequest: JDTextExtractionRequest,
-  options?: SecondParameter<typeof request<void>>,
-) => {
-  return request<void>(
-    {
-      url: `/api/roles/${roleId}/jd/extraction/text`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: jDTextExtractionRequest,
-    },
-    options,
-  )
-}
-/**
- * @summary Get Jd Extraction State
- */
-export const getJdExtractionState = (
-  roleId: string,
-  options?: SecondParameter<typeof request<TaskStatusResponse | TaskFailureResponse>>,
-) => {
-  return request<TaskStatusResponse | TaskFailureResponse>(
-    { url: `/api/roles/${roleId}/jd/extraction`, method: "GET" },
-    options,
-  )
-}
-/**
- * @summary Retry Jd Extraction
- */
-export const retryJdExtraction = (
-  roleId: string,
-  options?: SecondParameter<typeof request<void>>,
-) => {
-  return request<void>({ url: `/api/roles/${roleId}/jd/extraction/retry`, method: "POST" }, options)
-}
-/**
- * @summary Abort Jd Extraction
- */
-export const abortJdExtraction = (
-  roleId: string,
-  options?: SecondParameter<typeof request<void>>,
-) => {
-  return request<void>({ url: `/api/roles/${roleId}/jd/extraction/abort`, method: "POST" }, options)
-}
-export type ListRolesResult = NonNullable<Awaited<ReturnType<typeof listRoles>>>
-export type CreateRoleResult = NonNullable<Awaited<ReturnType<typeof createRole>>>
-export type UpdateRoleResult = NonNullable<Awaited<ReturnType<typeof updateRole>>>
-export type DeleteRoleResult = NonNullable<Awaited<ReturnType<typeof deleteRole>>>
-export type SetActiveRoleResult = NonNullable<Awaited<ReturnType<typeof setActiveRole>>>
-export type ArchiveRoleResult = NonNullable<Awaited<ReturnType<typeof archiveRole>>>
-export type RestoreRoleResult = NonNullable<Awaited<ReturnType<typeof restoreRole>>>
-export type UpdateJdResult = NonNullable<Awaited<ReturnType<typeof updateJd>>>
-export type ExtractJdFromTextResult = NonNullable<Awaited<ReturnType<typeof extractJdFromText>>>
-export type GetJdExtractionStateResult = NonNullable<
-  Awaited<ReturnType<typeof getJdExtractionState>>
+export type ListRolesResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["listRoles"]>>
 >
-export type RetryJdExtractionResult = NonNullable<Awaited<ReturnType<typeof retryJdExtraction>>>
-export type AbortJdExtractionResult = NonNullable<Awaited<ReturnType<typeof abortJdExtraction>>>
+export type CreateRoleResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["createRole"]>>
+>
+export type UpdateRoleResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["updateRole"]>>
+>
+export type DeleteRoleResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["deleteRole"]>>
+>
+export type SetActiveRoleResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["setActiveRole"]>>
+>
+export type ArchiveRoleResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["archiveRole"]>>
+>
+export type RestoreRoleResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["restoreRole"]>>
+>
+export type UpdateJdResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["updateJd"]>>
+>
+export type ExtractJdFromTextResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["extractJdFromText"]>>
+>
+export type GetJdExtractionStateResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["getJdExtractionState"]>>
+>
+export type RetryJdExtractionResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["retryJdExtraction"]>>
+>
+export type AbortJdExtractionResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["abortJdExtraction"]>>
+>

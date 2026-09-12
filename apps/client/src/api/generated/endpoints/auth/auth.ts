@@ -10,46 +10,51 @@ import { request } from "../../../http"
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-/**
- * @summary Register
- */
-export const register = (
-  registerCredentials: RegisterCredentials,
-  options?: SecondParameter<typeof request<UserResponse>>,
-) => {
-  return request<UserResponse>(
-    {
-      url: `/api/auth/register`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: registerCredentials,
-    },
-    options,
-  )
+export const getAuthApi = () => {
+  /**
+   * @summary Register
+   */
+  const register = (
+    registerCredentials: RegisterCredentials,
+    options?: SecondParameter<typeof request<UserResponse>>,
+  ) => {
+    return request<UserResponse>(
+      {
+        url: `/api/auth/register`,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        data: registerCredentials,
+      },
+      options,
+    )
+  }
+  /**
+   * @summary Login
+   */
+  const login = (
+    loginCredentials: LoginCredentials,
+    options?: SecondParameter<typeof request<UserResponse>>,
+  ) => {
+    return request<UserResponse>(
+      {
+        url: `/api/auth/login`,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        data: loginCredentials,
+      },
+      options,
+    )
+  }
+  /**
+   * @summary Logout
+   */
+  const logout = (options?: SecondParameter<typeof request<void>>) => {
+    return request<void>({ url: `/api/auth/logout`, method: "POST" }, options)
+  }
+  return { register, login, logout }
 }
-/**
- * @summary Login
- */
-export const login = (
-  loginCredentials: LoginCredentials,
-  options?: SecondParameter<typeof request<UserResponse>>,
-) => {
-  return request<UserResponse>(
-    {
-      url: `/api/auth/login`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: loginCredentials,
-    },
-    options,
-  )
-}
-/**
- * @summary Logout
- */
-export const logout = (options?: SecondParameter<typeof request<void>>) => {
-  return request<void>({ url: `/api/auth/logout`, method: "POST" }, options)
-}
-export type RegisterResult = NonNullable<Awaited<ReturnType<typeof register>>>
-export type LoginResult = NonNullable<Awaited<ReturnType<typeof login>>>
-export type LogoutResult = NonNullable<Awaited<ReturnType<typeof logout>>>
+export type RegisterResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getAuthApi>["register"]>>
+>
+export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuthApi>["login"]>>>
+export type LogoutResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuthApi>["logout"]>>>

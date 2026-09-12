@@ -10,10 +10,15 @@ import { request } from "../../../http"
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
 
-/**
- * @summary Health
- */
-export const checkHealth = (options?: SecondParameter<typeof request<HealthResponse>>) => {
-  return request<HealthResponse>({ url: `/api/health`, method: "GET" }, options)
+export const getHealthApi = () => {
+  /**
+   * @summary Health
+   */
+  const checkHealth = (options?: SecondParameter<typeof request<HealthResponse>>) => {
+    return request<HealthResponse>({ url: `/api/health`, method: "GET" }, options)
+  }
+  return { checkHealth }
 }
-export type CheckHealthResult = NonNullable<Awaited<ReturnType<typeof checkHealth>>>
+export type CheckHealthResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getHealthApi>["checkHealth"]>>
+>

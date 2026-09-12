@@ -1,19 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import {
-  archiveRole as apiArchiveRole,
-  createRole as apiCreateRole,
-  deleteRole as apiDeleteRole,
-  listRoles,
-  restoreRole as apiRestoreRole,
-  setActiveRole as apiSetActiveRole,
-  updateRole as apiUpdateRole,
-  updateJd as updateJdRequest,
-  extractJdFromText,
-  getJdExtractionState as getJdExtractionStateRequest,
-  retryJdExtraction as retryJdExtractionRequest,
-  abortJdExtraction as abortJdExtractionRequest,
-} from "@/api/generated/endpoints/roles/roles"
 import { matchResultFixture, roleListFixture, roleFixture } from "@/mocks/fixtures/role"
 import { roleFaker } from "@/mocks/fakers/role"
 import {
@@ -34,7 +20,7 @@ import {
   updateRole,
 } from "@/services/roles"
 
-vi.mock("@/api/generated/endpoints/roles/roles", () => ({
+const rolesApi = vi.hoisted(() => ({
   archiveRole: vi.fn(),
   createRole: vi.fn(),
   deleteRole: vi.fn(),
@@ -49,6 +35,10 @@ vi.mock("@/api/generated/endpoints/roles/roles", () => ({
   abortJdExtraction: vi.fn(),
 }))
 
+vi.mock("@/api/generated/endpoints/roles/roles", () => ({
+  getRolesApi: () => rolesApi,
+}))
+
 vi.mock("@/mocks/fakers/role", () => ({
   roleFaker: {
     clear: vi.fn(),
@@ -61,28 +51,28 @@ vi.mock("@/mocks/fakers/role", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(listRoles).mockResolvedValue(structuredClone(roleListFixture))
-  vi.mocked(getJdExtractionStateRequest).mockResolvedValue({ status: "idle", error: null })
+  vi.mocked(rolesApi.listRoles).mockResolvedValue(structuredClone(roleListFixture))
+  vi.mocked(rolesApi.getJdExtractionState).mockResolvedValue({ status: "idle", error: null })
   vi.mocked(roleFaker.getMatch).mockResolvedValue({ status: "none" })
 })
 
 describe("roles service", () => {
   it("returns the formal list without aggregating workflow resources", async () => {
     await expect(getRoles()).resolves.toEqual(roleListFixture)
-    expect(listRoles).toHaveBeenCalledOnce()
-    expect(getJdExtractionStateRequest).not.toHaveBeenCalled()
+    expect(rolesApi.listRoles).toHaveBeenCalledOnce()
+    expect(rolesApi.getJdExtractionState).not.toHaveBeenCalled()
     expect(roleFaker.getMatch).not.toHaveBeenCalled()
   })
 
   it("delegates formal role writes to generated operations", async () => {
     const createInput = { title: "Platform Engineer" }
     const updateInput = { title: "Senior Platform Engineer" }
-    vi.mocked(apiCreateRole).mockResolvedValue(roleFixture)
-    vi.mocked(apiUpdateRole).mockResolvedValue(roleFixture)
-    vi.mocked(apiSetActiveRole).mockResolvedValue(undefined)
-    vi.mocked(apiArchiveRole).mockResolvedValue(roleFixture)
-    vi.mocked(apiRestoreRole).mockResolvedValue(roleFixture)
-    vi.mocked(apiDeleteRole).mockResolvedValue(undefined)
+    vi.mocked(rolesApi.createRole).mockResolvedValue(roleFixture)
+    vi.mocked(rolesApi.updateRole).mockResolvedValue(roleFixture)
+    vi.mocked(rolesApi.setActiveRole).mockResolvedValue(undefined)
+    vi.mocked(rolesApi.archiveRole).mockResolvedValue(roleFixture)
+    vi.mocked(rolesApi.restoreRole).mockResolvedValue(roleFixture)
+    vi.mocked(rolesApi.deleteRole).mockResolvedValue(undefined)
 
     await createRole(createInput)
     await updateRole(roleFixture.id, updateInput)
@@ -91,17 +81,17 @@ describe("roles service", () => {
     await restoreRole(roleFixture.id)
     await deleteRole(roleFixture.id)
 
-    expect(apiCreateRole).toHaveBeenCalledWith(createInput)
-    expect(apiUpdateRole).toHaveBeenCalledWith(roleFixture.id, updateInput)
-    expect(apiSetActiveRole).toHaveBeenCalledWith({ roleId: roleFixture.id })
-    expect(apiArchiveRole).toHaveBeenCalledWith(roleFixture.id)
-    expect(apiRestoreRole).toHaveBeenCalledWith(roleFixture.id)
-    expect(apiDeleteRole).toHaveBeenCalledWith(roleFixture.id)
+    expect(rolesApi.createRole).toHaveBeenCalledWith(createInput)
+    expect(rolesApi.updateRole).toHaveBeenCalledWith(roleFixture.id, updateInput)
+    expect(rolesApi.setActiveRole).toHaveBeenCalledWith({ roleId: roleFixture.id })
+    expect(rolesApi.archiveRole).toHaveBeenCalledWith(roleFixture.id)
+    expect(rolesApi.restoreRole).toHaveBeenCalledWith(roleFixture.id)
+    expect(rolesApi.deleteRole).toHaveBeenCalledWith(roleFixture.id)
     expect(roleFaker.clear).toHaveBeenCalledWith(roleFixture.id)
   })
 
   it("keeps workflow state when formal role deletion fails", async () => {
-    vi.mocked(apiDeleteRole).mockRejectedValue(new Error("request failed"))
+    vi.mocked(rolesApi.deleteRole).mockRejectedValue(new Error("request failed"))
 
     await expect(deleteRole(roleFixture.id)).rejects.toThrow("request failed")
     expect(roleFaker.clear).not.toHaveBeenCalled()
@@ -115,8 +105,8 @@ describe("roles service", () => {
     vi.mocked(roleFaker.recognizeRole).mockResolvedValue(roleFixture)
     await expect(recognizeRole(input)).resolves.toBe(roleFixture)
     expect(roleFaker.recognizeRole).toHaveBeenCalledWith(input)
-    expect(apiCreateRole).not.toHaveBeenCalled()
-    expect(extractJdFromText).not.toHaveBeenCalled()
+    expect(rolesApi.createRole).not.toHaveBeenCalled()
+    expect(rolesApi.extractJdFromText).not.toHaveBeenCalled()
   })
 
   it("delegates extraction lifecycle to generated operations and invalidates matching after accepted writes", async () => {
@@ -124,10 +114,10 @@ describe("roles service", () => {
     await retryJdExtraction(roleFixture.id)
     await abortJdExtraction(roleFixture.id)
     await getJdExtractionState(roleFixture.id)
-    expect(extractJdFromText).toHaveBeenCalledWith(roleFixture.id, { text: "JD text" })
-    expect(retryJdExtractionRequest).toHaveBeenCalledWith(roleFixture.id)
-    expect(abortJdExtractionRequest).toHaveBeenCalledWith(roleFixture.id)
-    expect(getJdExtractionStateRequest).toHaveBeenCalledWith(roleFixture.id, {
+    expect(rolesApi.extractJdFromText).toHaveBeenCalledWith(roleFixture.id, { text: "JD text" })
+    expect(rolesApi.retryJdExtraction).toHaveBeenCalledWith(roleFixture.id)
+    expect(rolesApi.abortJdExtraction).toHaveBeenCalledWith(roleFixture.id)
+    expect(rolesApi.getJdExtractionState).toHaveBeenCalledWith(roleFixture.id, {
       signal: undefined,
     })
     expect(roleFaker.staleMatch).toHaveBeenCalledTimes(2)
@@ -145,11 +135,11 @@ describe("roles service", () => {
 
   it("marks matching stale after a direct structured-JD update", async () => {
     const input = { responsibilities: ["Updated responsibility"] }
-    vi.mocked(updateJdRequest).mockResolvedValue(roleFixture)
+    vi.mocked(rolesApi.updateJd).mockResolvedValue(roleFixture)
     vi.mocked(roleFaker.staleMatch).mockResolvedValue(undefined)
 
     await expect(updateJd(roleFixture.id, input)).resolves.toBe(roleFixture)
-    expect(updateJdRequest).toHaveBeenCalledWith(roleFixture.id, input)
+    expect(rolesApi.updateJd).toHaveBeenCalledWith(roleFixture.id, input)
     expect(roleFaker.staleMatch).toHaveBeenCalledWith(roleFixture.id)
   })
 })

@@ -1,5 +1,0 @@
-export * from "./auth/auth.faker"
-export * from "./career-profile/career-profile.faker"
-export * from "./health/health.faker"
-export * from "./roles/roles.faker"
-export * from "./users/users.faker"

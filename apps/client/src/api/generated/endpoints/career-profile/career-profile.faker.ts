@@ -6,83 +6,26 @@
  */
 import { faker } from "@faker-js/faker"
 
-import { EmploymentType } from "../../models"
 import type { CareerProfileResponse } from "../../models"
+
+import {
+  getEducationEntryResponseMock,
+  getProjectEntryResponseMock,
+  getWorkExperienceEntryResponseMock,
+} from "../../models/index.faker"
 
 export const getGetCareerProfileResponseMock = (
   overrideResponse: Partial<Extract<CareerProfileResponse, object>> = {},
 ): CareerProfileResponse => ({
   education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-    () => ({
-      startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-      endDate: faker.helpers.arrayElement([
-        faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-        null,
-      ]),
-      school: faker.string.alpha({ length: { min: 1, max: 20 } }),
-      degree: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 1, max: 20 } }),
-        null,
-      ]),
-      major: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 1, max: 20 } }),
-        null,
-      ]),
-    }),
+    () => ({ ...getEducationEntryResponseMock() }),
   ),
   workExperiences: Array.from(
     { length: faker.number.int({ min: 1, max: 10 }) },
     (_, i) => i + 1,
-  ).map(() => ({
-    startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-    endDate: faker.helpers.arrayElement([
-      faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-      null,
-    ]),
-    company: faker.string.alpha({ length: { min: 1, max: 20 } }),
-    title: faker.string.alpha({ length: { min: 1, max: 20 } }),
-    employmentType: faker.helpers.arrayElement([
-      faker.helpers.arrayElement(Object.values(EmploymentType)),
-      null,
-    ]),
-    location: faker.helpers.arrayElement([
-      faker.string.alpha({ length: { min: 1, max: 20 } }),
-      null,
-    ]),
-    responsibilities: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    achievements: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    skills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-      faker.string.alpha({ length: { min: 1, max: 20 } }),
-    ),
-  })),
+  ).map(() => ({ ...getWorkExperienceEntryResponseMock() })),
   projects: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-    () => ({
-      startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-      endDate: faker.helpers.arrayElement([
-        faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-        null,
-      ]),
-      name: faker.string.alpha({ length: { min: 1, max: 20 } }),
-      role: faker.helpers.arrayElement([faker.string.alpha({ length: { min: 1, max: 20 } }), null]),
-      description: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      achievements: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      techStack: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      url: faker.helpers.arrayElement([faker.internet.url(), null]),
-    }),
+    () => ({ ...getProjectEntryResponseMock() }),
   ),
   skills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
     faker.string.alpha({ length: { min: 1, max: 20 } }),
@@ -96,76 +39,14 @@ export const getCreateCareerProfileResponseMock = (
   overrideResponse: Partial<Extract<CareerProfileResponse, object>> = {},
 ): CareerProfileResponse => ({
   education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-    () => ({
-      startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-      endDate: faker.helpers.arrayElement([
-        faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-        null,
-      ]),
-      school: faker.string.alpha({ length: { min: 1, max: 20 } }),
-      degree: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 1, max: 20 } }),
-        null,
-      ]),
-      major: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 1, max: 20 } }),
-        null,
-      ]),
-    }),
+    () => ({ ...getEducationEntryResponseMock() }),
   ),
   workExperiences: Array.from(
     { length: faker.number.int({ min: 1, max: 10 }) },
     (_, i) => i + 1,
-  ).map(() => ({
-    startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-    endDate: faker.helpers.arrayElement([
-      faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-      null,
-    ]),
-    company: faker.string.alpha({ length: { min: 1, max: 20 } }),
-    title: faker.string.alpha({ length: { min: 1, max: 20 } }),
-    employmentType: faker.helpers.arrayElement([
-      faker.helpers.arrayElement(Object.values(EmploymentType)),
-      null,
-    ]),
-    location: faker.helpers.arrayElement([
-      faker.string.alpha({ length: { min: 1, max: 20 } }),
-      null,
-    ]),
-    responsibilities: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    achievements: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    skills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-      faker.string.alpha({ length: { min: 1, max: 20 } }),
-    ),
-  })),
+  ).map(() => ({ ...getWorkExperienceEntryResponseMock() })),
   projects: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-    () => ({
-      startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-      endDate: faker.helpers.arrayElement([
-        faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-        null,
-      ]),
-      name: faker.string.alpha({ length: { min: 1, max: 20 } }),
-      role: faker.helpers.arrayElement([faker.string.alpha({ length: { min: 1, max: 20 } }), null]),
-      description: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      achievements: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      techStack: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      url: faker.helpers.arrayElement([faker.internet.url(), null]),
-    }),
+    () => ({ ...getProjectEntryResponseMock() }),
   ),
   skills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
     faker.string.alpha({ length: { min: 1, max: 20 } }),
@@ -179,76 +60,14 @@ export const getUpdateCareerProfileResponseMock = (
   overrideResponse: Partial<Extract<CareerProfileResponse, object>> = {},
 ): CareerProfileResponse => ({
   education: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-    () => ({
-      startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-      endDate: faker.helpers.arrayElement([
-        faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-        null,
-      ]),
-      school: faker.string.alpha({ length: { min: 1, max: 20 } }),
-      degree: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 1, max: 20 } }),
-        null,
-      ]),
-      major: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 1, max: 20 } }),
-        null,
-      ]),
-    }),
+    () => ({ ...getEducationEntryResponseMock() }),
   ),
   workExperiences: Array.from(
     { length: faker.number.int({ min: 1, max: 10 }) },
     (_, i) => i + 1,
-  ).map(() => ({
-    startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-    endDate: faker.helpers.arrayElement([
-      faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-      null,
-    ]),
-    company: faker.string.alpha({ length: { min: 1, max: 20 } }),
-    title: faker.string.alpha({ length: { min: 1, max: 20 } }),
-    employmentType: faker.helpers.arrayElement([
-      faker.helpers.arrayElement(Object.values(EmploymentType)),
-      null,
-    ]),
-    location: faker.helpers.arrayElement([
-      faker.string.alpha({ length: { min: 1, max: 20 } }),
-      null,
-    ]),
-    responsibilities: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    achievements: Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-    skills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
-      faker.string.alpha({ length: { min: 1, max: 20 } }),
-    ),
-  })),
+  ).map(() => ({ ...getWorkExperienceEntryResponseMock() })),
   projects: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-    () => ({
-      startDate: faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-      endDate: faker.helpers.arrayElement([
-        faker.helpers.fromRegExp("^[0-9]{4}-(?:0[1-9]|1[0-2])$"),
-        null,
-      ]),
-      name: faker.string.alpha({ length: { min: 1, max: 20 } }),
-      role: faker.helpers.arrayElement([faker.string.alpha({ length: { min: 1, max: 20 } }), null]),
-      description: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      achievements: Array.from(
-        { length: faker.number.int({ min: 1, max: 10 }) },
-        (_, i) => i + 1,
-      ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
-      techStack: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
-        () => faker.string.alpha({ length: { min: 1, max: 20 } }),
-      ),
-      url: faker.helpers.arrayElement([faker.internet.url(), null]),
-    }),
+    () => ({ ...getProjectEntryResponseMock() }),
   ),
   skills: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
     faker.string.alpha({ length: { min: 1, max: 20 } }),

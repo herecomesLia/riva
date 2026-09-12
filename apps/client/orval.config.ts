@@ -18,7 +18,7 @@ export default defineConfig({
     },
     output: {
       mode: "tags-split",
-      client: "axios-functions",
+      client: "axios",
       target: fileURLToPath(new URL("./src/api/generated/endpoints", import.meta.url)),
       schemas: fileURLToPath(new URL("./src/api/generated/models", import.meta.url)),
       tsconfig: { compilerOptions: { target: "es2023" } },
@@ -27,19 +27,21 @@ export default defineConfig({
       tagsSplitDeduplication: true,
       formatter: "prettier",
       override: {
+        title: (title) => `${title}Api`,
         mutator: {
           path: fileURLToPath(new URL("./src/api/http.ts", import.meta.url)),
           name: "request",
         },
       },
       mock: {
-        indexMockFiles: true,
+        indexMockFiles: false,
         generators: [
           {
             type: "msw",
           },
           {
             type: "faker",
+            schemas: true,
           },
         ],
       },
