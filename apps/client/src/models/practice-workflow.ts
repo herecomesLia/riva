@@ -182,7 +182,6 @@ export type PracticeReview = {
   highlights: string[]
   mainIssues: string[]
   improvementSuggestions: string[]
-  reusableAnswerStructure: string[]
   exposedWeaknesses: string[]
   recommendation: PracticeRecommendation
 }

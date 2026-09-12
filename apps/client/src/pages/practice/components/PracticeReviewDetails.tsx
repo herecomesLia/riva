@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { PracticeReview } from "@/models/practice-workflow"
 
 function ReviewList({ items }: { items: string[] }) {
@@ -37,29 +37,6 @@ function ReviewSection({ items, title }: { items: string[]; title: string }) {
       </CardHeader>
       <CardContent>
         <ReviewList items={items} />
-      </CardContent>
-    </Card>
-  )
-}
-
-export function PracticeReusableStructure({ items }: { items: string[] }) {
-  const { t } = useTranslation()
-
-  return (
-    <Card data-testid="practice-reusable-structure">
-      <CardHeader>
-        <CardTitle>{t("practice.review.reusableStructure")}</CardTitle>
-        <CardDescription>{t("practice.review.reusableStructureDescription")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((item, index) => (
-            <li className="flex min-w-0 items-start gap-2 rounded-xl bg-muted/60 p-3" key={item}>
-              <Badge variant="outline">{index + 1}</Badge>
-              <span className="wrap-break-word text-sm leading-6">{item}</span>
-            </li>
-          ))}
-        </ol>
       </CardContent>
     </Card>
   )

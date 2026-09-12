@@ -287,8 +287,6 @@ export const practice = {
     highlights: "Answer highlights",
     issues: "Main issues",
     improvements: "Improvement plan",
-    reusableStructure: "Reusable answer structure",
-    reusableStructureDescription: "These are organization steps, not a complete reference answer.",
     weaknesses: "Weak areas identified",
     noNewWeaknesses: "No new weak areas were identified for this question.",
     retryRecommended: "Retry this question",

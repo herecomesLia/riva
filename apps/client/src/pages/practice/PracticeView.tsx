@@ -57,11 +57,7 @@ import { PracticeQuestionReview } from "./components/PracticeQuestionReview"
 import { PracticeEvaluationStatus } from "./components/PracticeEvaluationStatus"
 import { PracticeScoreOverview } from "./components/PracticeScoreOverview"
 import { PracticeDimensionScores } from "./components/PracticeDimensionScores"
-import {
-  PracticeReusableStructure,
-  PracticeReviewSummary,
-  PracticeWeaknesses,
-} from "./components/PracticeReviewDetails"
+import { PracticeReviewSummary, PracticeWeaknesses } from "./components/PracticeReviewDetails"
 import { PracticeRecommendationCard } from "./components/PracticeRecommendationCard"
 import { PracticeReviewActions } from "./components/PracticeReviewActions"
 import { PracticeReferenceAnswer } from "./components/PracticeReferenceAnswer"
@@ -477,7 +473,6 @@ function PracticeReviewView({
       />
       <PracticeDimensionScores scores={session.evaluation.dimensionScores} />
       <PracticeReviewSummary review={session.review} />
-      <PracticeReusableStructure items={session.review.reusableAnswerStructure} />
       <PracticeWeaknesses items={session.review.exposedWeaknesses} />
       <PracticeRecommendationCard recommendation={session.review.recommendation} />
       <PracticeReviewActions

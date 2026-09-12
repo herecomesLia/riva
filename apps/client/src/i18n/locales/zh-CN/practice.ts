@@ -271,8 +271,6 @@ export const practice = {
     highlights: "回答亮点",
     issues: "主要问题",
     improvements: "改进建议",
-    reusableStructure: "可复用答题结构",
-    reusableStructureDescription: "这是组织回答的步骤提示，不是完整参考答案。",
     weaknesses: "本题暴露的薄弱项",
     noNewWeaknesses: "本题没有识别出新的薄弱项。",
     retryRecommended: "建议重练当前题",

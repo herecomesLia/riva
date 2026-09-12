@@ -73,7 +73,6 @@ export const practiceFixture = {
     highlights: ["能够说明个人采取的关键行动。"],
     mainIssues: ["结果的验证依据不够具体。"],
     improvementSuggestions: ["补充一个可比较的结果指标。"],
-    reusableAnswerStructure: ["目标、关键行动、结果证据与复盘"],
     exposedWeaknesses: ["量化证据"],
     recommendation: { action: "retryCurrent", reason: "结合复盘补充证据，再尝试一次。" },
   } satisfies PracticeReview,

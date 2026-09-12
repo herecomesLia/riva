@@ -56,7 +56,6 @@ export type TrainingRecordReview = {
   strengths: string[]
   issues: string[]
   improvementSuggestions: string[]
-  reusableAnswerStructure: string[]
 }
 
 export type TrainingRecordReferenceAnswer =

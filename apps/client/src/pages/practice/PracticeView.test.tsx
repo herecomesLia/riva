@@ -1613,7 +1613,7 @@ describe("PracticeView", () => {
     }
   })
 
-  it("keeps highlights, issues, improvements, structure, and weaknesses in distinct sections", async () => {
+  it("keeps highlights, issues, improvements, and weaknesses in distinct sections", async () => {
     const data = createPracticeScenario("reviewRetryRecommended")
     renderReadyView(data)
     if (data.session.status !== "review") return
@@ -1624,9 +1624,6 @@ describe("PracticeView", () => {
     for (const item of data.session.review.improvementSuggestions)
       expect(review).toHaveTextContent(item)
     for (const item of data.session.review.exposedWeaknesses) expect(review).toHaveTextContent(item)
-    expect(screen.getByTestId("practice-reusable-structure")).toHaveTextContent(
-      i18n.t("practice.review.reusableStructureDescription"),
-    )
   })
 
   it("shows retry and next-question recommendations directly from the response", async () => {

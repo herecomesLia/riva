@@ -17,7 +17,6 @@ import {
   PracticeAnswerHighlights,
   PracticeAnswerIssues,
   PracticeImprovementPlan,
-  PracticeReusableStructure,
 } from "@/pages/practice/components/PracticeReviewDetails"
 
 import { HistoryReferenceAnswer } from "./HistoryReferenceAnswer"
@@ -242,7 +241,6 @@ function EvaluationSection({
             <PracticeAnswerIssues items={review.issues} />
             <PracticeImprovementPlan items={review.improvementSuggestions} />
           </div>
-          <PracticeReusableStructure items={review.reusableAnswerStructure} />
         </>
       )}
     </section>

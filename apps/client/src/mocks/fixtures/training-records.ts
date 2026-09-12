@@ -46,7 +46,6 @@ const question = {
     strengths: ["明确了个人贡献。"],
     issues: ["对照依据还不够具体。"],
     improvementSuggestions: ["补充实验前后的指标。"],
-    reusableAnswerStructure: ["背景、判断、行动、结果"],
   },
   referenceAnswer: { status: "notRequested", content: null },
   followUps: [
@@ -72,7 +71,6 @@ const question = {
         strengths: ["考虑了干扰因素。"],
         issues: ["样本范围说明不足。"],
         improvementSuggestions: ["补充样本选择依据。"],
-        reusableAnswerStructure: ["对照方法、证据、结论边界"],
       },
       referenceAnswer: reference,
     },

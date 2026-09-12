@@ -76,7 +76,6 @@ export function createPracticeReviewStoryFixture(
     session.review.highlights = []
     session.review.mainIssues = []
     session.review.improvementSuggestions = []
-    session.review.reusableAnswerStructure = []
     session.review.exposedWeaknesses = []
   }
   if (variant === "longDetails") {
@@ -91,14 +90,6 @@ export function createPracticeReviewStoryFixture(
     session.review.improvementSuggestions = [
       "将回答压缩为目标与约束、个人判断、关键取舍、推动动作、量化验证和复盘沉淀六个连续部分，每一部分优先说明自己的具体贡献。",
       "补充优化前基线、实验组与对照组差异、持续观察周期、异常告警阈值和回滚条件，使收益归因与风险控制形成完整闭环。",
-    ]
-    session.review.reusableAnswerStructure = [
-      "用业务目标、用户影响和明确约束快速界定问题",
-      "说明个人负责的分析过程、证据来源和关键判断",
-      "比较候选方案并解释收益、成本、风险和长期维护取舍",
-      "描述跨团队分歧、沟通动作、共识形成和推进节奏",
-      "给出实验设计、指标变化、观察周期和可信归因",
-      "补充异常告警、止损条件、回滚方案和复盘沉淀",
     ]
     session.review.exposedWeaknesses = [
       "复杂背景下快速突出个人贡献与关键判断",
