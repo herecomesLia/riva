@@ -264,7 +264,6 @@ export const practice = {
     scoreDescription: "分数与解释均基于本题完整问答记录。",
     overallScore: "本题总分",
     overallPerformance: "本题表现总结",
-    completed: "评分已完成",
     dimensionsTitle: "八维能力表现",
     dimensionsDescription: "每个维度都包含分数和针对当前回答的简短解释。",
     dimensionScore: "{{score}} 分",

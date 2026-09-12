@@ -5,8 +5,8 @@ import { createPracticeReviewStoryFixture } from "../stories/practice-story-fixt
 import { PracticeScoreOverview } from "./PracticeScoreOverview"
 
 function createArgs(variant: Parameters<typeof createPracticeReviewStoryFixture>[0]) {
-  const { evaluation, review } = createPracticeReviewStoryFixture(variant)
-  return { evaluation, overallPerformance: review.overallPerformance }
+  const { evaluation } = createPracticeReviewStoryFixture(variant)
+  return { evaluation }
 }
 
 const meta = preview.meta({
@@ -35,7 +35,7 @@ export const BoundaryScore = meta.story({
   },
 })
 
-export const LongEnglishSummary = meta.story({
-  args: createArgs("longDetails"),
+export const InEnglish = meta.story({
+  args: createArgs("balanced"),
   globals: { locale: "en" },
 })

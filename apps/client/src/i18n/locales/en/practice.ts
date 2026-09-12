@@ -279,7 +279,6 @@ export const practice = {
     scoreDescription: "Scores and explanations use the complete conversation for this question.",
     overallScore: "Overall question score",
     overallPerformance: "Performance summary",
-    completed: "Evaluation complete",
     dimensionsTitle: "Eight-dimension performance",
     dimensionsDescription:
       "Every dimension includes a score and a concise explanation tied to this answer.",

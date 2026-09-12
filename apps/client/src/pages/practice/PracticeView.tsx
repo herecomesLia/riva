@@ -452,14 +452,17 @@ function PracticeReviewView({
       className="flex flex-col gap-5 pb-80 min-[360px]:pb-52 sm:pb-40 lg:pb-28"
       data-testid="practice-review-state"
     >
-      <PracticeSessionHeader context={context} selection={session.selection} />
-      <p className="text-sm text-muted-foreground">
-        {t("practice.review.attempt", { count: session.attemptNumber })}
-      </p>
-      <PracticeScoreOverview
-        evaluation={session.evaluation}
-        overallPerformance={session.review.overallPerformance}
-      />
+      <div className="@container">
+        <div className="grid items-start gap-5 @2xl:grid-cols-[minmax(0,1fr)_minmax(14rem,1fr)]">
+          <div className="flex min-w-0 flex-col gap-3 break-words [overflow-wrap:anywhere]">
+            <PracticeSessionHeader context={context} selection={session.selection} />
+            <p className="text-sm text-muted-foreground">
+              {t("practice.review.attempt", { count: session.attemptNumber })}
+            </p>
+          </div>
+          <PracticeScoreOverview evaluation={session.evaluation} />
+        </div>
+      </div>
       <PracticeConversationTimeline
         followUpCompletion={session.followUpCompletion}
         followUps={session.followUps}
@@ -471,7 +474,14 @@ function PracticeReviewView({
         followUpCompletion={session.followUpCompletion}
         followUps={session.followUps}
       />
-      <PracticeDimensionScores scores={session.evaluation.dimensionScores} />
+      <PracticeDimensionScores scores={session.evaluation.dimensionScores}>
+        <section className="flex min-w-0 flex-col gap-2 border-b pb-5">
+          <h3 className="font-heading font-medium">{t("practice.review.overallPerformance")}</h3>
+          <p className="whitespace-pre-wrap break-words text-sm leading-7 [overflow-wrap:anywhere]">
+            {session.review.overallPerformance}
+          </p>
+        </section>
+      </PracticeDimensionScores>
       <PracticeReviewSummary review={session.review} />
       <PracticeWeaknesses items={session.review.exposedWeaknesses} />
       <PracticeRecommendationCard recommendation={session.review.recommendation} />

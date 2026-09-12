@@ -1,10 +1,17 @@
 import { useTranslation } from "react-i18next"
+import type { ReactNode } from "react"
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { DimensionScore } from "@/models/practice-workflow"
 
-export function PracticeDimensionScores({ scores }: { scores: DimensionScore[] }) {
+export function PracticeDimensionScores({
+  scores,
+  children,
+}: {
+  scores: DimensionScore[]
+  children?: ReactNode
+}) {
   const { t } = useTranslation()
 
   return (
@@ -13,7 +20,8 @@ export function PracticeDimensionScores({ scores }: { scores: DimensionScore[] }
         <CardTitle>{t("practice.review.dimensionsTitle")}</CardTitle>
         <CardDescription>{t("practice.review.dimensionsDescription")}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex min-w-0 flex-col gap-5">
+        {children}
         <dl className="grid gap-3 sm:grid-cols-2">
           {scores.map((item) => (
             <div
