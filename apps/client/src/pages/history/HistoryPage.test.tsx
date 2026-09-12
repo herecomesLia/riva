@@ -76,7 +76,7 @@ describe("HistoryPage", () => {
     expect(getTrainingRecordsOverview).toHaveBeenCalledOnce()
     expect(listTrainingRecords).toHaveBeenCalledWith({
       kinds: undefined,
-      targetRoleId: undefined,
+      roleId: undefined,
       startedAtFrom: undefined,
       page: 1,
       pageSize: 3,
@@ -104,7 +104,7 @@ describe("HistoryPage", () => {
     await waitFor(() =>
       expect(listTrainingRecords).toHaveBeenLastCalledWith({
         kinds: ["mockInterview"],
-        targetRoleId: undefined,
+        roleId: undefined,
         startedAtFrom: undefined,
         page: 1,
         pageSize: 3,
@@ -113,7 +113,7 @@ describe("HistoryPage", () => {
     expect(await screen.findByText(i18n.t("history.empty.noMatches.title"))).toBeInTheDocument()
   })
 
-  it("submits target-role and time-range filters to the service", async () => {
+  it("submits role and time-range filters to the service", async () => {
     const user = userEvent.setup()
     vi.mocked(getTrainingRecordsOverview).mockResolvedValue(
       structuredClone(historyOverviewStoryFixture),
@@ -133,7 +133,7 @@ describe("HistoryPage", () => {
     await waitFor(() =>
       expect(listTrainingRecords).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          targetRoleId: "22222222-2222-4222-8222-222222222222",
+          roleId: "22222222-2222-4222-8222-222222222222",
           page: 1,
         }),
       ),
@@ -149,7 +149,7 @@ describe("HistoryPage", () => {
     await waitFor(() =>
       expect(listTrainingRecords).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          targetRoleId: "22222222-2222-4222-8222-222222222222",
+          roleId: "22222222-2222-4222-8222-222222222222",
           startedAtFrom: expect.any(String),
           page: 1,
         }),

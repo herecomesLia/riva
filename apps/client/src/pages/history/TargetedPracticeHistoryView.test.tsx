@@ -63,7 +63,7 @@ describe("TargetedPracticeHistoryView", () => {
     const retryLink = screen.getByRole("button", { name: i18n.t("history.detail.retry") })
     const retryHref = retryLink.getAttribute("href") ?? ""
     expect(retryHref).toContain("entry=history")
-    expect(retryHref).toContain(`targetRoleId=${encodeURIComponent(record.targetRole.id)}`)
+    expect(retryHref).toContain(`roleId=${encodeURIComponent(record.role.id)}`)
     expect(retryHref).toContain(`difficulty=${record.setup.difficulty}`)
     expect(retryHref).toContain(`source=${record.setup.source}`)
     expect(retryHref).toContain(
@@ -75,7 +75,7 @@ describe("TargetedPracticeHistoryView", () => {
     })
     const recommendationHref = recommendationLink.getAttribute("href") ?? ""
     expect(recommendationHref).toContain("/interview?")
-    expect(recommendationHref).toContain(`targetRoleId=${encodeURIComponent(record.targetRole.id)}`)
+    expect(recommendationHref).toContain(`roleId=${encodeURIComponent(record.role.id)}`)
     expect(recommendationHref).toContain(`round=${record.recommendation!.round}`)
     expect(recommendationHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
   })

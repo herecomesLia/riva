@@ -1,10 +1,6 @@
 import { useQueries, useQueryClient, type Query } from "@tanstack/react-query"
 
-import type {
-  TargetRoleResponse,
-  TaskStatusResponse,
-  TaskFailureResponse,
-} from "@/api/generated/models"
+import type { RoleResponse, TaskStatusResponse, TaskFailureResponse } from "@/api/generated/models"
 import type { MatchingAnalysisState } from "@/mocks/models/role"
 import { getJdExtractionState, getMatchingAnalysis } from "@/services/roles"
 
@@ -12,7 +8,7 @@ export const ROLES_QUERY_KEY = ["roles"] as const
 export const jdTaskQueryKey = (roleId: string) => ["roles", roleId, "jd-extraction"] as const
 export const matchingQueryKey = (roleId: string) => ["roles", roleId, "matching-analysis"] as const
 
-export function useRoleQueries(roles: TargetRoleResponse[]) {
+export function useRoleQueries(roles: RoleResponse[]) {
   const queryClient = useQueryClient()
   const jdQueries = useQueries({
     queries: roles.map((role) => ({

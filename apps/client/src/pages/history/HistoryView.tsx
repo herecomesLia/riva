@@ -67,7 +67,7 @@ export function HistoryView({
               filters={filters}
               loading={state.status === "loading"}
               onChange={onFiltersChange}
-              targetRoles={state.status === "loading" ? [] : state.data.overview.targetRoles}
+              roles={state.status === "loading" ? [] : state.data.overview.roles}
             />
             <HistoryRecordList
               emptyReason={state.status === "empty" ? state.reason : undefined}

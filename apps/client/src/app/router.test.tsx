@@ -168,7 +168,7 @@ describe("app router auth redirects", () => {
   it("preserves list filters and pagination across detail navigation and return", async () => {
     const user = userEvent.setup()
     queryClient.setQueryData(CURRENT_USER_QUERY_KEY, userMock)
-    const historySearch = "?kind=all&targetRoleId=all&timeRange=all&page=2"
+    const historySearch = "?kind=all&roleId=all&timeRange=all&page=2"
 
     renderRouterAt(`/history${historySearch}`)
 
@@ -199,7 +199,7 @@ describe("app router auth redirects", () => {
     queryClient.setQueryData(CURRENT_USER_QUERY_KEY, userMock)
 
     renderRouterAt(
-      "/history/interview/unknown-record?kind=mockInterview&targetRoleId=all&timeRange=last30Days&page=1",
+      "/history/interview/unknown-record?kind=mockInterview&roleId=all&timeRange=last30Days&page=1",
     )
 
     expect(

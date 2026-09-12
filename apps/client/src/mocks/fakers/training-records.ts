@@ -19,7 +19,7 @@ function toSummary(record: TrainingRecordDetail): TrainingRecordSummary {
     startedAt: record.startedAt,
     endedAt: record.endedAt,
     durationSeconds: record.durationSeconds,
-    targetRole: record.targetRole,
+    role: record.role,
     answeredQuestionCount: record.answeredQuestionCount,
     totalQuestionCount: record.totalQuestionCount,
     overallScore: record.overallScore,
@@ -59,7 +59,7 @@ export function createTrainingRecordsFaker() {
       const filtered = records
         .filter((record) => !input.kinds?.length || input.kinds.includes(record.kind))
         .filter((record) => !input.statuses?.length || input.statuses.includes(record.status))
-        .filter((record) => !input.targetRoleId || record.targetRole.id === input.targetRoleId)
+        .filter((record) => !input.roleId || record.role.id === input.roleId)
         .filter((record) => !input.startedAtFrom || record.startedAt >= input.startedAtFrom)
         .filter((record) => !input.startedAtTo || record.startedAt <= input.startedAtTo)
         .toSorted((a, b) => b.startedAt.localeCompare(a.startedAt))

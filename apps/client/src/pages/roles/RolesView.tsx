@@ -16,26 +16,26 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import type {
-  CreateTargetRoleRequest,
-  TargetRoleResponse,
+  CreateRoleRequest,
+  RoleResponse,
   UpdateJobDescriptionRequest,
-  UpdateTargetRoleRequest,
-  TargetRoleListResponse,
+  UpdateRoleRequest,
+  RoleListResponse,
 } from "@/api/generated/models"
 import type { JdField } from "@/pages/roles/types"
 import type { RecognizeRoleInput } from "@/mocks/models/role"
 import type { Loadable } from "@/types"
 
-import { MobileTargetRoleSelector } from "./components/MobileTargetRoleSelector"
-import { RoleDetails, type TargetRoleTab } from "./components/RoleDetails"
-import { TargetRoleProgressSummary } from "./components/TargetRoleProgressSummary"
+import { MobileRoleSelector } from "./components/MobileRoleSelector"
+import { RoleDetails, type RoleTab } from "./components/RoleDetails"
+import { RoleProgressSummary } from "./components/RoleProgressSummary"
 import { RoleEditorDialog } from "./components/RoleEditorDialog"
-import { TargetRoleCreationDialog } from "./components/TargetRoleCreationDialog"
+import { RoleCreationDialog } from "./components/RoleCreationDialog"
 import { JobDescriptionEditorDialog } from "./components/JobDescriptionEditorDialog"
 import { JobDescriptionAnalysisEditorDialog } from "./components/JobDescriptionAnalysisEditorDialog"
 import { RolesHeader } from "./components/RolesHeader"
 import { RolesList } from "./components/RolesList"
-import { getRolesForCategory, type TargetRoleListCategory } from "./components/roles-list-utils"
+import { getRolesForCategory, type RoleListCategory } from "./components/roles-list-utils"
 import {
   RolesEmptyState,
   RolesErrorState,
@@ -46,29 +46,29 @@ import { getRolesActionErrorCode, type RolesActionErrorCode } from "./roles-erro
 
 export type RolesViewActions = {
   archiveRole: (roleId: string) => Promise<unknown>
-  createRole: (input: CreateTargetRoleRequest) => Promise<TargetRoleResponse>
+  createRole: (input: CreateRoleRequest) => Promise<RoleResponse>
   deleteRole: (roleId: string) => Promise<unknown>
   match: (roleId: string) => Promise<unknown>
   retryJdSynchronization: (roleId: string) => Promise<unknown>
   retryMatchSynchronization: (roleId: string) => Promise<unknown>
-  recognizeRole: (input: RecognizeRoleInput) => Promise<TargetRoleResponse>
+  recognizeRole: (input: RecognizeRoleInput) => Promise<RoleResponse>
   restoreRole: (roleId: string) => Promise<unknown>
   extractJd: (roleId: string, text: string) => Promise<unknown>
   retryJdExtraction: (roleId: string) => Promise<unknown>
   abortJdExtraction: (roleId: string) => Promise<unknown>
   setActiveRole: (roleId: string) => Promise<unknown>
   updateJd: (roleId: string, input: UpdateJobDescriptionRequest) => Promise<unknown>
-  updateRole: (roleId: string, input: UpdateTargetRoleRequest) => Promise<unknown>
+  updateRole: (roleId: string, input: UpdateRoleRequest) => Promise<unknown>
 }
 
 export type RolesViewProps =
   | {
       variant: "default"
-      content: Loadable<TargetRoleListResponse>
+      content: Loadable<RoleListResponse>
       jdTasksByRoleId?: RoleResources["jdTasksByRoleId"]
       matchingByRoleId?: RoleResources["matchingByRoleId"]
       actions?: RolesViewActions
-      initialActiveTab?: TargetRoleTab
+      initialActiveTab?: RoleTab
       initialSelectedRoleId?: string
       jdSynchronizationErrorRoleIds?: string[]
       matchSynchronizationErrorRoleIds?: string[]
@@ -120,21 +120,21 @@ function RolesReadyView({
   actions?: RolesViewActions
   jdTasksByRoleId: RoleResources["jdTasksByRoleId"]
   matchingByRoleId: RoleResources["matchingByRoleId"]
-  data: TargetRoleListResponse
-  initialActiveTab?: TargetRoleTab
+  data: RoleListResponse
+  initialActiveTab?: RoleTab
   initialSelectedRoleId?: string
   jdSynchronizationErrorRoleIds: string[]
   matchSynchronizationErrorRoleIds: string[]
 }) {
   const { t } = useTranslation()
   const defaultSelectedRoleId =
-    initialSelectedRoleId ?? data.activeTargetRoleId ?? data.targetRoles[0]?.id ?? null
-  const initiallySelectedRole = data.targetRoles.find((role) => role.id === defaultSelectedRoleId)
+    initialSelectedRoleId ?? data.activeRoleId ?? data.roles[0]?.id ?? null
+  const initiallySelectedRole = data.roles.find((role) => role.id === defaultSelectedRoleId)
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(defaultSelectedRoleId)
-  const [roleCategory, setRoleCategory] = useState<TargetRoleListCategory>(
+  const [roleCategory, setRoleCategory] = useState<RoleListCategory>(
     initiallySelectedRole?.isArchived ? "archived" : "active",
   )
-  const [activeTab, setActiveTab] = useState<TargetRoleTab>(initialActiveTab ?? "overview")
+  const [activeTab, setActiveTab] = useState<RoleTab>(initialActiveTab ?? "overview")
   const [editorMode, setEditorMode] = useState<"edit" | null>(null)
   const [isCreationDialogOpen, setIsCreationDialogOpen] = useState(false)
   const [isJobDescriptionEditorOpen, setIsJobDescriptionEditorOpen] = useState(false)
@@ -181,18 +181,18 @@ function RolesReadyView({
     }
   }
 
-  const visibleRoles = getRolesForCategory(data.targetRoles, roleCategory)
+  const visibleRoles = getRolesForCategory(data.roles, roleCategory)
   const selectedRole =
     visibleRoles.find((role) => role.id === selectedRoleId) ??
-    visibleRoles.find((role) => role.id === data.activeTargetRoleId) ??
+    visibleRoles.find((role) => role.id === data.activeRoleId) ??
     visibleRoles[0] ??
     null
 
   const jdTask = selectedRole ? jdTasksByRoleId[selectedRole.id] : undefined
   const analysis = selectedRole ? matchingByRoleId[selectedRole.id] : undefined
 
-  function handleRoleCategoryChange(category: TargetRoleListCategory) {
-    const nextRoles = getRolesForCategory(data.targetRoles, category)
+  function handleRoleCategoryChange(category: RoleListCategory) {
+    const nextRoles = getRolesForCategory(data.roles, category)
     setRoleCategory(category)
     setSelectedRoleId(nextRoles[0]?.id ?? null)
   }
@@ -203,11 +203,11 @@ function RolesReadyView({
         disabled={pendingAction}
         onAdd={actions ? () => setIsCreationDialogOpen(true) : undefined}
       />
-      {data.targetRoles.length === 0 ? (
+      {data.roles.length === 0 ? (
         <RolesEmptyState />
       ) : (
         <>
-          {data.activeTargetRoleId === null && (
+          {data.activeRoleId === null && (
             <Alert data-testid="roles-no-current-alert">
               <AlertCircleIcon />
               <AlertTitle>{t("roles.noCurrentRole")}</AlertTitle>
@@ -228,16 +228,16 @@ function RolesReadyView({
               <RolesList
                 category={roleCategory}
                 className="shrink-0"
-                activeRoleId={data.activeTargetRoleId}
+                activeRoleId={data.activeRoleId}
                 onCategoryChange={handleRoleCategoryChange}
                 onSelectRole={setSelectedRoleId}
-                roles={data.targetRoles}
+                roles={data.roles}
                 matchingByRoleId={matchingByRoleId}
                 selectedRoleId={selectedRole?.id ?? null}
               />
               {selectedRole && (
-                <TargetRoleProgressSummary
-                  isCurrent={selectedRole.id === data.activeTargetRoleId}
+                <RoleProgressSummary
+                  isCurrent={selectedRole.id === data.activeRoleId}
                   role={selectedRole}
                   jdTask={jdTask}
                   analysis={analysis}
@@ -245,18 +245,18 @@ function RolesReadyView({
               )}
             </aside>
             <section className="flex min-w-0 flex-col gap-4">
-              <MobileTargetRoleSelector
+              <MobileRoleSelector
                 category={roleCategory}
-                activeRoleId={data.activeTargetRoleId}
+                activeRoleId={data.activeRoleId}
                 onCategoryChange={handleRoleCategoryChange}
                 onSelectRole={setSelectedRoleId}
-                roles={data.targetRoles}
+                roles={data.roles}
                 selectedRole={selectedRole}
               />
               {selectedRole && (
                 <div className="@4xl/app:hidden">
-                  <TargetRoleProgressSummary
-                    isCurrent={selectedRole.id === data.activeTargetRoleId}
+                  <RoleProgressSummary
+                    isCurrent={selectedRole.id === data.activeRoleId}
                     role={selectedRole}
                     jdTask={jdTask}
                     analysis={analysis}
@@ -315,7 +315,7 @@ function RolesReadyView({
                         }
                       : undefined
                   }
-                  activeRoleId={data.activeTargetRoleId}
+                  activeRoleId={data.activeRoleId}
                   onTabChange={setActiveTab}
                   pending={pendingAction}
                   role={selectedRole}
@@ -336,7 +336,7 @@ function RolesReadyView({
 
       {actions && (
         <>
-          <TargetRoleCreationDialog
+          <RoleCreationDialog
             onDirtyChange={handleDirtyChange}
             onManualCreate={async (input) => {
               const createdRole = await actions.createRole(input)

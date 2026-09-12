@@ -21,7 +21,7 @@ export const practiceFixture = {
     nextStepSuggestion: "继续练习，并优先补强复盘中暴露的薄弱能力。",
   } satisfies Omit<CompletedSession, "status" | "selection">,
   selection: {
-    targetRoleId: null,
+    roleId: null,
     questionType: "projectDeepDive",
     difficulty: "basic",
     source: "personalized",

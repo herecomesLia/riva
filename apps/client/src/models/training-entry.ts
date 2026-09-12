@@ -16,7 +16,7 @@ import type { TrainingRecordQuestionType } from "./training-records"
 export type TrainingEntryOrigin = "history"
 
 export type PracticeTrainingEntryParameters = {
-  targetRoleId?: string
+  roleId?: string
   questionType?: QuestionType
   difficulty?: Difficulty
   source?: QuestionSource
@@ -24,7 +24,7 @@ export type PracticeTrainingEntryParameters = {
 }
 
 export type InterviewTrainingEntryParameters = {
-  targetRoleId?: string
+  roleId?: string
   round?: InterviewRound
   difficulty?: InterviewDifficulty
   durationMinutes?: InterviewDurationMinutes
@@ -37,7 +37,7 @@ export type TrainingEntryAdjustmentReason =
   | "durationUnavailable"
 
 export type TrainingEntryRoleUnavailableReason =
-  "targetRoleDeleted" | "targetRoleArchived" | "targetRolePrerequisiteUnavailable"
+  "roleDeleted" | "roleArchived" | "rolePrerequisiteUnavailable"
 
 export type TrainingEntryRoleAvailability =
   | { status: "available" }
@@ -114,7 +114,7 @@ export function resolvePracticeTrainingEntry(
       reason: roleAvailability.reason,
       configuration: {
         ...current,
-        targetRoleId: null,
+        roleId: null,
         questionType: parameters.questionType ?? current.questionType,
         difficulty: context.availableDifficulties.includes(
           parameters.difficulty ?? current.difficulty,
@@ -127,7 +127,7 @@ export function resolvePracticeTrainingEntry(
     }
   }
 
-  const selectedRole = context.targetRoles.find(({ id }) => id === parameters.targetRoleId)
+  const selectedRole = context.roles.find(({ id }) => id === parameters.roleId)
   if (!selectedRole) {
     throw new Error("Available history target role is missing from practice setup.")
   }
@@ -148,7 +148,7 @@ export function resolvePracticeTrainingEntry(
   if (difficulty !== requestedDifficulty) adjustments.push("difficultyUnavailable")
 
   const configuration = {
-    targetRoleId: selectedRole.id,
+    roleId: selectedRole.id,
     questionType,
     difficulty,
     source: parameters.source ?? current.source,
@@ -177,7 +177,7 @@ export function resolveInterviewTrainingEntry(
       status: "roleUnavailable",
       reason: roleAvailability.reason,
       configuration: {
-        targetRoleId: null,
+        roleId: null,
         round: parameters.round ?? setup.defaultConfiguration.round,
         difficulty: setup.availableDifficulties.includes(
           parameters.difficulty ?? setup.defaultConfiguration.difficulty,
@@ -193,7 +193,7 @@ export function resolveInterviewTrainingEntry(
     }
   }
 
-  const selectedRole = setup.targetRoles.find(({ id }) => id === parameters.targetRoleId)
+  const selectedRole = setup.roles.find(({ id }) => id === parameters.roleId)
   if (!selectedRole) {
     throw new Error("Available history target role is missing from interview setup.")
   }
@@ -215,7 +215,7 @@ export function resolveInterviewTrainingEntry(
   if (durationMinutes !== requestedDuration) adjustments.push("durationUnavailable")
 
   const configuration = {
-    targetRoleId: selectedRole.id,
+    roleId: selectedRole.id,
     round,
     difficulty,
     durationMinutes,

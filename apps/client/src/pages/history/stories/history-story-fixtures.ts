@@ -20,7 +20,7 @@ function toSummary(record: TrainingRecordDetail): TrainingRecordSummary {
     startedAt: record.startedAt,
     endedAt: record.endedAt,
     durationSeconds: record.durationSeconds,
-    targetRole: structuredClone(record.targetRole),
+    role: structuredClone(record.role),
     answeredQuestionCount: record.answeredQuestionCount,
     totalQuestionCount: record.totalQuestionCount,
     overallScore: record.overallScore,
@@ -51,9 +51,9 @@ export const historyOverviewStoryFixture: TrainingRecordsOverviewResponse = {
   totalDurationSeconds: 4110,
   answeredQuestionCount: 6,
   averageScore: 78,
-  targetRoles: structuredClone([
-    completedTargetedPracticeHistoryStoryFixture.targetRole,
-    completeMockInterviewHistoryStoryFixture.targetRole,
+  roles: structuredClone([
+    completedTargetedPracticeHistoryStoryFixture.role,
+    completeMockInterviewHistoryStoryFixture.role,
   ]),
   byKind: {
     targetedPractice: {
@@ -89,7 +89,7 @@ export const emptyHistoryOverviewStoryFixture: TrainingRecordsOverviewResponse =
   totalDurationSeconds: 0,
   answeredQuestionCount: 0,
   averageScore: null,
-  targetRoles: [],
+  roles: [],
   byKind: {
     targetedPractice: {
       recordCount: 0,

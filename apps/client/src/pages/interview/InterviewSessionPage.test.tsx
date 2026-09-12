@@ -64,7 +64,7 @@ function completedResponse(active: Exclude<InterviewSession, CompletedSession>):
   }
 }
 
-const configuration = { ...interviewFixture.configuration, targetRoleId: "role_frontend_bytedance" }
+const configuration = { ...interviewFixture.configuration, roleId: "role_frontend_bytedance" }
 
 function openingResponse(): InterviewData {
   return responseWithSession({

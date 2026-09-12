@@ -4,36 +4,36 @@ import preview from "#storybook/preview"
 import { expect, screen } from "storybook/test"
 
 import { createRoleStoryResponse } from "../stories/role-story-fixtures"
-import { RoleDetails, type TargetRoleTab } from "./RoleDetails"
+import { RoleDetails, type RoleTab } from "./RoleDetails"
 
 const meta = preview.meta({
   component: RoleDetails,
   title: "Roles/RoleDetails",
 })
 
-function DetailsHarness({ initialTab = "overview" }: { initialTab?: TargetRoleTab }) {
-  const [activeTab, setActiveTab] = useState<TargetRoleTab>(initialTab)
+function DetailsHarness({ initialTab = "overview" }: { initialTab?: RoleTab }) {
+  const [activeTab, setActiveTab] = useState<RoleTab>(initialTab)
   const response = createRoleStoryResponse("matchingAnalysisCurrent")
   return (
     <RoleDetails
       activeTab={activeTab}
-      activeRoleId={response.activeTargetRoleId}
+      activeRoleId={response.activeRoleId}
       onTabChange={setActiveTab}
-      role={response.targetRoles[0]!}
-      jdTask={response.jdTasksByRoleId[response.targetRoles[0]!.id]}
-      analysis={response.matchingByRoleId[response.targetRoles[0]!.id]}
+      role={response.roles[0]!}
+      jdTask={response.jdTasksByRoleId[response.roles[0]!.id]}
+      analysis={response.matchingByRoleId[response.roles[0]!.id]}
     />
   )
 }
 
 function ArchivedDetailsHarness() {
-  const [activeTab, setActiveTab] = useState<TargetRoleTab>("overview")
+  const [activeTab, setActiveTab] = useState<RoleTab>("overview")
   const response = createRoleStoryResponse("archivedRoles")
-  const archivedRole = response.targetRoles.find((role) => role.isArchived)!
+  const archivedRole = response.roles.find((role) => role.isArchived)!
   return (
     <RoleDetails
       activeTab={activeTab}
-      activeRoleId={response.activeTargetRoleId}
+      activeRoleId={response.activeRoleId}
       onTabChange={setActiveTab}
       role={archivedRole}
       jdTask={response.jdTasksByRoleId[archivedRole.id]}

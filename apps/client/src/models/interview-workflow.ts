@@ -6,7 +6,7 @@ export type InterviewDifficulty = "basic" | "pressure"
 export type InterviewDurationMinutes = 15 | 30 | 45
 
 export type InterviewConfiguration = {
-  targetRoleId: string
+  roleId: string
   round: InterviewRound
   difficulty: InterviewDifficulty
   durationMinutes: InterviewDurationMinutes
@@ -28,11 +28,11 @@ export type InterviewAvailability =
 
 export type InterviewSetup = {
   availability: InterviewAvailability
-  targetRoles: InterviewRoleOption[]
+  roles: InterviewRoleOption[]
   availableDifficulties: InterviewDifficulty[]
   availableDurationMinutes: InterviewDurationMinutes[]
-  defaultConfiguration: Omit<InterviewConfiguration, "targetRoleId"> & {
-    targetRoleId: string | null
+  defaultConfiguration: Omit<InterviewConfiguration, "roleId"> & {
+    roleId: string | null
   }
 }
 

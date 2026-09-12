@@ -53,7 +53,7 @@ import { InterviewAnswerComposer } from "./components/InterviewAnswerComposer"
 import { InterviewConversationHistory } from "./components/InterviewConversationHistory"
 
 export type InterviewSessionSummary = {
-  targetRole: string
+  role: string
   company: string | null
   round: InterviewRound
   difficulty: InterviewDifficulty
@@ -175,7 +175,7 @@ function SessionSummaryHeader({ summary }: { summary: InterviewSessionSummary })
         <Badge variant="outline">{t(`interview.difficulty.${summary.difficulty}`)}</Badge>
       </div>
       <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
-        {summary.targetRole}
+        {summary.role}
       </h1>
       {summary.company ? <p className="text-sm text-muted-foreground">{summary.company}</p> : null}
       <SessionProgress summary={summary} />
@@ -217,7 +217,7 @@ function SessionHeader({
             <Badge variant="outline">{t(`interview.difficulty.${summary.difficulty}`)}</Badge>
           </div>
           <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
-            {summary.targetRole}
+            {summary.role}
           </h1>
           {summary.company ? (
             <p className="text-sm text-muted-foreground">{summary.company}</p>

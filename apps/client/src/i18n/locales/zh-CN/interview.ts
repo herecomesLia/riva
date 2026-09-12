@@ -5,7 +5,7 @@ export const interview = {
     title: "配置本次面试",
     description: "选择目标岗位、面试轮次和难度，Riva 将据此准备本次模拟面试。",
     fields: {
-      targetRole: "目标岗位",
+      role: "目标岗位",
       round: "面试轮次",
       difficulty: "面试难度",
       duration: "预计面试时长",

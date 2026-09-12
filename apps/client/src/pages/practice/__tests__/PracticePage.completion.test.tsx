@@ -16,12 +16,12 @@ describe("PracticePage: completion", () => {
       const current = api.createPracticeScenario(scenario)
       const prepared = api.createPracticeScenario("setupReady")
       if (prepared.session.status !== "setup") throw new Error("Expected setup state.")
-      const productRole = prepared.setupContext.targetRoles.find(
+      const productRole = prepared.setupContext.roles.find(
         ({ id }) => id === "role_product_manager_meituan",
       )
       if (productRole === undefined) throw new Error("Expected product role.")
       prepared.session.selection = {
-        targetRoleId: productRole.id,
+        roleId: productRole.id,
         questionType: "behavioral",
         difficulty: "pressure",
         source: "history",
@@ -38,18 +38,18 @@ describe("PracticePage: completion", () => {
       })
 
       context.renderPracticePage(
-        "/practice?entry=history&targetRoleId=role_product_manager_meituan&questionType=behavioral&difficulty=pressure&source=history&prioritizeWeaknesses=true",
+        "/practice?entry=history&roleId=role_product_manager_meituan&questionType=behavioral&difficulty=pressure&source=history&prioritizeWeaknesses=true",
       )
 
       expect(await testing.screen.findByTestId("practice-setup-state")).toBeInTheDocument()
       expect(vi.mocked(api.preparePracticeTrainingEntry).mock.calls[0]?.[0]).toEqual({
-        targetRoleId: "role_product_manager_meituan",
+        roleId: "role_product_manager_meituan",
         questionType: "behavioral",
         difficulty: "pressure",
         source: "history",
         prioritizeWeaknesses: true,
       })
-      expect(testing.screen.getByTestId("practice-target-role-trigger")).toHaveTextContent(
+      expect(testing.screen.getByTestId("practice-role-trigger")).toHaveTextContent(
         "Product Manager",
       )
       expect(
@@ -76,12 +76,12 @@ describe("PracticePage: completion", () => {
     const current = api.createPracticeScenario("answeringQuestion")
     const prepared = api.createPracticeScenario("setupReady")
     if (prepared.session.status !== "setup") throw new Error("Expected setup state.")
-    const productRole = prepared.setupContext.targetRoles.find(
+    const productRole = prepared.setupContext.roles.find(
       ({ id }) => id === "role_product_manager_meituan",
     )!
     prepared.session.selection = {
       ...prepared.session.selection,
-      targetRoleId: productRole.id,
+      roleId: productRole.id,
       questionType: productRole.supportedQuestionTypes[0],
       source: "history",
     }
@@ -91,7 +91,7 @@ describe("PracticePage: completion", () => {
     }
     generating.session.selection = {
       ...prepared.session.selection,
-      targetRoleId: productRole.id,
+      roleId: productRole.id,
     }
     vi.mocked(api.getPracticePage).mockResolvedValue(current)
     vi.mocked(api.preparePracticeTrainingEntry).mockResolvedValue({
@@ -105,7 +105,7 @@ describe("PracticePage: completion", () => {
     vi.mocked(api.startPracticeSession).mockResolvedValue(generating.session)
 
     context.renderPracticePage(
-      "/practice?entry=history&targetRoleId=role_product_manager_meituan&questionType=technicalFoundation&difficulty=basic&source=history",
+      "/practice?entry=history&roleId=role_product_manager_meituan&questionType=technicalFoundation&difficulty=basic&source=history",
     )
 
     expect(await testing.screen.findByTestId("history-entry-adjusted")).toHaveTextContent(
@@ -130,7 +130,7 @@ describe("PracticePage: completion", () => {
     if (prepared.session.status !== "setup") throw new Error("Expected setup state.")
     prepared.session.selection = {
       ...prepared.session.selection,
-      targetRoleId: null,
+      roleId: null,
       source: "history",
     }
     const generating = api.createPracticeScenario("generatingQuestion")
@@ -139,31 +139,31 @@ describe("PracticePage: completion", () => {
       page: prepared,
       resolution: {
         status: "roleUnavailable",
-        reason: "targetRoleDeleted",
+        reason: "roleDeleted",
         configuration: prepared.session.selection,
       },
     })
     vi.mocked(api.startPracticeSession).mockResolvedValue(generating.session)
 
     context.renderPracticePage(
-      "/practice?entry=history&targetRoleId=role_deleted&questionType=projectDeepDive&difficulty=basic&source=history",
+      "/practice?entry=history&roleId=role_deleted&questionType=projectDeepDive&difficulty=basic&source=history",
     )
 
     expect(await testing.screen.findByTestId("history-entry-role-unavailable")).toHaveTextContent(
-      i18n.t("common.trainingEntry.roleUnavailable.reasons.targetRoleDeleted"),
+      i18n.t("common.trainingEntry.roleUnavailable.reasons.roleDeleted"),
     )
     const start = testing.screen.getByRole("button", { name: i18n.t("practice.actions.start") })
     expect(start).toBeDisabled()
-    expect(testing.screen.getByTestId("practice-target-role-trigger")).toHaveTextContent(
+    expect(testing.screen.getByTestId("practice-role-trigger")).toHaveTextContent(
       i18n.t("common.trainingEntry.selectRole"),
     )
 
-    await user.click(testing.screen.getByTestId("practice-target-role-trigger"))
+    await user.click(testing.screen.getByTestId("practice-role-trigger"))
     await user.click(await testing.screen.findByRole("option", { name: /ByteDance/ }))
     expect(start).toBeEnabled()
     await user.click(start)
     expect(vi.mocked(api.startPracticeSession).mock.calls[0]?.[0]).toEqual(
-      expect.objectContaining({ targetRoleId: "role_frontend_bytedance" }),
+      expect.objectContaining({ roleId: "role_frontend_bytedance" }),
     )
   })
 
@@ -185,7 +185,7 @@ describe("PracticePage: completion", () => {
       })
 
     context.renderPracticePage(
-      "/practice?entry=history&targetRoleId=role_frontend_bytedance&questionType=projectDeepDive",
+      "/practice?entry=history&roleId=role_frontend_bytedance&questionType=projectDeepDive",
     )
     expect(await testing.screen.findByTestId("history-entry-failed")).toBeInTheDocument()
     await user.click(
@@ -302,10 +302,9 @@ describe("PracticePage: completion", () => {
 
     expect(result.queryClient.getQueryData(PRACTICE_QUERY_KEY)).toEqual(prepared)
     expect(await testing.screen.findByTestId("practice-setup-state")).toBeInTheDocument()
-    expect(testing.screen.getByTestId("practice-target-role-trigger")).toHaveTextContent(
-      completed.setupContext.targetRoles.find(
-        (role) => role.id === completed.session.selection.targetRoleId,
-      )?.title ?? "",
+    expect(testing.screen.getByTestId("practice-role-trigger")).toHaveTextContent(
+      completed.setupContext.roles.find((role) => role.id === completed.session.selection.roleId)
+        ?.title ?? "",
     )
     expect(
       testing.screen.getByRole("button", {

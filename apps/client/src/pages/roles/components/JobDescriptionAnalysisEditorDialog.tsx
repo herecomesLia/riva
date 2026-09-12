@@ -20,7 +20,7 @@ import type {
   JobDescriptionResponse,
   JobRequirementsRequest,
   UpdateJobDescriptionRequest,
-  TargetRoleResponse,
+  RoleResponse,
 } from "@/api/generated/models"
 import type { JdField } from "@/pages/roles/types"
 
@@ -62,7 +62,7 @@ export function JobDescriptionAnalysisEditorDialog({
   onOpenChange: (open: boolean) => void
   onSave: (roleId: string, input: UpdateJobDescriptionRequest) => Promise<void>
   onSaved: () => void
-  role: TargetRoleResponse | null
+  role: RoleResponse | null
   jdTask: RoleResources["jdTasksByRoleId"][string]
 }) {
   const { t } = useTranslation()
@@ -105,7 +105,7 @@ function JobDescriptionAnalysisEditorForm({
   onOpenChange: (open: boolean) => void
   onSave: (roleId: string, input: UpdateJobDescriptionRequest) => Promise<void>
   onSaved: () => void
-  role: TargetRoleResponse
+  role: RoleResponse
   title: string
 }) {
   const { t } = useTranslation()

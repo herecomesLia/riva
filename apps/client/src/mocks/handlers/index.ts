@@ -6,12 +6,12 @@ import {
 } from "@/api/generated/endpoints/users/users.msw"
 import { authHandlers } from "@/mocks/handlers/auth"
 import { careerProfileHandlers } from "@/mocks/handlers/career-profile"
-import { targetRoleHandlers } from "@/mocks/handlers/target-role"
+import { roleHandlers } from "@/mocks/handlers/role"
 
 export const handlers = [
   ...authHandlers,
   ...careerProfileHandlers,
-  ...targetRoleHandlers,
+  ...roleHandlers,
   ...getHealthMock(),
   getUpdateCurrentUserMockHandler(),
   getSetUserAvatarMockHandler(),

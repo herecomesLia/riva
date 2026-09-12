@@ -13,12 +13,12 @@ export const Default = meta.story({
   args: {
     filters: {
       kind: "all",
-      targetRoleId: "all",
+      roleId: "all",
       timeRange: "all",
     },
     loading: false,
     onChange: fn(),
-    targetRoles: historyOverviewStoryFixture.targetRoles,
+    roles: historyOverviewStoryFixture.roles,
   },
 })
 
@@ -26,6 +26,6 @@ export const Loading = meta.story({
   args: {
     ...Default.input.args,
     loading: true,
-    targetRoles: [],
+    roles: [],
   },
 })

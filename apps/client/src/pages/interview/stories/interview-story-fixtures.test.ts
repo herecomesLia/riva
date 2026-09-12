@@ -13,10 +13,10 @@ import {
 describe("interview Story fixtures", () => {
   it("returns independent setup and session data for every Story", () => {
     const firstSetup = createInterviewSetupStoryFixture()
-    firstSetup.targetRoles[0]!.title = "被 Story 修改的岗位"
+    firstSetup.roles[0]!.title = "被 Story 修改的岗位"
     const secondSetup = createInterviewSetupStoryFixture()
 
-    expect(secondSetup.targetRoles[0]?.title).toBe("Senior Frontend Engineer")
+    expect(secondSetup.roles[0]?.title).toBe("Senior Frontend Engineer")
 
     const firstSession = createInterviewSessionStoryFixture()
     firstSession.history[0]!.answer = "被 Story 修改的回答"
@@ -27,16 +27,16 @@ describe("interview Story fixtures", () => {
 
   it("provides product-ready and missing-JD display scenarios", () => {
     const allReady = createInterviewSetupStoryFixture("multipleRolesReady")
-    expect(allReady.targetRoles.map(({ id }) => id)).toEqual([
+    expect(allReady.roles.map(({ id }) => id)).toEqual([
       "role_frontend_bytedance",
       "role_product_manager_meituan",
     ])
 
     const defaultSetup = createInterviewSetupStoryFixture()
-    expect(defaultSetup.targetRoles.map(({ id }) => id)).toEqual(["role_frontend_bytedance"])
+    expect(defaultSetup.roles.map(({ id }) => id)).toEqual(["role_frontend_bytedance"])
 
     const missing = createInterviewSetupStoryFixture("jobDescriptionMissing")
-    expect(missing.targetRoles).toEqual([])
+    expect(missing.roles).toEqual([])
     expect(missing.availability).toEqual({
       status: "blocked",
       reason: "jobDescriptionMissing",

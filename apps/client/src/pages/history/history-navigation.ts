@@ -4,7 +4,7 @@ const historyKinds: HistoryKindFilter[] = ["all", "targetedPractice", "mockInter
 const historyTimeRanges: HistoryTimeRange[] = ["all", "last7Days", "last30Days", "last90Days"]
 export const defaultHistorySearch = {
   kind: "all",
-  targetRoleId: "all",
+  roleId: "all",
   timeRange: "all",
   page: 1,
 } satisfies HistoryRouteSearch
@@ -16,7 +16,7 @@ export type HistoryRouteSearch = HistoryFiltersValue & {
 export function parseHistorySearch(search: Record<string, unknown>): HistoryRouteSearch {
   return {
     kind: includes(historyKinds, search.kind) ? search.kind : defaultHistorySearch.kind,
-    targetRoleId: nonEmptyString(search.targetRoleId) ?? defaultHistorySearch.targetRoleId,
+    roleId: nonEmptyString(search.roleId) ?? defaultHistorySearch.roleId,
     timeRange: includes(historyTimeRanges, search.timeRange)
       ? search.timeRange
       : defaultHistorySearch.timeRange,

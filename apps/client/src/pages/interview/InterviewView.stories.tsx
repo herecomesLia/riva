@@ -41,7 +41,7 @@ export const HistoricalConfigurationAvailable = meta.story({
 })
 
 const unavailableRoleSetup = createInterviewSetupStoryFixture("multipleRolesReady")
-unavailableRoleSetup.defaultConfiguration.targetRoleId = null
+unavailableRoleSetup.defaultConfiguration.roleId = null
 
 export const HistoricalRoleUnavailable = meta.story({
   args: {
@@ -49,7 +49,7 @@ export const HistoricalRoleUnavailable = meta.story({
     setup: unavailableRoleSetup,
     historyEntryResolution: {
       status: "roleUnavailable",
-      reason: "targetRolePrerequisiteUnavailable",
+      reason: "rolePrerequisiteUnavailable",
       configuration: unavailableRoleSetup.defaultConfiguration,
     },
     isStarting: false,
@@ -187,7 +187,7 @@ export const ProductHrBasic = meta.story({
     onStart: onStartProductHrBasic,
   },
   play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getByTestId("interview-target-role-trigger"))
+    await userEvent.click(canvas.getByTestId("interview-role-trigger"))
     await userEvent.click(await screen.findByRole("option", { name: "Product Manager · Meituan" }))
     await expect(
       canvas.queryByRole("button", { name: /技术面|technical/i }),
@@ -197,7 +197,7 @@ export const ProductHrBasic = meta.story({
       canvas.getByRole("button", { name: /开始模拟面试|Start mock interview/i }),
     )
     await expect(onStartProductHrBasic).toHaveBeenCalledWith({
-      targetRoleId: "role_product_manager_meituan",
+      roleId: "role_product_manager_meituan",
       round: "hr",
       difficulty: "basic",
       durationMinutes: 30,
@@ -216,8 +216,8 @@ export const JobDescriptionMissing = meta.story({
     reason: missingJobDescriptionSetup.availability.reason,
   },
   play: async ({ canvas }) => {
-    await expect(canvas.getByText(/补充目标岗位 JD|add a target-role JD/i)).toBeVisible()
-    await expect(canvas.queryByTestId("interview-target-role-trigger")).not.toBeInTheDocument()
+    await expect(canvas.getByText(/补充目标岗位 JD|add a role JD/i)).toBeVisible()
+    await expect(canvas.queryByTestId("interview-role-trigger")).not.toBeInTheDocument()
   },
 })
 
@@ -235,7 +235,7 @@ export const FrontendTechnicalPressure = meta.story({
       canvas.getByRole("button", { name: /开始模拟面试|Start mock interview/i }),
     )
     await expect(onStartFrontendTechnicalPressure).toHaveBeenCalledWith({
-      targetRoleId: "role_frontend_bytedance",
+      roleId: "role_frontend_bytedance",
       round: "technical",
       difficulty: "pressure",
       durationMinutes: 30,

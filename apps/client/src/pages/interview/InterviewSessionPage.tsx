@@ -199,10 +199,8 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     )
   }
 
-  const targetRole = data.setup.targetRoles.find(
-    ({ id }) => id === session.configuration.targetRoleId,
-  )
-  if (targetRole === undefined) {
+  const role = data.setup.roles.find(({ id }) => id === session.configuration.roleId)
+  if (role === undefined) {
     return (
       <InterviewSessionView
         onBack={() => void backToSetup()}
@@ -212,7 +210,7 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
     )
   }
 
-  const summary = toSummary(session, targetRole.title, targetRole.company)
+  const summary = toSummary(session, role.title, role.company)
   if (session.status === "opening") {
     return (
       <InterviewSessionView
@@ -263,11 +261,11 @@ export function InterviewSessionContainer({ sessionId }: { sessionId: string }) 
 
 function toSummary(
   session: Exclude<InterviewSession, { status: "completed" }>,
-  targetRole: string,
+  role: string,
   company: string | null,
 ): InterviewSessionSummary {
   return {
-    targetRole,
+    role,
     company,
     round: session.configuration.round,
     difficulty: session.configuration.difficulty,

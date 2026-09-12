@@ -7,7 +7,7 @@ export const interview = {
     description:
       "Choose a target role, interview round, and difficulty so Riva can prepare your session.",
     fields: {
-      targetRole: "Target role",
+      role: "Target role",
       round: "Interview round",
       difficulty: "Difficulty",
       duration: "Expected duration",

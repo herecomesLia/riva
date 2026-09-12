@@ -20,7 +20,7 @@ describe("mapTrainingRecommendationToEntry", () => {
       to: "/practice",
       search: {
         entry: "history",
-        targetRoleId: "role-1",
+        roleId: "role-1",
         questionType: "technicalFoundation",
         difficulty: "pressure",
         source: "history",
@@ -46,7 +46,7 @@ describe("mapTrainingRecommendationToEntry", () => {
       to: "/interview",
       search: {
         entry: "history",
-        targetRoleId: "role-1",
+        roleId: "role-1",
         round: "technical",
         difficulty: "basic",
       },

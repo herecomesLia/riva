@@ -13,7 +13,7 @@ from riva.utils import utc_now
 if TYPE_CHECKING:
     from riva.models.auth import AuthSession
     from riva.models.career_profile import CareerProfile
-    from riva.models.target_role import TargetRole
+    from riva.models.role import Role
 
 
 def normalize_username(username: str) -> str:
@@ -37,11 +37,11 @@ class User(Base):
         DateTime(timezone=True),
         nullable=True,
     )
-    active_target_role_id: Mapped[UUID | None] = mapped_column(
+    active_role_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey(
-            "target_roles.id",
-            name="fk_users_active_target_role_id_target_roles",
+            "roles.id",
+            name="fk_users_active_role_id_roles",
             ondelete="SET NULL",
             use_alter=True,
         ),
@@ -86,16 +86,16 @@ class User(Base):
         lazy="selectin",
     )
 
-    target_roles: Mapped[list[TargetRole]] = relationship(
-        "TargetRole",
+    roles: Mapped[list[Role]] = relationship(
+        "Role",
         cascade="all, delete-orphan",
-        foreign_keys="TargetRole.user_id",
+        foreign_keys="Role.user_id",
         lazy="selectin",
     )
 
-    active_target_role: Mapped[TargetRole | None] = relationship(
-        "TargetRole",
-        foreign_keys=[active_target_role_id],
+    active_role: Mapped[Role | None] = relationship(
+        "Role",
+        foreign_keys=[active_role_id],
         lazy="selectin",
         post_update=True,
     )

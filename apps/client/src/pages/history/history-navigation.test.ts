@@ -13,13 +13,13 @@ describe("training history navigation contracts", () => {
     expect(
       parseHistorySearch({
         kind: "mockInterview",
-        targetRoleId: "role-1",
+        roleId: "role-1",
         timeRange: "last30Days",
         page: "3",
       }),
     ).toEqual({
       kind: "mockInterview",
-      targetRoleId: "role-1",
+      roleId: "role-1",
       timeRange: "last30Days",
       page: 3,
     })
@@ -44,7 +44,7 @@ describe("training history navigation contracts", () => {
     expect(
       parsePracticeEntrySearch({
         entry: "history",
-        targetRoleId: "role-1",
+        roleId: "role-1",
         questionType: "behavioral",
         difficulty: "pressure",
         source: "history",
@@ -56,7 +56,7 @@ describe("training history navigation contracts", () => {
       }),
     ).toEqual({
       entry: "history",
-      targetRoleId: "role-1",
+      roleId: "role-1",
       questionType: "behavioral",
       difficulty: "pressure",
       source: "history",
@@ -65,7 +65,7 @@ describe("training history navigation contracts", () => {
     expect(
       parseInterviewEntrySearch({
         entry: "history",
-        targetRoleId: "role-1",
+        roleId: "role-1",
         round: "technical",
         difficulty: "pressure",
         durationMinutes: "30",
@@ -76,7 +76,7 @@ describe("training history navigation contracts", () => {
       }),
     ).toEqual({
       entry: "history",
-      targetRoleId: "role-1",
+      roleId: "role-1",
       round: "technical",
       difficulty: "pressure",
       durationMinutes: 30,

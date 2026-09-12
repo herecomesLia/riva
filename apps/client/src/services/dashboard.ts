@@ -1,6 +1,6 @@
 import { dashboardFixture } from "@/mocks/fixtures/dashboard"
 import type { DashboardResponse } from "@/models/dashboard"
-import type { TargetRoleResponse } from "@/api/generated/models"
+import type { RoleResponse } from "@/api/generated/models"
 import type { MatchingAnalysisState } from "@/mocks/models/role"
 import { hasJobDescription } from "@/lib/job-description"
 import { isCareerProfileComplete } from "@/lib/career-profile"
@@ -8,7 +8,7 @@ import { getProfile } from "@/services/profile"
 import { getRoles, getMatchingAnalysis, getJdExtractionState } from "@/services/roles"
 
 function toCurrentRole(
-  role: TargetRoleResponse | null,
+  role: RoleResponse | null,
   profileCompleted: boolean,
   jobDescriptionAdded: boolean,
 ): DashboardResponse["currentRole"] {
@@ -35,8 +35,8 @@ function toRoleFit(
 
 export async function getDashboardData(): Promise<DashboardResponse> {
   const [roles, profile] = await Promise.all([getRoles(), getProfile()])
-  let currentRole = roles.activeTargetRoleId
-    ? (roles.targetRoles.find(({ id }) => id === roles.activeTargetRoleId) ?? null)
+  let currentRole = roles.activeRoleId
+    ? (roles.roles.find(({ id }) => id === roles.activeRoleId) ?? null)
     : null
   const fixture = structuredClone(dashboardFixture)
   const [analysis, task] = currentRole
@@ -44,7 +44,7 @@ export async function getDashboardData(): Promise<DashboardResponse> {
     : [null, null]
   if (currentRole && task?.status === "idle") {
     const roleId = currentRole.id
-    currentRole = (await getRoles()).targetRoles.find((role) => role.id === roleId) ?? null
+    currentRole = (await getRoles()).roles.find((role) => role.id === roleId) ?? null
   }
 
   return {

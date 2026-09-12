@@ -1,12 +1,12 @@
 from riva.models.auth import AuthSession
 from riva.models.career_profile import CareerProfile, CareerProfileContent
-from riva.models.target_role import (
+from riva.models.role import (
     HardSkills,
     JobDescription,
     JobDescriptionContent,
     JobRequirements,
     RecruitmentTrack,
-    TargetRole,
+    Role,
 )
 from riva.models.user import User
 
@@ -19,6 +19,6 @@ __all__ = [
     "JobDescriptionContent",
     "JobRequirements",
     "RecruitmentTrack",
-    "TargetRole",
+    "Role",
     "User",
 ]

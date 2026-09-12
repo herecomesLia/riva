@@ -5,7 +5,7 @@ export const dashboardFixture = {
   recommendation: {
     id: "dashboard-recommendation",
     sourceRecordId: "training-practice",
-    targetRoleId: "11111111-1111-4111-8111-111111111111",
+    roleId: "11111111-1111-4111-8111-111111111111",
     recommendation: {
       action: "mockInterview",
       reason: "可以进一步在连续问答中验证表达稳定性。",

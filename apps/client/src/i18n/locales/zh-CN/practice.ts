@@ -5,7 +5,7 @@ export const practice = {
     title: "练习设置",
     description: "选择本次练习的岗位和题目方向，Riva 将据此生成一道针对性问题。",
     fields: {
-      targetRole: "目标岗位",
+      role: "目标岗位",
       questionType: "题目类型",
       difficulty: "难度",
       source: "题目来源",
@@ -293,7 +293,7 @@ export const practice = {
     viewHistory: "查看练习记录",
   },
   summary: {
-    targetRole: "目标岗位",
+    role: "目标岗位",
     questionType: "题目类型",
     difficulty: "难度",
     source: "题目来源",

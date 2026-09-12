@@ -14,7 +14,7 @@ const meta = preview.meta({
 function DialogHarness({
   role,
 }: {
-  role: ReturnType<typeof createRoleStoryResponse>["targetRoles"][number]
+  role: ReturnType<typeof createRoleStoryResponse>["roles"][number]
 }) {
   const [open, setOpen] = useState(true)
   return (
@@ -31,9 +31,7 @@ function DialogHarness({
 
 export const Add = meta.story({
   render: () => (
-    <DialogHarness
-      role={createRoleStoryResponse("singleRoleWithoutJobDescription").targetRoles[0]!}
-    />
+    <DialogHarness role={createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!} />
   ),
   play: async ({ userEvent }) => {
     const dialog = await screen.findByRole("dialog")
@@ -50,9 +48,7 @@ export const Add = meta.story({
 
 export const Replace = meta.story({
   render: () => (
-    <DialogHarness
-      role={createRoleStoryResponse("roleWithExtractedJobDescription").targetRoles[0]!}
-    />
+    <DialogHarness role={createRoleStoryResponse("roleWithExtractedJobDescription").roles[0]!} />
   ),
 })
 
@@ -63,7 +59,7 @@ export const ValidationError = meta.story({
     onSave: fn(async () => undefined),
     onSaved: fn(),
     open: true,
-    role: createRoleStoryResponse("singleRoleWithoutJobDescription").targetRoles[0]!,
+    role: createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!,
   },
   play: async ({ userEvent }) => {
     const dialog = await screen.findByRole("dialog")

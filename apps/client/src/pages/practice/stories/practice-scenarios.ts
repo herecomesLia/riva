@@ -14,7 +14,7 @@ import type {
 } from "@/models/practice-workflow"
 
 const defaultSetupContext: PracticeSetupContext = {
-  targetRoles: [
+  roles: [
     {
       id: "role_frontend_bytedance",
       title: "Senior Frontend Engineer",
@@ -46,7 +46,7 @@ const defaultSetupContext: PracticeSetupContext = {
 
 const selection: ActiveSelection = {
   ...practiceFixture.selection,
-  targetRoleId: "role_frontend_bytedance",
+  roleId: "role_frontend_bytedance",
 }
 
 function question(overrides: Partial<PracticeQuestion> = {}): PracticeQuestion {
@@ -155,7 +155,7 @@ const scenarios = {
   setupReady: data({ status: "setup", selection }),
   noRoles: data(
     { status: "setup", selection: practiceFixture.selection },
-    { ...defaultSetupContext, targetRoles: [], eligibleQuestionCounts: { saved: 0, history: 0 } },
+    { ...defaultSetupContext, roles: [], eligibleQuestionCounts: { saved: 0, history: 0 } },
   ),
   noEligibleSavedQuestions: data(
     { status: "setup", selection: { ...selection, source: "saved" } },

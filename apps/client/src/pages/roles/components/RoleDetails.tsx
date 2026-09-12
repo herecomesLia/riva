@@ -4,14 +4,14 @@ import { useTranslation } from "react-i18next"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { JdField } from "@/pages/roles/types"
-import type { TargetRoleResponse } from "@/api/generated/models"
+import type { RoleResponse } from "@/api/generated/models"
 
 import { JobDescriptionCard } from "./JobDescriptionCard"
 import { MatchingAnalysisCard } from "./MatchingAnalysisCard"
 import { RoleStatusBadges } from "./RoleStatusBadges"
-import { TargetRoleOverview } from "./TargetRoleOverview"
+import { RoleOverview } from "./RoleOverview"
 
-export type TargetRoleTab = "overview" | "job-description" | "matching-analysis"
+export type RoleTab = "overview" | "job-description" | "matching-analysis"
 
 export type RoleDetailsActions = {
   archive: () => void
@@ -41,15 +41,15 @@ export function RoleDetails({
   matchSynchronizationError = false,
 }: {
   actions?: RoleDetailsActions
-  activeTab: TargetRoleTab
+  activeTab: RoleTab
   activeRoleId: string | null
   jdSynchronizationError?: boolean
   matchSynchronizationError?: boolean
-  onTabChange: (tab: TargetRoleTab) => void
+  onTabChange: (tab: RoleTab) => void
   pending?: boolean
   jdTask: RoleResources["jdTasksByRoleId"][string]
   analysis: RoleResources["matchingByRoleId"][string]
-  role: TargetRoleResponse
+  role: RoleResponse
 }) {
   const { t } = useTranslation()
   const isCurrent = role.id === activeRoleId
@@ -71,12 +71,12 @@ export function RoleDetails({
       <CardContent className="min-w-0">
         <Tabs
           className="min-w-0 gap-5"
-          onValueChange={(value) => onTabChange(value as TargetRoleTab)}
+          onValueChange={(value) => onTabChange(value as RoleTab)}
           value={activeTab}
         >
           <div
             className="max-w-full overflow-x-auto overflow-y-hidden pb-1"
-            data-testid="target-role-tabs-scroll"
+            data-testid="role-tabs-scroll"
           >
             <TabsList aria-label={t("roles.tabs.label")} className="min-w-max" variant="line">
               <TabsTrigger
@@ -102,12 +102,7 @@ export function RoleDetails({
 
           <TabsContent value="overview">
             {activeTab === "overview" && (
-              <TargetRoleOverview
-                actions={actions}
-                isCurrent={isCurrent}
-                pending={pending}
-                role={role}
-              />
+              <RoleOverview actions={actions} isCurrent={isCurrent} pending={pending} role={role} />
             )}
           </TabsContent>
           <TabsContent value="job-description">

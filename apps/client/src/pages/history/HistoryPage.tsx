@@ -19,10 +19,10 @@ export function HistoryPage() {
   const filters = useMemo(
     () => ({
       kind: search.kind,
-      targetRoleId: search.targetRoleId,
+      roleId: search.roleId,
       timeRange: search.timeRange,
     }),
-    [search.kind, search.targetRoleId, search.timeRange],
+    [search.kind, search.roleId, search.timeRange],
   )
   const queryInput = useMemo(
     () => createListInput(filters, search.page, Date.now()),
@@ -70,9 +70,7 @@ export function HistoryPage() {
   return (
     <HistoryView
       filters={filters}
-      onClearFilters={() =>
-        setSearch({ kind: "all", targetRoleId: "all", timeRange: "all", page: 1 })
-      }
+      onClearFilters={() => setSearch({ kind: "all", roleId: "all", timeRange: "all", page: 1 })}
       onFiltersChange={handleFiltersChange}
       onPageChange={(page) => setSearch({ ...filters, page })}
       onRetry={() => void handleRetry()}
@@ -88,7 +86,7 @@ function createListInput(
 ): ListTrainingRecordsInput {
   return {
     kinds: filters.kind === "all" ? undefined : [filters.kind],
-    targetRoleId: filters.targetRoleId === "all" ? undefined : filters.targetRoleId,
+    roleId: filters.roleId === "all" ? undefined : filters.roleId,
     startedAtFrom: toStartedAtFrom(filters.timeRange, referenceTime),
     page,
     pageSize,

@@ -19,7 +19,7 @@ export function createInterviewSetupStoryFixture(
 ): InterviewSetup {
   const setup: InterviewSetup = {
     availability: { status: "available" },
-    targetRoles: [
+    roles: [
       {
         id: "role_frontend_bytedance",
         title: "Senior Frontend Engineer",
@@ -31,11 +31,11 @@ export function createInterviewSetupStoryFixture(
     availableDurationMinutes: [15, 30, 45],
     defaultConfiguration: {
       ...interviewFixture.configuration,
-      targetRoleId: "role_frontend_bytedance",
+      roleId: "role_frontend_bytedance",
     },
   }
   if (scenario === "multipleRolesReady")
-    setup.targetRoles.push({
+    setup.roles.push({
       id: "role_product_manager_meituan",
       title: "Product Manager",
       company: "Meituan",
@@ -45,21 +45,21 @@ export function createInterviewSetupStoryFixture(
     setup.availability = { status: "blocked", reason: "profileIncomplete" }
   if (scenario === "jobDescriptionMissing") {
     setup.availability = { status: "blocked", reason: "jobDescriptionMissing" }
-    setup.targetRoles = []
-    setup.defaultConfiguration.targetRoleId = null
+    setup.roles = []
+    setup.defaultConfiguration.roleId = null
   }
   return setup
 }
 
 export function createInterviewPageStoryFixture(
-  scenario: "setupReady" | "prerequisiteNotMet" | "noTargetRoles" | "completed" = "setupReady",
+  scenario: "setupReady" | "prerequisiteNotMet" | "noRoles" | "completed" = "setupReady",
 ): InterviewData {
   const setup = createInterviewSetupStoryFixture(
     scenario === "prerequisiteNotMet" ? scenario : "setupReady",
   )
-  if (scenario === "noTargetRoles") {
-    setup.targetRoles = []
-    setup.defaultConfiguration.targetRoleId = null
+  if (scenario === "noRoles") {
+    setup.roles = []
+    setup.defaultConfiguration.roleId = null
   }
   return {
     setup,
@@ -100,7 +100,7 @@ export function createInterviewSessionStoryFixture() {
     },
   ]
   const summary: InterviewSessionSummary = {
-    targetRole: "Senior Frontend Engineer",
+    role: "Senior Frontend Engineer",
     company: "ByteDance",
     round: interviewFixture.configuration.round,
     difficulty: interviewFixture.configuration.difficulty,

@@ -41,7 +41,7 @@ describe("InterviewView", () => {
     const loadingState = screen.getByTestId("interview-loading-state")
     expect(loadingState).toHaveAttribute("aria-busy", "true")
     expect(loadingState.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(7)
-    expect(screen.queryByText(i18n.t("interview.setup.fields.targetRole"))).not.toBeInTheDocument()
+    expect(screen.queryByText(i18n.t("interview.setup.fields.role"))).not.toBeInTheDocument()
     expect(screen.queryByText(i18n.t("interview.setup.fields.round"))).not.toBeInTheDocument()
     expect(screen.queryByText(i18n.t("interview.setup.fields.difficulty"))).not.toBeInTheDocument()
     expect(screen.queryByText(i18n.t("interview.setup.fields.duration"))).not.toBeInTheDocument()
@@ -57,7 +57,7 @@ describe("InterviewView", () => {
     expect(setupCard?.parentElement).not.toHaveClass("max-w-4xl")
 
     expect(await screen.findByText("Senior Frontend Engineer · ByteDance")).toBeInTheDocument()
-    for (const round of createInterviewSetupStoryFixture().targetRoles[0].supportedRounds) {
+    for (const round of createInterviewSetupStoryFixture().roles[0].supportedRounds) {
       expect(
         screen.getByRole("button", { name: i18n.t(`interview.rounds.${round}`) }),
       ).toBeVisible()
@@ -80,7 +80,7 @@ describe("InterviewView", () => {
     const user = userEvent.setup()
     renderReadyView(undefined, false, createInterviewSetupStoryFixture("multipleRolesReady"))
 
-    await user.click(await screen.findByTestId("interview-target-role-trigger"))
+    await user.click(await screen.findByTestId("interview-role-trigger"))
     await user.click(await screen.findByRole("option", { name: "Product Manager · Meituan" }))
 
     expect(
@@ -95,10 +95,10 @@ describe("InterviewView", () => {
   it("keeps setup dividers spaced without doubling the footer gap", async () => {
     renderReadyView()
 
-    const targetRoleField = (
-      await screen.findByText(i18n.t("interview.setup.fields.targetRole"))
-    ).closest('[data-slot="field"]')
-    expect(targetRoleField).toHaveClass("pb-5")
+    const roleField = (await screen.findByText(i18n.t("interview.setup.fields.role"))).closest(
+      '[data-slot="field"]',
+    )
+    expect(roleField).toHaveClass("pb-5")
 
     const roundFieldSet = screen
       .getByText(i18n.t("interview.setup.fields.round"))
@@ -185,7 +185,7 @@ describe("InterviewView", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument()
   })
 
-  it("renders an empty state with a target-role navigation action", async () => {
+  it("renders an empty state with a role navigation action", async () => {
     renderWithProviders(<InterviewView status="empty" />, {
       router: { initialEntries: ["/interview"] },
     })

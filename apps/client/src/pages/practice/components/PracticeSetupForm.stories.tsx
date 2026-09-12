@@ -6,7 +6,7 @@ import { createPracticeScenario } from "@/pages/practice/stories/practice-scenar
 import { PracticeSetupForm } from "./PracticeSetupForm"
 
 const response = createPracticeScenario("setupReady")
-if (response.session.selection.targetRoleId === null) {
+if (response.session.selection.roleId === null) {
   throw new Error("The setup fixture must select a target role.")
 }
 
@@ -19,7 +19,7 @@ const defaultArgs = {
   context: response.setupContext,
   initialSelection: {
     ...response.session.selection,
-    targetRoleId: response.session.selection.targetRoleId,
+    roleId: response.session.selection.roleId,
   },
   isPending: false,
   onStart: fn(async () => undefined),

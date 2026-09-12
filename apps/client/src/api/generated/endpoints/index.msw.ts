@@ -1,5 +1,5 @@
 export { getAuthMock } from "./auth/auth.msw"
 export { getCareerProfileMock } from "./career-profile/career-profile.msw"
 export { getHealthMock } from "./health/health.msw"
-export { getTargetRolesMock } from "./target-roles/target-roles.msw"
+export { getRolesMock } from "./roles/roles.msw"
 export { getUsersMock } from "./users/users.msw"

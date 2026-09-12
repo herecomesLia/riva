@@ -27,9 +27,7 @@ describe("trainingRecordsFaker", () => {
       },
     ])
     expect(faker.list({ ...input, kinds: ["mockInterview"] }).items[0]?.id).toBe(interview.id)
-    expect(faker.list({ ...input, targetRoleId: practice.targetRole.id }).items[0]?.id).toBe(
-      practice.id,
-    )
+    expect(faker.list({ ...input, roleId: practice.role.id }).items[0]?.id).toBe(practice.id)
     expect(faker.list({ ...input, startedAtFrom: practice.startedAt }).items[0]?.id).toBe(
       practice.id,
     )

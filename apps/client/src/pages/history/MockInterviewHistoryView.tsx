@@ -92,7 +92,7 @@ export function MockInterviewHistoryView({
                 <Link
                   search={{
                     entry: "history",
-                    targetRoleId: state.data.targetRole.id,
+                    roleId: state.data.role.id,
                     round: state.data.setup.round,
                     difficulty: state.data.setup.difficulty,
                     durationMinutes: state.data.setup.plannedDurationMinutes,
@@ -164,7 +164,7 @@ function DetailReady({
         ))}
       </section>
       <CandidateQuestions exchanges={record.candidateQuestionExchanges} />
-      <Recommendation recommendation={record.recommendation} targetRoleId={record.targetRole.id} />
+      <Recommendation recommendation={record.recommendation} roleId={record.role.id} />
     </div>
   )
 }
@@ -388,14 +388,14 @@ function CandidateQuestions({
 
 function Recommendation({
   recommendation,
-  targetRoleId,
-}: Pick<MockInterviewRecordDetailResponse, "recommendation"> & { targetRoleId: string }) {
+  roleId,
+}: Pick<MockInterviewRecordDetailResponse, "recommendation"> & { roleId: string }) {
   const { t } = useTranslation()
   return (
     <TrainingRecommendationCard
       recommendation={recommendation}
       showIcon
-      targetRoleId={targetRoleId}
+      roleId={roleId}
       title={t("history.mockDetail.sections.nextTraining")}
     />
   )
@@ -471,9 +471,7 @@ function DetailNotFound({ historySearch }: { historySearch: HistoryRouteSearch }
 }
 
 function formatRole(record: MockInterviewRecordDetailResponse) {
-  return record.targetRole.company
-    ? `${record.targetRole.company} · ${record.targetRole.title}`
-    : record.targetRole.title
+  return record.role.company ? `${record.role.company} · ${record.role.title}` : record.role.title
 }
 
 function statusVariant(status: TrainingRecordStatus): "default" | "secondary" | "outline" {

@@ -6,10 +6,10 @@ import type {
   PracticeTrainingEntryPreparationResponse,
   TrainingEntryRoleAvailability,
 } from "@/models/training-entry"
-import type { TargetRoleListResponse } from "@/api/generated/models"
+import type { RoleListResponse } from "@/api/generated/models"
 import { getRoles } from "@/services/roles"
 
-function setupContext(roles: TargetRoleListResponse["targetRoles"]): PracticeSetupContext {
+function setupContext(roles: RoleListResponse["roles"]): PracticeSetupContext {
   const supportedQuestionTypes: QuestionType[] = [
     "projectDeepDive",
     "behavioral",
@@ -18,7 +18,7 @@ function setupContext(roles: TargetRoleListResponse["targetRoles"]): PracticeSet
     "technicalFoundation",
   ]
   return {
-    targetRoles: roles
+    roles: roles
       .filter((role) => !role.isArchived)
       .map(({ id, title, company }) => ({
         id,
@@ -33,14 +33,14 @@ function setupContext(roles: TargetRoleListResponse["targetRoles"]): PracticeSet
 
 export async function getPracticePage(): Promise<PracticeData> {
   const [roles, session] = await Promise.all([getRoles(), practiceFaker.get()])
-  const context = setupContext(roles.targetRoles)
+  const context = setupContext(roles.roles)
   if (session.status === "setup") {
-    const available = (id: string | null) => context.targetRoles.some((role) => role.id === id)
-    session.selection.targetRoleId = available(session.selection.targetRoleId)
-      ? session.selection.targetRoleId
-      : available(roles.activeTargetRoleId)
-        ? roles.activeTargetRoleId
-        : (context.targetRoles[0]?.id ?? null)
+    const available = (id: string | null) => context.roles.some((role) => role.id === id)
+    session.selection.roleId = available(session.selection.roleId)
+      ? session.selection.roleId
+      : available(roles.activeRoleId)
+        ? roles.activeRoleId
+        : (context.roles[0]?.id ?? null)
   }
   return { setupContext: context, session }
 }
@@ -49,12 +49,12 @@ export async function preparePracticeTrainingEntry(
   input: PracticeTrainingEntryParameters,
 ): Promise<PracticeTrainingEntryPreparationResponse> {
   const [roles, session] = await Promise.all([getRoles(), practiceFaker.get()])
-  const context = setupContext(roles.targetRoles)
-  const role = roles.targetRoles.find((role) => role.id === input.targetRoleId)
+  const context = setupContext(roles.roles)
+  const role = roles.roles.find((role) => role.id === input.roleId)
   const availability: TrainingEntryRoleAvailability = !role
-    ? { status: "unavailable", reason: "targetRoleDeleted" }
+    ? { status: "unavailable", reason: "roleDeleted" }
     : role.isArchived
-      ? { status: "unavailable", reason: "targetRoleArchived" }
+      ? { status: "unavailable", reason: "roleArchived" }
       : { status: "available" }
   const resolution = resolvePracticeTrainingEntry(context, session.selection, input, availability)
   return {

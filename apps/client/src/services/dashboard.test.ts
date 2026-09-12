@@ -4,8 +4,8 @@ import { createRoleStoryResponse } from "@/pages/roles/stories/role-story-fixtur
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { dashboardFixture } from "@/mocks/fixtures/dashboard"
-import { matchResultFixture, targetRoleFixture } from "@/mocks/fixtures/target-role"
-import type { TargetRoleResponse } from "@/api/generated/models"
+import { matchResultFixture, roleFixture } from "@/mocks/fixtures/role"
+import type { RoleResponse } from "@/api/generated/models"
 import { getRoles, getMatchingAnalysis, getJdExtractionState } from "@/services/roles"
 import { getDashboardData } from "./dashboard"
 
@@ -25,14 +25,14 @@ beforeEach(() => {
 })
 
 const role = {
-  ...structuredClone(targetRoleFixture),
-} satisfies TargetRoleResponse
+  ...structuredClone(roleFixture),
+} satisfies RoleResponse
 
 describe("getDashboardData", () => {
   it("projects the active role and uses fixed training data", async () => {
     vi.mocked(getRoles).mockResolvedValue({
-      targetRoles: [role],
-      activeTargetRoleId: role.id,
+      roles: [role],
+      activeRoleId: role.id,
     })
 
     const response = await getDashboardData()
@@ -56,23 +56,23 @@ describe("getDashboardData", () => {
 
   it("keeps training data when no role is active", async () => {
     vi.mocked(getRoles).mockResolvedValue({
-      targetRoles: [role],
-      activeTargetRoleId: null,
+      roles: [role],
+      activeRoleId: null,
     })
     expect(await getDashboardData()).toEqual(dashboardFixture)
   })
 
   it("projects incomplete prerequisites without exposing a stale score", async () => {
-    const incomplete: TargetRoleResponse = structuredClone(role)
-    incomplete.jd = createRoleStoryResponse("singleRoleWithoutJobDescription").targetRoles[0]!.jd
+    const incomplete: RoleResponse = structuredClone(role)
+    incomplete.jd = createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!.jd
     vi.mocked(getProfile).mockResolvedValue({ ...careerProfileFixture, skills: [] })
     vi.mocked(getMatchingAnalysis).mockResolvedValue({
       status: "stale",
       result: matchResultFixture,
     })
     vi.mocked(getRoles).mockResolvedValue({
-      targetRoles: [incomplete],
-      activeTargetRoleId: incomplete.id,
+      roles: [incomplete],
+      activeRoleId: incomplete.id,
     })
     const response = await getDashboardData()
     expect(response.currentRole).toMatchObject({

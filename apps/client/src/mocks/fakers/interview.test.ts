@@ -5,7 +5,7 @@ import { interviewFixture } from "@/mocks/fixtures/interview"
 import type { InterviewConfiguration } from "@/models/interview-workflow"
 
 const configuration: InterviewConfiguration = {
-  targetRoleId: "selected-role",
+  roleId: "selected-role",
   round: "manager",
   difficulty: "basic",
   durationMinutes: 15,

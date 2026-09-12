@@ -4,7 +4,7 @@ from riva.api.auth import router as auth_router
 from riva.api.career_profile import router as career_profile_router
 from riva.api.errors.openapi import error_responses
 from riva.api.health import router as health_router
-from riva.api.target_roles import router as target_roles_router
+from riva.api.roles import router as roles_router
 from riva.api.users import router as users_router
 
 router = APIRouter()
@@ -25,6 +25,6 @@ router.include_router(
     responses=error_responses(Exception),
 )
 router.include_router(
-    target_roles_router,
+    roles_router,
     responses=error_responses(Exception),
 )

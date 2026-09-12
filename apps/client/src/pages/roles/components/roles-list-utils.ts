@@ -1,10 +1,10 @@
-import type { TargetRoleResponse } from "@/api/generated/models"
+import type { RoleResponse } from "@/api/generated/models"
 
-export type TargetRoleListCategory = "active" | "archived"
+export type RoleListCategory = "active" | "archived"
 
 export function getRolesForCategory(
-  roles: TargetRoleResponse[],
-  category: TargetRoleListCategory,
-): TargetRoleResponse[] {
+  roles: RoleResponse[],
+  category: RoleListCategory,
+): RoleResponse[] {
   return roles.filter((role) => (category === "archived" ? role.isArchived : !role.isArchived))
 }

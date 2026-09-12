@@ -22,7 +22,7 @@ const meta = preview.meta({
 function argsFor(scenario: Parameters<typeof createRoleStoryResponse>[0]) {
   const response = createRoleStoryResponse(scenario)
   return {
-    analysis: response.matchingByRoleId[response.targetRoles[0]!.id],
+    analysis: response.matchingByRoleId[response.roles[0]!.id],
     synchronizationError: false,
   }
 }
@@ -58,7 +58,7 @@ function SynchronizationRetryHarness() {
         setSynchronizationError(false)
         setResponse(completed)
       }}
-      analysis={response.matchingByRoleId[response.targetRoles[0]!.id]}
+      analysis={response.matchingByRoleId[response.roles[0]!.id]}
       synchronizationError={synchronizationError}
     />
   )
@@ -83,7 +83,7 @@ const staleWhileExtracting = createStaleWhileExtractingResponse()
 
 export const StaleWhileJobDescriptionExtracting = meta.story({
   args: {
-    analysis: staleWhileExtracting.matchingByRoleId[staleWhileExtracting.targetRoles[0]!.id],
+    analysis: staleWhileExtracting.matchingByRoleId[staleWhileExtracting.roles[0]!.id],
     synchronizationError: false,
   },
 })
@@ -92,7 +92,7 @@ const longMatchingAnalysis = createLongMatchingAnalysisResponse()
 
 export const LongMatchingAnalysis = meta.story({
   args: {
-    analysis: longMatchingAnalysis.matchingByRoleId[longMatchingAnalysis.targetRoles[0]!.id],
+    analysis: longMatchingAnalysis.matchingByRoleId[longMatchingAnalysis.roles[0]!.id],
     synchronizationError: false,
   },
 })
@@ -104,7 +104,7 @@ function AnalysisFlowHarness({
 }) {
   const [response, setResponse] = useState(() => createRoleStoryResponse(initialScenario))
   const completed = createRoleStoryResponse("matchingAnalysisCurrent")
-  const role = response.targetRoles[0]!
+  const role = response.roles[0]!
 
   return (
     <MatchingAnalysisCard

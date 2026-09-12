@@ -106,7 +106,7 @@ describe("DashboardView", () => {
     })
     expect(recommendationLink).toHaveAttribute("href", expect.stringContaining("/interview?"))
     expect(recommendationLink.getAttribute("href")).toContain(
-      `targetRoleId=${dashboardStoryFixture.recommendation!.targetRoleId}`,
+      `roleId=${dashboardStoryFixture.recommendation!.roleId}`,
     )
     const historyLink = screen.getByRole("link", { name: i18n.t("dashboard.actions.viewHistory") })
     expect(historyLink).toHaveClass("border-border")

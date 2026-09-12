@@ -41,7 +41,7 @@ export type InterviewEntrySearch = InterviewTrainingEntryParameters & {
 export function parsePracticeEntrySearch(search: Record<string, unknown>): PracticeEntrySearch {
   return compact({
     entry: search.entry === "history" ? "history" : undefined,
-    targetRoleId: nonEmptyString(search.targetRoleId),
+    roleId: nonEmptyString(search.roleId),
     questionType: includes(practiceQuestionTypes, search.questionType)
       ? search.questionType
       : undefined,
@@ -55,7 +55,7 @@ export function parseInterviewEntrySearch(search: Record<string, unknown>): Inte
   const duration = positiveInteger(search.durationMinutes)
   return compact({
     entry: search.entry === "history" ? "history" : undefined,
-    targetRoleId: nonEmptyString(search.targetRoleId),
+    roleId: nonEmptyString(search.roleId),
     round: includes(interviewRounds, search.round) ? search.round : undefined,
     difficulty: includes(interviewDifficulties, search.difficulty) ? search.difficulty : undefined,
     durationMinutes:

@@ -10,7 +10,7 @@ export type HistoryTimeRange = "all" | "last7Days" | "last30Days" | "last90Days"
 
 export type HistoryFiltersValue = {
   kind: HistoryKindFilter
-  targetRoleId: string
+  roleId: string
   timeRange: HistoryTimeRange
 }
 

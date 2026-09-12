@@ -9,7 +9,7 @@ import { renderWithProviders } from "@/test/render"
 import { InterviewSessionView, type InterviewSessionViewProps } from "./InterviewSessionView"
 
 const summary = {
-  targetRole: "高级前端工程师",
+  role: "高级前端工程师",
   company: "字节跳动",
   round: "technical",
   difficulty: "pressure",

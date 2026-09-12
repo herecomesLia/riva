@@ -27,10 +27,10 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 import type {
-  CreateTargetRoleRequest,
+  CreateRoleRequest,
   RecruitmentTrack,
-  UpdateTargetRoleRequest,
-  TargetRoleResponse,
+  UpdateRoleRequest,
+  RoleResponse,
 } from "@/api/generated/models"
 
 import { getRolesActionErrorCode, type RolesActionErrorCode } from "../roles-errors"
@@ -44,13 +44,13 @@ export type RoleDraft = {
 
 type RoleEditorDialogProps = {
   mode: "create" | "edit"
-  onCreate: (input: CreateTargetRoleRequest) => Promise<void>
+  onCreate: (input: CreateRoleRequest) => Promise<void>
   onDirtyChange: (isDirty: boolean) => void
   onOpenChange: (open: boolean) => void
   onSaved: () => void
-  onUpdate: (roleId: string, input: UpdateTargetRoleRequest) => Promise<void>
+  onUpdate: (roleId: string, input: UpdateRoleRequest) => Promise<void>
   open: boolean
-  role: TargetRoleResponse | null
+  role: RoleResponse | null
 }
 
 const roleDraftSchema = z.object({
@@ -254,7 +254,7 @@ function DraftStateSync({
   return null
 }
 
-function createRoleDraft(role: TargetRoleResponse | null): RoleDraft {
+function createRoleDraft(role: RoleResponse | null): RoleDraft {
   return {
     title: role?.title ?? "",
     company: role?.company ?? "",
@@ -272,6 +272,6 @@ function toBasicInput(value: RoleDraft) {
   }
 }
 
-function toCreateInput(value: RoleDraft): CreateTargetRoleRequest {
+function toCreateInput(value: RoleDraft): CreateRoleRequest {
   return toBasicInput(value)
 }

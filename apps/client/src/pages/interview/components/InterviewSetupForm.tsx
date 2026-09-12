@@ -46,18 +46,17 @@ function getInitialConfiguration(
   historyEntryResolution?: InterviewTrainingEntryResolution,
 ): InterviewSetup["defaultConfiguration"] {
   if (historyEntryResolution?.status === "roleUnavailable") {
-    return { ...setup.defaultConfiguration, targetRoleId: null }
+    return { ...setup.defaultConfiguration, roleId: null }
   }
   const selectedRole =
-    setup.targetRoles.find(({ id }) => id === setup.defaultConfiguration.targetRoleId) ??
-    setup.targetRoles[0]
+    setup.roles.find(({ id }) => id === setup.defaultConfiguration.roleId) ?? setup.roles[0]
 
   if (selectedRole === undefined) {
     throw new Error("Interview setup form requires at least one target role.")
   }
 
   return {
-    targetRoleId: selectedRole.id,
+    roleId: selectedRole.id,
     round: selectedRole.supportedRounds.includes(setup.defaultConfiguration.round)
       ? setup.defaultConfiguration.round
       : selectedRole.supportedRounds[0],
@@ -86,13 +85,13 @@ export function InterviewSetupForm({
   const form = useForm({
     defaultValues: getInitialConfiguration(setup, historyEntryResolution),
     onSubmit: async ({ value }) => {
-      if (!value.targetRoleId || !value.round || !value.difficulty || !value.durationMinutes) {
+      if (!value.roleId || !value.round || !value.difficulty || !value.durationMinutes) {
         return
       }
       setSubmitError(false)
       try {
         await onStart({
-          targetRoleId: value.targetRoleId,
+          roleId: value.roleId,
           round: value.round,
           difficulty: value.difficulty,
           durationMinutes: value.durationMinutes,
@@ -123,9 +122,9 @@ export function InterviewSetupForm({
           />
         )}
         <FieldGroup className="gap-0">
-          <form.Field name="targetRoleId">
+          <form.Field name="roleId">
             {(field) => {
-              const selectedRole = setup.targetRoles.find(({ id }) => id === field.state.value)
+              const selectedRole = setup.roles.find(({ id }) => id === field.state.value)
               const selectedRoleLabel = selectedRole?.company
                 ? `${selectedRole.title} · ${selectedRole.company}`
                 : selectedRole?.title
@@ -134,14 +133,14 @@ export function InterviewSetupForm({
                 <Field className="pb-5" data-disabled={pending}>
                   <FieldLabel className="[&>svg]:size-4 [&>svg]:text-primary" htmlFor={field.name}>
                     <BriefcaseBusinessIcon aria-hidden="true" />
-                    {t("interview.setup.fields.targetRole")}
+                    {t("interview.setup.fields.role")}
                   </FieldLabel>
                   <Select
                     disabled={pending}
                     onValueChange={(value) => {
                       if (!value) return
                       field.handleChange(value)
-                      const role = setup.targetRoles.find(({ id }) => id === value)
+                      const role = setup.roles.find(({ id }) => id === value)
                       const currentRound = form.getFieldValue("round")
                       if (role && (!currentRound || !role.supportedRounds.includes(currentRound))) {
                         form.setFieldValue("round", role.supportedRounds[0])
@@ -151,7 +150,7 @@ export function InterviewSetupForm({
                   >
                     <SelectTrigger
                       className="w-full focus:border-primary focus:text-primary focus-visible:border-primary focus-visible:text-primary"
-                      data-testid="interview-target-role-trigger"
+                      data-testid="interview-role-trigger"
                       id={field.name}
                       onBlur={field.handleBlur}
                     >
@@ -161,7 +160,7 @@ export function InterviewSetupForm({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {setup.targetRoles.map((role) => (
+                        {setup.roles.map((role) => (
                           <SelectItem key={role.id} value={role.id}>
                             {role.company ? `${role.title} · ${role.company}` : role.title}
                           </SelectItem>
@@ -175,9 +174,9 @@ export function InterviewSetupForm({
           </form.Field>
 
           <div className="border-t border-border py-5">
-            <form.Subscribe selector={(state) => state.values.targetRoleId}>
-              {(targetRoleId) => {
-                const selectedRole = setup.targetRoles.find(({ id }) => id === targetRoleId)
+            <form.Subscribe selector={(state) => state.values.roleId}>
+              {(roleId) => {
+                const selectedRole = setup.roles.find(({ id }) => id === roleId)
                 return (
                   <form.Field name="round">
                     {(field) => (
@@ -294,11 +293,11 @@ export function InterviewSetupForm({
       </CardContent>
 
       <CardFooter className="mt-6">
-        <form.Subscribe selector={(state) => state.values.targetRoleId}>
-          {(targetRoleId) => (
+        <form.Subscribe selector={(state) => state.values.roleId}>
+          {(roleId) => (
             <Button
               className="w-full sm:w-fit"
-              disabled={pending || !targetRoleId || !adjustmentConfirmed}
+              disabled={pending || !roleId || !adjustmentConfirmed}
               size="lg"
               type="submit"
             >

@@ -58,7 +58,7 @@ describe("MockInterviewHistoryView", () => {
     const retryLink = screen.getByRole("button", { name: i18n.t("history.mockDetail.retry") })
     const retryHref = retryLink.getAttribute("href") ?? ""
     expect(retryHref).toContain("entry=history")
-    expect(retryHref).toContain(`targetRoleId=${encodeURIComponent(record.targetRole.id)}`)
+    expect(retryHref).toContain(`roleId=${encodeURIComponent(record.role.id)}`)
     expect(retryHref).toContain(`round=${record.setup.round}`)
     expect(retryHref).toContain(`difficulty=${record.setup.difficulty}`)
     expect(retryHref).toContain(`durationMinutes=${record.setup.plannedDurationMinutes}`)
@@ -68,7 +68,7 @@ describe("MockInterviewHistoryView", () => {
     })
     const recommendationHref = recommendationLink.getAttribute("href") ?? ""
     expect(recommendationHref).toContain("/practice?")
-    expect(recommendationHref).toContain(`targetRoleId=${encodeURIComponent(record.targetRole.id)}`)
+    expect(recommendationHref).toContain(`roleId=${encodeURIComponent(record.role.id)}`)
     expect(recommendationHref).toContain("questionType=technicalFoundation")
     expect(recommendationHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
   })

@@ -16,7 +16,7 @@ export type TrainingRecommendationEntry =
 
 export function mapTrainingRecommendationToEntry(
   recommendation: TrainingRecordRecommendation | null,
-  targetRoleId: string,
+  roleId: string,
 ): TrainingRecommendationEntry | null {
   if (!recommendation || recommendation.action === "none") return null
 
@@ -25,7 +25,7 @@ export function mapTrainingRecommendationToEntry(
       action: recommendation.action,
       search: {
         entry: "history",
-        targetRoleId,
+        roleId,
         round: recommendation.round,
         difficulty: recommendation.difficulty,
       },
@@ -38,7 +38,7 @@ export function mapTrainingRecommendationToEntry(
     action: recommendation.action,
     search: {
       entry: "history",
-      targetRoleId,
+      roleId,
       ...(questionType ? { questionType } : {}),
       difficulty: recommendation.difficulty,
       source: "history",

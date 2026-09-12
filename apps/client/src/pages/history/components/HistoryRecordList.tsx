@@ -202,7 +202,7 @@ function HistoryRecordCard({
           aria-label={t("history.records.viewDetailsLabel", {
             date: formatDateTime(record.startedAt, i18n.language),
             kind: kindLabel,
-            role: record.targetRole.title,
+            role: record.role.title,
           })}
           nativeButton={false}
           render={detailLink}
@@ -293,9 +293,7 @@ function statusBadgeVariant(status: TrainingRecordStatus): "default" | "secondar
 }
 
 function formatRole(record: TrainingRecordSummary): string {
-  return record.targetRole.company
-    ? `${record.targetRole.title} · ${record.targetRole.company}`
-    : record.targetRole.title
+  return record.role.company ? `${record.role.title} · ${record.role.company}` : record.role.title
 }
 
 function formatDateTime(value: string, language: string): string {

@@ -15,7 +15,7 @@ const meta = preview.meta({
 })
 
 function roleFor(scenario: Parameters<typeof createRoleStoryResponse>[0]) {
-  return createRoleStoryResponse(scenario).targetRoles[0]!
+  return createRoleStoryResponse(scenario).roles[0]!
 }
 
 export const Missing = meta.story({
@@ -74,8 +74,8 @@ function SynchronizationRetryHarness() {
         setSynchronizationError(false)
         setResponse(ready)
       }}
-      role={response.targetRoles[0]!}
-      jdTask={response.jdTasksByRoleId[response.targetRoles[0]!.id]}
+      role={response.roles[0]!}
+      jdTask={response.jdTasksByRoleId[response.roles[0]!.id]}
       synchronizationError={synchronizationError}
     />
   )
@@ -135,7 +135,7 @@ export const EditAnalysisModule = meta.story({
 export const LongContent = meta.story({
   args: {
     onEdit: fn(),
-    role: createLongJobDescriptionResponse().targetRoles[0]!,
+    role: createLongJobDescriptionResponse().roles[0]!,
     jdTask: { status: "idle", error: null },
     synchronizationError: false,
   },

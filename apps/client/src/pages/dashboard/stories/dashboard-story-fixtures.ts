@@ -13,7 +13,7 @@ export const dashboardStoryFixture: DashboardResponse = {
   recommendation: {
     id: "dashboard-recommendation-targeted-practice-record-001",
     sourceRecordId: "targeted-practice-record-001",
-    targetRoleId: "role_frontend_bytedance",
+    roleId: "role_frontend_bytedance",
     recommendation: {
       action: "mockInterview",
       reason: "单题结构已经稳定，可以在连续问答中验证临场表达。",

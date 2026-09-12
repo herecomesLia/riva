@@ -9,7 +9,7 @@ const followUpPrompt = "你如何确认最终结果主要来自你的关键行�
 export const interviewFixture = {
   sessionId: "interview-session",
   configuration: {
-    targetRoleId: "role_frontend",
+    roleId: "role_frontend",
     round: "technical",
     difficulty: "pressure",
     durationMinutes: 30,

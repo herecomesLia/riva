@@ -5,10 +5,10 @@ import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import type { TargetRoleResponse } from "@/api/generated/models"
+import type { RoleResponse } from "@/api/generated/models"
 
 import { RoleStatusBadges } from "./RoleStatusBadges"
-import { getRolesForCategory, type TargetRoleListCategory } from "./roles-list-utils"
+import { getRolesForCategory, type RoleListCategory } from "./roles-list-utils"
 
 export function RolesList({
   category,
@@ -20,11 +20,11 @@ export function RolesList({
   selectedRoleId,
   onSelectRole,
 }: {
-  category: TargetRoleListCategory
+  category: RoleListCategory
   className?: string
   activeRoleId: string | null
-  onCategoryChange: (category: TargetRoleListCategory) => void
-  roles: TargetRoleResponse[]
+  onCategoryChange: (category: RoleListCategory) => void
+  roles: RoleResponse[]
   matchingByRoleId: RoleResources["matchingByRoleId"]
   selectedRoleId: string | null
   onSelectRole: (roleId: string) => void
@@ -107,7 +107,7 @@ function RoleListItem({
 }: {
   isCurrent: boolean
   onSelectRole: (roleId: string) => void
-  role: TargetRoleResponse
+  role: RoleResponse
   analysis: MatchingAnalysisState | undefined
   selected: boolean
 }) {

@@ -18,7 +18,7 @@ export type TrainingRecordQuestionType =
 export type TrainingRecordInterviewRound =
   "hr" | "firstBusiness" | "technical" | "manager" | "final" | "comprehensive"
 
-export type TrainingRecordTargetRole = {
+export type TrainingRecordRole = {
   id: string
   title: string
   company: string | null
@@ -179,7 +179,7 @@ type TrainingRecordBase = {
   startedAt: string
   endedAt: string
   durationSeconds: number
-  targetRole: TrainingRecordTargetRole
+  role: TrainingRecordRole
   answeredQuestionCount: number
   totalQuestionCount: number
   overallScore: number | null
@@ -209,7 +209,7 @@ export type TrainingRecordsOverviewResponse = {
   totalDurationSeconds: number
   answeredQuestionCount: number
   averageScore: number | null
-  targetRoles: TrainingRecordTargetRole[]
+  roles: TrainingRecordRole[]
   byKind: Record<
     TrainingRecordKind,
     {
@@ -223,7 +223,7 @@ export type TrainingRecordsOverviewResponse = {
 export type ListTrainingRecordsInput = {
   kinds?: TrainingRecordKind[]
   statuses?: TrainingRecordStatus[]
-  targetRoleId?: string
+  roleId?: string
   startedAtFrom?: string
   startedAtTo?: string
   page: number

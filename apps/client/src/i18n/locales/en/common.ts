@@ -25,10 +25,9 @@ export const common = {
     roleUnavailable: {
       title: "The historical target role is unavailable",
       reasons: {
-        targetRoleDeleted: "The original target role was deleted. Select another role to continue.",
-        targetRoleArchived:
-          "The original target role was archived. Select an active role to continue.",
-        targetRolePrerequisiteUnavailable:
+        roleDeleted: "The original target role was deleted. Select another role to continue.",
+        roleArchived: "The original target role was archived. Select an active role to continue.",
+        rolePrerequisiteUnavailable:
           "The original role no longer meets the training prerequisites. Select another eligible role to continue.",
       },
     },

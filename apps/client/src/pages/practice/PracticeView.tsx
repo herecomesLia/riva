@@ -240,7 +240,7 @@ function PracticeViewContent(props: PracticeViewProps) {
 
   switch (session.status) {
     case "setup": {
-      if (setupContext.targetRoles.length === 0) return <PracticeNoRolesState />
+      if (setupContext.roles.length === 0) return <PracticeNoRolesState />
 
       const selection =
         props.historyEntryResolution?.status === "roleUnavailable"
@@ -655,15 +655,15 @@ function resolveActiveSelection(
   selection: PracticeSelection,
   context: PracticeData["setupContext"],
 ): ActiveSelection | null {
-  const targetRoleId = selection.targetRoleId
-  if (!targetRoleId) return null
+  const roleId = selection.roleId
+  if (!roleId) return null
 
-  const role = context.targetRoles.find((candidate) => candidate.id === targetRoleId)
+  const role = context.roles.find((candidate) => candidate.id === roleId)
   if (!role) return null
   const questionType = role.supportedQuestionTypes.includes(selection.questionType)
     ? selection.questionType
     : role.supportedQuestionTypes[0]
   if (!questionType) return null
 
-  return { ...selection, targetRoleId, questionType }
+  return { ...selection, roleId, questionType }
 }

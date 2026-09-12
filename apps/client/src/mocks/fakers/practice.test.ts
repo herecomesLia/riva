@@ -6,7 +6,7 @@ import type { ActiveSelection } from "@/models/practice-workflow"
 
 const selection: ActiveSelection = {
   ...practiceFixture.selection,
-  targetRoleId: "target-role-id",
+  roleId: "role-id",
   questionType: "motivation",
   difficulty: "pressure",
   source: "history",

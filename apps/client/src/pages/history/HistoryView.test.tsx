@@ -14,7 +14,7 @@ import { renderWithProviders } from "@/test/render"
 
 const filters = {
   kind: "all",
-  targetRoleId: "all",
+  roleId: "all",
   timeRange: "all",
 } as const
 
@@ -68,9 +68,7 @@ describe("HistoryView", () => {
     })
 
     expect(await screen.findByText(record.reviewSummary!)).toBeInTheDocument()
-    expect(
-      screen.getAllByText(`${record.targetRole.title} · ${record.targetRole.company}`),
-    ).not.toHaveLength(0)
+    expect(screen.getAllByText(`${record.role.title} · ${record.role.company}`)).not.toHaveLength(0)
     const detailLink = screen.getByRole("button", {
       name: i18n.t("history.records.viewDetailsLabel", {
         date: new Intl.DateTimeFormat(i18n.language, {
@@ -78,7 +76,7 @@ describe("HistoryView", () => {
           timeStyle: "short",
         }).format(new Date(record.startedAt)),
         kind: i18n.t(`history.filters.kinds.${record.kind}`),
-        role: record.targetRole.title,
+        role: record.role.title,
       }),
     })
     expect(detailLink.getAttribute("href")).toContain(`/history/practice/${record.id}`)
@@ -143,7 +141,7 @@ describe("HistoryView", () => {
           timeStyle: "short",
         }).format(new Date(record.startedAt)),
         kind: i18n.t("history.filters.kinds.mockInterview"),
-        role: record.targetRole.title,
+        role: record.role.title,
       }),
     })
     expect(detailButton.getAttribute("href")).toContain(`/history/interview/${record.id}`)

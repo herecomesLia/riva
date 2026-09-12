@@ -1,10 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from riva.models.target_role import (
+from riva.models.role import (
     HardSkills,
     JobDescription,
     JobRequirements,
-    TargetRole,
+    Role,
 )
 from riva.services.errors import ConflictError, NotFoundError
 from riva.services.types import UNSET
@@ -28,7 +28,7 @@ class JobDescriptionService:
 
     async def update(
         self,
-        role: TargetRole,
+        role: Role,
         *,
         responsibilities: list[str] | UNSET = UNSET,
         requirements: JobRequirements | UNSET = UNSET,
@@ -36,7 +36,7 @@ class JobDescriptionService:
         soft_skills: list[str] | UNSET = UNSET,
         preferred_qualifications: list[str] | UNSET = UNSET,
         business_domains: list[str] | UNSET = UNSET,
-    ) -> TargetRole:
+    ) -> Role:
         jd = await self._lock_jd(role)
         if jd.extraction_job_id is not None and await get_job_status(
             self.session, jd.extraction_job_id
@@ -60,20 +60,20 @@ class JobDescriptionService:
         await self.session.commit()
         return role
 
-    async def extract_text(self, role: TargetRole, *, text: str) -> None:
+    async def extract_text(self, role: Role, *, text: str) -> None:
         jd = await self._lock_jd(role)
         if jd.extraction_job_id is not None:
             await cancel_job(self.session, jd.extraction_job_id, abort=True)
         jd.extraction_job_id = await defer_job(
             self.session,
             Task.EXTRACT_JD_TEXT,
-            target_role_id=str(role.id),
+            role_id=str(role.id),
             text=text,
         )
         jd.extraction_error_code = None
         await self.session.commit()
 
-    async def get_extraction_state(self, role: TargetRole) -> TaskState:
+    async def get_extraction_state(self, role: Role) -> TaskState:
         # Keep the current job and its error stable while reading the job status.
         jd = await self._lock_jd(role, shared=True)
         if jd.extraction_job_id is None:
@@ -92,7 +92,7 @@ class JobDescriptionService:
             }.get(status, TaskStatus.IDLE)
         )
 
-    async def retry_extraction(self, role: TargetRole) -> None:
+    async def retry_extraction(self, role: Role) -> None:
         jd = await self._lock_jd(role)
         if (
             jd.extraction_job_id is None
@@ -104,7 +104,7 @@ class JobDescriptionService:
         jd.extraction_error_code = None
         await self.session.commit()
 
-    async def abort_extraction(self, role: TargetRole) -> None:
+    async def abort_extraction(self, role: Role) -> None:
         jd = await self._lock_jd(role)
         if jd.extraction_job_id is None:
             raise ConflictError("There is no active JD extraction to abort.")
@@ -115,9 +115,7 @@ class JobDescriptionService:
             raise ConflictError("Only an active JD extraction can be aborted.")
         await self.session.commit()
 
-    async def _lock_jd(
-        self, role: TargetRole, *, shared: bool = False
-    ) -> JobDescription:
+    async def _lock_jd(self, role: Role, *, shared: bool = False) -> JobDescription:
         jd = await self.session.get(
             JobDescription,
             role.id,

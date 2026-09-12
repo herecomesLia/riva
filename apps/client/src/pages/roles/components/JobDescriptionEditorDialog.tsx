@@ -17,7 +17,7 @@ import {
 import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
-import type { TargetRoleResponse } from "@/api/generated/models"
+import type { RoleResponse } from "@/api/generated/models"
 
 import { getRolesActionErrorCode, type RolesActionErrorCode } from "../roles-errors"
 
@@ -36,7 +36,7 @@ export function JobDescriptionEditorDialog({
   onSave: (roleId: string, text: string) => Promise<void>
   onSaved: () => void
   open: boolean
-  role: TargetRoleResponse | null
+  role: RoleResponse | null
 }) {
   const { t } = useTranslation()
 
@@ -79,7 +79,7 @@ function JobDescriptionEditorForm({
   onOpenChange: (open: boolean) => void
   onSave: (roleId: string, text: string) => Promise<void>
   onSaved: () => void
-  role: TargetRoleResponse
+  role: RoleResponse
 }) {
   const { t } = useTranslation()
   const [saveError, setSaveError] = useState<RolesActionErrorCode | null>(null)

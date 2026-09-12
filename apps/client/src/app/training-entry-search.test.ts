@@ -11,12 +11,12 @@ import {
 
 const selection: ActiveSelection = {
   ...practiceFixture.selection,
-  targetRoleId: "role_active",
+  roleId: "role_active",
 }
 const setupContext: PracticeSetupContext = {
-  targetRoles: [
+  roles: [
     {
-      id: selection.targetRoleId,
+      id: selection.roleId,
       title: "Frontend Engineer",
       company: null,
       supportedQuestionTypes: ["behavioral"],
@@ -40,17 +40,17 @@ describe("training entry search application", () => {
         setupContext,
         selection,
         {
-          targetRoleId: "role_missing",
+          roleId: "role_missing",
           questionType: "businessUnderstanding",
         },
-        { status: "unavailable", reason: "targetRoleDeleted" },
+        { status: "unavailable", reason: "roleDeleted" },
       ),
     ).toEqual({
       status: "roleUnavailable",
-      reason: "targetRoleDeleted",
+      reason: "roleDeleted",
       configuration: {
         ...selection,
-        targetRoleId: null,
+        roleId: null,
         questionType: "businessUnderstanding",
       },
     })
@@ -65,11 +65,11 @@ describe("training entry search application", () => {
     }
     const setup: InterviewSetup = {
       availability: { status: "available" },
-      targetRoles: [{ ...role, supportedRounds: ["technical"] }],
+      roles: [{ ...role, supportedRounds: ["technical"] }],
       availableDifficulties: ["basic"],
       availableDurationMinutes: [15],
       defaultConfiguration: {
-        targetRoleId: role.id,
+        roleId: role.id,
         round: "technical",
         difficulty: "basic",
         durationMinutes: 15,
@@ -80,7 +80,7 @@ describe("training entry search application", () => {
       resolveInterviewTrainingEntry(
         setup,
         {
-          targetRoleId: role.id,
+          roleId: role.id,
           round: "hr",
           difficulty: "pressure",
           durationMinutes: 45,
@@ -91,7 +91,7 @@ describe("training entry search application", () => {
       status: "adjusted",
       adjustments: ["interviewRoundUnsupported", "difficultyUnavailable", "durationUnavailable"],
       configuration: {
-        targetRoleId: role.id,
+        roleId: role.id,
         round: "technical",
         difficulty: "basic",
         durationMinutes: 15,
@@ -105,7 +105,7 @@ describe("training entry search application", () => {
         setupContext,
         selection,
         {
-          targetRoleId: selection.targetRoleId,
+          roleId: selection.roleId,
           questionType: "technicalFoundation",
           difficulty: "pressure",
         },

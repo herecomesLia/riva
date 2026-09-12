@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ApiError } from "@/api/error"
-import type { TargetRoleResponse, TargetRoleListResponse } from "@/api/generated/models"
+import type { RoleResponse, RoleListResponse } from "@/api/generated/models"
 
 import {
   archiveRole,
@@ -30,7 +30,7 @@ import { RolesActionError } from "./roles-errors"
 export function RolesPage() {
   const queryClient = useQueryClient()
   const rolesQuery = useQuery({ queryFn: getRoles, queryKey: ROLES_QUERY_KEY, retry: false })
-  const resources = useRoleQueries(rolesQuery.data?.targetRoles ?? [])
+  const resources = useRoleQueries(rolesQuery.data?.roles ?? [])
   const refreshRoles = () =>
     queryClient.invalidateQueries({ queryKey: ROLES_QUERY_KEY, exact: true })
   const refreshRoleResources = async (roleId: string) => {
@@ -39,12 +39,12 @@ export function RolesPage() {
       queryClient.invalidateQueries({ queryKey: matchingQueryKey(roleId) }),
     ])
   }
-  const cacheCreatedRole = (role: TargetRoleResponse) => {
-    queryClient.setQueryData<TargetRoleListResponse>(ROLES_QUERY_KEY, (current) =>
+  const cacheCreatedRole = (role: RoleResponse) => {
+    queryClient.setQueryData<RoleListResponse>(ROLES_QUERY_KEY, (current) =>
       current
         ? {
             ...current,
-            targetRoles: [role, ...current.targetRoles.filter((item) => item.id !== role.id)],
+            roles: [role, ...current.roles.filter((item) => item.id !== role.id)],
           }
         : current,
     )

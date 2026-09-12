@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import type { TrainingRecordTargetRole } from "@/models/training-records"
+import type { TrainingRecordRole } from "@/models/training-records"
 
 import type { HistoryFiltersValue, HistoryKindFilter, HistoryTimeRange } from "../history-types"
 
@@ -24,15 +24,15 @@ export function HistoryFilters({
   filters,
   loading,
   onChange,
-  targetRoles,
+  roles,
 }: {
   filters: HistoryFiltersValue
   loading: boolean
   onChange: (filters: HistoryFiltersValue) => void
-  targetRoles: TrainingRecordTargetRole[]
+  roles: TrainingRecordRole[]
 }) {
   const { t } = useTranslation()
-  const selectedRole = targetRoles.find((role) => role.id === filters.targetRoleId)
+  const selectedRole = roles.find((role) => role.id === filters.roleId)
 
   return (
     <Card>
@@ -73,17 +73,17 @@ export function HistoryFilters({
             </FieldSet>
 
             <Field>
-              <FieldLabel htmlFor="history-target-role">
+              <FieldLabel htmlFor="history-role">
                 <TargetIcon aria-hidden="true" />
                 {t("history.filters.roleLabel")}
               </FieldLabel>
               <Select
-                onValueChange={(targetRoleId) => {
-                  if (targetRoleId) onChange({ ...filters, targetRoleId })
+                onValueChange={(roleId) => {
+                  if (roleId) onChange({ ...filters, roleId })
                 }}
-                value={filters.targetRoleId}
+                value={filters.roleId}
               >
-                <SelectTrigger className="w-full" id="history-target-role">
+                <SelectTrigger className="w-full" id="history-role">
                   <SelectValue>
                     {selectedRole ? formatRole(selectedRole) : t("history.filters.allRoles")}
                   </SelectValue>
@@ -91,7 +91,7 @@ export function HistoryFilters({
                 <SelectContent align="start" alignItemWithTrigger={false}>
                   <SelectGroup>
                     <SelectItem value="all">{t("history.filters.allRoles")}</SelectItem>
-                    {targetRoles.map((role) => (
+                    {roles.map((role) => (
                       <SelectItem key={role.id} value={role.id}>
                         {formatRole(role)}
                       </SelectItem>
@@ -133,7 +133,7 @@ export function HistoryFilters({
   )
 }
 
-function formatRole(role: TrainingRecordTargetRole): string {
+function formatRole(role: TrainingRecordRole): string {
   return role.company ? `${role.title} · ${role.company}` : role.title
 }
 

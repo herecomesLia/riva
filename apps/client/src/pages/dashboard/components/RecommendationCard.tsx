@@ -129,7 +129,7 @@ function RecommendationDataFooter({
   const { t } = useTranslation()
   const entry = mapTrainingRecommendationToEntry(
     recommendation.recommendation,
-    recommendation.targetRoleId,
+    recommendation.roleId,
   )
 
   return (

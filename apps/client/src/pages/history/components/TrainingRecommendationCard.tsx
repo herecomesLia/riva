@@ -19,17 +19,17 @@ export function TrainingRecommendationCard({
   recommendation,
   showIcon = false,
   size,
-  targetRoleId,
+  roleId,
   title,
 }: {
   recommendation: TrainingRecordRecommendation | null
   showIcon?: boolean
   size?: "sm"
-  targetRoleId: string
+  roleId: string
   title: string
 }) {
   const { t } = useTranslation()
-  const entry = mapTrainingRecommendationToEntry(recommendation, targetRoleId)
+  const entry = mapTrainingRecommendationToEntry(recommendation, roleId)
 
   return (
     <Card size={size}>

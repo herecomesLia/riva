@@ -6,7 +6,7 @@ export type Difficulty = "basic" | "pressure"
 export type QuestionSource = "personalized" | "saved" | "history"
 
 export type PracticeSelection = {
-  targetRoleId: string | null
+  roleId: string | null
   questionType: QuestionType
   difficulty: Difficulty
   source: QuestionSource
@@ -14,7 +14,7 @@ export type PracticeSelection = {
 }
 
 export type ActiveSelection = PracticeSelection & {
-  targetRoleId: string
+  roleId: string
 }
 
 export type Guidance<T> =
@@ -222,7 +222,7 @@ export type PracticeRoleOption = {
 }
 
 export type PracticeSetupContext = {
-  targetRoles: PracticeRoleOption[]
+  roles: PracticeRoleOption[]
   availableDifficulties: Difficulty[]
   eligibleQuestionCounts: { saved: number; history: number }
 }

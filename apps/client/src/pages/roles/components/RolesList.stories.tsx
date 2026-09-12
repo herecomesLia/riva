@@ -11,32 +11,32 @@ const meta = preview.meta({
 
 const singleRoleResponse = createRoleStoryResponse("singleRoleWithoutJobDescription")
 const multipleRolesResponse = createRoleStoryResponse("multipleRoles")
-const currentRole = multipleRolesResponse.targetRoles.find(
-  (role) => role.id === multipleRolesResponse.activeTargetRoleId,
+const currentRole = multipleRolesResponse.roles.find(
+  (role) => role.id === multipleRolesResponse.activeRoleId,
 )!
-const selectedRole = multipleRolesResponse.targetRoles.find(
-  (role) => role.id !== multipleRolesResponse.activeTargetRoleId,
+const selectedRole = multipleRolesResponse.roles.find(
+  (role) => role.id !== multipleRolesResponse.activeRoleId,
 )!
 
 export const SavedRoles = meta.story({
   args: {
     category: "active",
-    activeRoleId: singleRoleResponse.activeTargetRoleId,
+    activeRoleId: singleRoleResponse.activeRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
-    roles: singleRoleResponse.targetRoles,
+    roles: singleRoleResponse.roles,
     matchingByRoleId: singleRoleResponse.matchingByRoleId,
-    selectedRoleId: singleRoleResponse.activeTargetRoleId,
+    selectedRoleId: singleRoleResponse.activeRoleId,
   },
 })
 
 export const MixedRoles = meta.story({
   args: {
     category: "active",
-    activeRoleId: multipleRolesResponse.activeTargetRoleId,
+    activeRoleId: multipleRolesResponse.activeRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
-    roles: multipleRolesResponse.targetRoles,
+    roles: multipleRolesResponse.roles,
     matchingByRoleId: multipleRolesResponse.matchingByRoleId,
     selectedRoleId: currentRole.id,
   },
@@ -47,10 +47,10 @@ const onSelectRole = fn()
 export const SelectedRoleDifferentFromCurrent = meta.story({
   args: {
     category: "active",
-    activeRoleId: multipleRolesResponse.activeTargetRoleId,
+    activeRoleId: multipleRolesResponse.activeRoleId,
     onCategoryChange: fn(),
     onSelectRole,
-    roles: multipleRolesResponse.targetRoles,
+    roles: multipleRolesResponse.roles,
     matchingByRoleId: multipleRolesResponse.matchingByRoleId,
     selectedRoleId: selectedRole.id,
   },
@@ -69,15 +69,15 @@ export const SelectedRoleDifferentFromCurrent = meta.story({
 })
 
 const archivedRolesResponse = createRoleStoryResponse("archivedRoles")
-const archivedRole = archivedRolesResponse.targetRoles.find((role) => role.isArchived)!
+const archivedRole = archivedRolesResponse.roles.find((role) => role.isArchived)!
 
 export const ArchivedRoles = meta.story({
   args: {
     category: "archived",
-    activeRoleId: archivedRolesResponse.activeTargetRoleId,
+    activeRoleId: archivedRolesResponse.activeRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
-    roles: archivedRolesResponse.targetRoles,
+    roles: archivedRolesResponse.roles,
     matchingByRoleId: archivedRolesResponse.matchingByRoleId,
     selectedRoleId: archivedRole.id,
   },
@@ -86,28 +86,28 @@ export const ArchivedRoles = meta.story({
 export const ScrollableRolesList = meta.story({
   args: {
     category: "active",
-    activeRoleId: multipleRolesResponse.activeTargetRoleId,
+    activeRoleId: multipleRolesResponse.activeRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
-    roles: createManyRolesResponse().targetRoles,
+    roles: createManyRolesResponse().roles,
     matchingByRoleId: createManyRolesResponse().matchingByRoleId,
     selectedRoleId: currentRole.id,
   },
 })
 
 const scoreResponse = createRoleStoryResponse("matchingAnalysisCurrent")
-const roleWithoutScore = createRoleStoryResponse("singleRoleWithoutJobDescription").targetRoles[0]!
+const roleWithoutScore = createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!
 roleWithoutScore.id = "role-without-match-score"
 roleWithoutScore.title = "Platform Product Manager"
 
 export const RolesWithAndWithoutMatchScore = meta.story({
   args: {
     category: "active",
-    activeRoleId: scoreResponse.activeTargetRoleId,
+    activeRoleId: scoreResponse.activeRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
-    roles: [scoreResponse.targetRoles[0]!, roleWithoutScore],
+    roles: [scoreResponse.roles[0]!, roleWithoutScore],
     matchingByRoleId: scoreResponse.matchingByRoleId,
-    selectedRoleId: scoreResponse.targetRoles[0]!.id,
+    selectedRoleId: scoreResponse.roles[0]!.id,
   },
 })

@@ -18,7 +18,7 @@ from riva.core.config import DatabaseSettings, Settings
 from riva.db import Database
 from riva.db.base import Base
 from riva.models import User
-from riva.models.target_role import JobDescription, TargetRole
+from riva.models.role import JobDescription, Role
 from riva.services.users import UserService
 from riva.tasks import setup_task_schema
 from tests.support.clock import Clock
@@ -150,7 +150,7 @@ async def extraction_role(extraction_database: Database) -> UUID:
         user = User(username="JDUser", password_hash="unused", display_name="JD User")
         session.add(user)
         await session.flush()
-        role = TargetRole(
+        role = Role(
             user_id=user.id,
             title="Engineer",
             jd=JobDescription(responsibilities=["Original"], soft_skills=["Teamwork"]),

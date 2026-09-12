@@ -10,7 +10,7 @@ type PracticeSessionHeaderProps = {
 
 export function PracticeSessionHeader({ context, selection }: PracticeSessionHeaderProps) {
   const { t } = useTranslation()
-  const role = context.targetRoles.find((candidate) => candidate.id === selection.targetRoleId)
+  const role = context.roles.find((candidate) => candidate.id === selection.roleId)
 
   return (
     <header className="flex flex-col gap-3" data-testid="practice-session-header">

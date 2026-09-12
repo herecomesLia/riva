@@ -1,12 +1,8 @@
-import type {
-  TargetRoleResponse,
-  TaskFailureResponse,
-  TaskStatusResponse,
-} from "@/api/generated/models"
+import type { RoleResponse, TaskFailureResponse, TaskStatusResponse } from "@/api/generated/models"
 import { hasJobDescription } from "@/lib/job-description"
 
 export function getJobDescriptionUiStatus(
-  role: TargetRoleResponse,
+  role: RoleResponse,
   task: TaskStatusResponse | TaskFailureResponse | undefined,
 ) {
   if (!task) return "loading"

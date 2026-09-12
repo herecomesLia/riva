@@ -22,7 +22,7 @@ import type {
   HardSkillsResponse,
   JobDescriptionResponse,
   JobRequirementsResponse,
-  TargetRoleResponse,
+  RoleResponse,
 } from "@/api/generated/models"
 import type { JdField } from "@/pages/roles/types"
 
@@ -44,7 +44,7 @@ export function JobDescriptionCard({
   onAbortExtraction?: () => void
   pending?: boolean
   jdTask: RoleResources["jdTasksByRoleId"][string]
-  role: TargetRoleResponse
+  role: RoleResponse
   synchronizationError: boolean
 }) {
   const { t } = useTranslation()

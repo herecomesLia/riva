@@ -188,10 +188,10 @@ export function PracticeSelectionSummary({
   selection: ActiveSelection
 }) {
   const { t } = useTranslation()
-  const role = context.targetRoles.find((candidate) => candidate.id === selection.targetRoleId)
+  const role = context.roles.find((candidate) => candidate.id === selection.roleId)
 
   const items = [
-    [t("practice.summary.targetRole"), role?.title ?? t("practice.session.unknownRole")],
+    [t("practice.summary.role"), role?.title ?? t("practice.session.unknownRole")],
     [t("practice.summary.questionType"), t(`practice.questionTypes.${selection.questionType}`)],
     [t("practice.summary.difficulty"), t(`practice.difficulty.${selection.difficulty}`)],
     [t("practice.summary.source"), t(`practice.sources.${selection.source}`)],

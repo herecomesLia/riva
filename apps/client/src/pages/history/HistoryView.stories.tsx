@@ -13,7 +13,7 @@ import {
 
 const defaultFilters = {
   kind: "all",
-  targetRoleId: "all",
+  roleId: "all",
   timeRange: "all",
 } as const
 
@@ -73,7 +73,7 @@ export const FilteredEmpty = meta.story({
     ...Default.input.args,
     filters: {
       kind: "mockInterview",
-      targetRoleId: "22222222-2222-4222-8222-222222222222",
+      roleId: "22222222-2222-4222-8222-222222222222",
       timeRange: "last7Days",
     },
     onClearFilters,

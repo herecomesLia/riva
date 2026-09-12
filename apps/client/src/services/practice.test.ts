@@ -1,20 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { practiceFaker } from "@/mocks/fakers/practice"
 import { practiceFixture } from "@/mocks/fixtures/practice"
-import { targetRoleFixture } from "@/mocks/fixtures/target-role"
-import type { TargetRoleListResponse } from "@/api/generated/models"
+import { roleFixture } from "@/mocks/fixtures/role"
+import type { RoleListResponse } from "@/api/generated/models"
 import { getRoles } from "@/services/roles"
 import { getPracticePage, preparePracticeTrainingEntry } from "@/services/practice"
 
 vi.mock("@/services/roles", () => ({ getRoles: vi.fn() }))
 
-const roles: TargetRoleListResponse = {
-  targetRoles: ["first", "active", "archived"].map((id) => ({
-    ...structuredClone(targetRoleFixture),
+const roles: RoleListResponse = {
+  roles: ["first", "active", "archived"].map((id) => ({
+    ...structuredClone(roleFixture),
     id,
     isArchived: id === "archived",
   })),
-  activeTargetRoleId: "active",
+  activeRoleId: "active",
 }
 
 beforeEach(() => {
@@ -29,10 +29,10 @@ beforeEach(() => {
 describe("Practice service", () => {
   it("combines formal roles and the session with an available default role", async () => {
     const page = await getPracticePage()
-    expect(page.setupContext.targetRoles.map((role) => role.id)).toEqual(["first", "active"])
-    expect(page.setupContext.targetRoles[0]).toMatchObject({
-      title: targetRoleFixture.title,
-      company: targetRoleFixture.company,
+    expect(page.setupContext.roles.map((role) => role.id)).toEqual(["first", "active"])
+    expect(page.setupContext.roles[0]).toMatchObject({
+      title: roleFixture.title,
+      company: roleFixture.company,
       supportedQuestionTypes: [
         "projectDeepDive",
         "behavioral",
@@ -47,29 +47,29 @@ describe("Practice service", () => {
     })
     expect(page.session).toEqual({
       status: "setup",
-      selection: { ...practiceFixture.selection, targetRoleId: "active" },
+      selection: { ...practiceFixture.selection, roleId: "active" },
     })
     vi.mocked(practiceFaker.get).mockResolvedValue({
       status: "setup",
-      selection: { ...practiceFixture.selection, targetRoleId: "first" },
+      selection: { ...practiceFixture.selection, roleId: "first" },
     })
     expect((await getPracticePage()).session).toMatchObject({
-      selection: { targetRoleId: "first" },
+      selection: { roleId: "first" },
     })
     vi.mocked(practiceFaker.get).mockResolvedValue({
       status: "setup",
-      selection: { ...practiceFixture.selection, targetRoleId: "deleted" },
+      selection: { ...practiceFixture.selection, roleId: "deleted" },
     })
-    vi.mocked(getRoles).mockResolvedValue({ ...roles, activeTargetRoleId: "archived" })
+    vi.mocked(getRoles).mockResolvedValue({ ...roles, activeRoleId: "archived" })
     expect((await getPracticePage()).session).toMatchObject({
-      selection: { targetRoleId: "first" },
+      selection: { roleId: "first" },
     })
-    vi.mocked(getRoles).mockResolvedValue({ ...roles, targetRoles: [] })
-    expect((await getPracticePage()).session).toMatchObject({ selection: { targetRoleId: null } })
+    vi.mocked(getRoles).mockResolvedValue({ ...roles, roles: [] })
+    expect((await getPracticePage()).session).toMatchObject({ selection: { roleId: null } })
 
     const session = {
       status: "generatingQuestion" as const,
-      selection: { ...practiceFixture.selection, targetRoleId: "active" },
+      selection: { ...practiceFixture.selection, roleId: "active" },
     }
     vi.mocked(practiceFaker.get).mockResolvedValue(session)
     expect((await getPracticePage()).session).toEqual(session)
@@ -77,18 +77,15 @@ describe("Practice service", () => {
 
   it.each([
     ["first", "available", undefined],
-    ["archived", "roleUnavailable", "targetRoleArchived"],
-    ["deleted", "roleUnavailable", "targetRoleDeleted"],
-  ] as const)(
-    "resolves history entry for %s into setup data",
-    async (targetRoleId, status, reason) => {
-      const response = await preparePracticeTrainingEntry({ targetRoleId, source: "history" })
-      expect(response.resolution).toMatchObject({ status, ...(reason ? { reason } : {}) })
-      expect(response.page.session).toEqual({
-        status: "setup",
-        selection: response.resolution.configuration,
-      })
-      expect(practiceFaker.get).toHaveBeenCalledOnce()
-    },
-  )
+    ["archived", "roleUnavailable", "roleArchived"],
+    ["deleted", "roleUnavailable", "roleDeleted"],
+  ] as const)("resolves history entry for %s into setup data", async (roleId, status, reason) => {
+    const response = await preparePracticeTrainingEntry({ roleId, source: "history" })
+    expect(response.resolution).toMatchObject({ status, ...(reason ? { reason } : {}) })
+    expect(response.page.session).toEqual({
+      status: "setup",
+      selection: response.resolution.configuration,
+    })
+    expect(practiceFaker.get).toHaveBeenCalledOnce()
+  })
 })

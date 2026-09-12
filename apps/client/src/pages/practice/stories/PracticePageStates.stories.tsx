@@ -39,14 +39,14 @@ const unavailableRoleArgs = createPracticeViewArgs("setupReady")
 if (unavailableRoleArgs.content.data.session.status !== "setup") {
   throw new Error("Practice setup fixture required.")
 }
-unavailableRoleArgs.content.data.session.selection.targetRoleId = null
+unavailableRoleArgs.content.data.session.selection.roleId = null
 
 export const HistoricalRoleUnavailable = meta.story({
   args: {
     ...unavailableRoleArgs,
     historyEntryResolution: {
       status: "roleUnavailable",
-      reason: "targetRoleArchived",
+      reason: "roleArchived",
       configuration: unavailableRoleArgs.content.data.session.selection,
     },
   },

@@ -71,7 +71,7 @@ export const NoCurrentRole = meta.story({
 })
 
 const archivedRoles = createRoleStoryResponse("archivedRoles")
-const archivedRole = archivedRoles.targetRoles.find((role) => role.isArchived)!
+const archivedRole = archivedRoles.roles.find((role) => role.isArchived)!
 
 export const ArchivedRoleSelected = meta.story({
   args: {
@@ -84,11 +84,11 @@ export const ArchivedRoleSelected = meta.story({
 })
 
 const selectedDifferent = createRoleStoryResponse("multipleRoles")
-const currentRole = selectedDifferent.targetRoles.find(
-  (role) => role.id === selectedDifferent.activeTargetRoleId,
+const currentRole = selectedDifferent.roles.find(
+  (role) => role.id === selectedDifferent.activeRoleId,
 )!
-const selectedRole = selectedDifferent.targetRoles.find(
-  (role) => role.id !== selectedDifferent.activeTargetRoleId,
+const selectedRole = selectedDifferent.roles.find(
+  (role) => role.id !== selectedDifferent.activeRoleId,
 )!
 
 export const SelectedRoleDifferentFromCurrent = meta.story({
@@ -119,7 +119,7 @@ export const SelectedRoleDifferentFromCurrent = meta.story({
   },
 })
 
-export const ManyTargetRoles = meta.story({
+export const ManyRoles = meta.story({
   args: {
     content: { status: "ready", data: createManyRolesResponse() },
     jdTasksByRoleId: createManyRolesResponse().jdTasksByRoleId,

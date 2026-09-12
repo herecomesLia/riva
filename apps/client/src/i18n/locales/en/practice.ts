@@ -6,7 +6,7 @@ export const practice = {
     description:
       "Choose a target role and question direction. Riva will generate one focused question.",
     fields: {
-      targetRole: "Target role",
+      role: "Target role",
       questionType: "Question type",
       difficulty: "Difficulty",
       source: "Question source",
@@ -308,7 +308,7 @@ export const practice = {
     viewHistory: "View practice history",
   },
   summary: {
-    targetRole: "Target role",
+    role: "Target role",
     questionType: "Question type",
     difficulty: "Difficulty",
     source: "Question source",

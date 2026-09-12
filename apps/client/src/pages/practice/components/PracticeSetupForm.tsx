@@ -47,7 +47,7 @@ import type {
 import type { PracticeTrainingEntryResolution } from "@/models/training-entry"
 
 const setupSchema = z.object({
-  targetRoleId: z.string().min(1),
+  roleId: z.string().min(1),
   questionType: z.enum([
     "projectDeepDive",
     "behavioral",
@@ -93,10 +93,10 @@ export function PracticeSetupForm({
     defaultValues: initialSelection,
     validators: { onSubmit: setupSchema },
     onSubmit: async ({ value }) => {
-      if (!value.targetRoleId) return
+      if (!value.roleId) return
       setSubmitError(false)
       try {
-        await onStart({ ...value, targetRoleId: value.targetRoleId })
+        await onStart({ ...value, roleId: value.roleId })
       } catch {
         setSubmitError(true)
       }
@@ -122,9 +122,9 @@ export function PracticeSetupForm({
         />
       )}
       <FieldGroup className="gap-0">
-        <form.Field name="targetRoleId">
+        <form.Field name="roleId">
           {(field) => {
-            const selectedRole = context.targetRoles.find((role) => role.id === field.state.value)
+            const selectedRole = context.roles.find((role) => role.id === field.state.value)
             const selectedRoleLabel = selectedRole?.company
               ? `${selectedRole.title} · ${selectedRole.company}`
               : selectedRole?.title
@@ -133,14 +133,14 @@ export function PracticeSetupForm({
               <Field className="pb-5" data-disabled={pending}>
                 <FieldLabel className="[&>svg]:size-4 [&>svg]:text-primary" htmlFor={field.name}>
                   <BriefcaseBusinessIcon aria-hidden="true" />
-                  {t("practice.setup.fields.targetRole")}
+                  {t("practice.setup.fields.role")}
                 </FieldLabel>
                 <Select
                   disabled={pending}
                   onValueChange={(value) => {
                     if (!value) return
                     field.handleChange(value)
-                    const selectedRole = context.targetRoles.find((role) => role.id === value)
+                    const selectedRole = context.roles.find((role) => role.id === value)
                     const currentQuestionType = form.getFieldValue("questionType")
                     if (
                       selectedRole &&
@@ -154,7 +154,7 @@ export function PracticeSetupForm({
                 >
                   <SelectTrigger
                     className="w-full focus:border-primary focus:text-primary focus-visible:border-primary focus-visible:text-primary"
-                    data-testid="practice-target-role-trigger"
+                    data-testid="practice-role-trigger"
                     id={field.name}
                     onBlur={field.handleBlur}
                   >
@@ -164,7 +164,7 @@ export function PracticeSetupForm({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      {context.targetRoles.map((role) => (
+                      {context.roles.map((role) => (
                         <SelectItem key={role.id} value={role.id}>
                           {role.company ? `${role.title} · ${role.company}` : role.title}
                         </SelectItem>
@@ -178,9 +178,9 @@ export function PracticeSetupForm({
         </form.Field>
 
         <div className="border-t border-border py-5">
-          <form.Subscribe selector={(state) => state.values.targetRoleId}>
-            {(targetRoleId) => {
-              const selectedRole = context.targetRoles.find((role) => role.id === targetRoleId)
+          <form.Subscribe selector={(state) => state.values.roleId}>
+            {(roleId) => {
+              const selectedRole = context.roles.find((role) => role.id === roleId)
               const supportedQuestionTypes = selectedRole?.supportedQuestionTypes ?? []
 
               return (
@@ -352,10 +352,8 @@ export function PracticeSetupForm({
         </Alert>
       )}
 
-      <form.Subscribe
-        selector={(state) => [state.values.source, state.values.targetRoleId] as const}
-      >
-        {([source, targetRoleId]) => {
+      <form.Subscribe selector={(state) => [state.values.source, state.values.roleId] as const}>
+        {([source, roleId]) => {
           const sourceUnavailable =
             (source === "saved" && context.eligibleQuestionCounts.saved === 0) ||
             (source === "history" && context.eligibleQuestionCounts.history === 0)
@@ -363,7 +361,7 @@ export function PracticeSetupForm({
           return (
             <Button
               className="w-full sm:w-fit"
-              disabled={pending || sourceUnavailable || !targetRoleId || !adjustmentConfirmed}
+              disabled={pending || sourceUnavailable || !roleId || !adjustmentConfirmed}
               type="submit"
             >
               {!pending && <PlayIcon aria-hidden="true" data-icon="inline-start" />}

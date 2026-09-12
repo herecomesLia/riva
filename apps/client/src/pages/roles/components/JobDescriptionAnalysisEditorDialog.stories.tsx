@@ -23,7 +23,7 @@ function dialogArgs(
     onOpenChange: fn(),
     onSave: fn(async () => undefined),
     onSaved: fn(),
-    role: createRoleStoryResponse("roleWithExtractedJobDescription").targetRoles[0]!,
+    role: createRoleStoryResponse("roleWithExtractedJobDescription").roles[0]!,
     jdTask: { status: "idle" as const, error: null },
   }
 }

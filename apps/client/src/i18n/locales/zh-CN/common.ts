@@ -20,10 +20,9 @@ export const common = {
     roleUnavailable: {
       title: "历史岗位当前不可用",
       reasons: {
-        targetRoleDeleted: "原目标岗位已删除，请主动选择其他岗位后继续。",
-        targetRoleArchived: "原目标岗位已归档，请主动选择仍在准备中的岗位后继续。",
-        targetRolePrerequisiteUnavailable:
-          "原岗位当前不满足训练前置条件，请选择满足条件的岗位后继续。",
+        roleDeleted: "原目标岗位已删除，请主动选择其他岗位后继续。",
+        roleArchived: "原目标岗位已归档，请主动选择仍在准备中的岗位后继续。",
+        rolePrerequisiteUnavailable: "原岗位当前不满足训练前置条件，请选择满足条件的岗位后继续。",
       },
     },
     failed: {

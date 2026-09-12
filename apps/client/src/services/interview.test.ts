@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { interviewFaker } from "@/mocks/fakers/interview"
 import { interviewFixture } from "@/mocks/fixtures/interview"
-import { targetRoleFixture } from "@/mocks/fixtures/target-role"
-import type { TargetRoleListResponse } from "@/api/generated/models"
+import { roleFixture } from "@/mocks/fixtures/role"
+import type { RoleListResponse } from "@/api/generated/models"
 import { getRoles, getJdExtractionState } from "@/services/roles"
 import {
   getInterviewPage,
@@ -17,17 +17,17 @@ import {
 vi.mock("@/services/roles", () => ({ getRoles: vi.fn(), getJdExtractionState: vi.fn() }))
 vi.mock("@/services/profile", () => ({ getProfile: vi.fn() }))
 
-const roles: TargetRoleListResponse = {
-  targetRoles: ["first", "active", "missing", "archived"].map((id) => ({
-    ...structuredClone(targetRoleFixture),
+const roles: RoleListResponse = {
+  roles: ["first", "active", "missing", "archived"].map((id) => ({
+    ...structuredClone(roleFixture),
     id,
     isArchived: id === "archived",
     jd:
       id === "missing"
-        ? createRoleStoryResponse("singleRoleWithoutJobDescription").targetRoles[0]!.jd
-        : targetRoleFixture.jd,
+        ? createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!.jd
+        : roleFixture.jd,
   })),
-  activeTargetRoleId: "active",
+  activeRoleId: "active",
 }
 
 beforeEach(() => {
@@ -42,8 +42,8 @@ describe("Interview service", () => {
   it("combines ready roles, defaults and the current session", async () => {
     const page = await getInterviewPage()
     expect(page.session).toBeNull()
-    expect(page.setup.targetRoles.map(({ id }) => id)).toEqual(["first", "active"])
-    expect(page.setup.targetRoles[0]?.supportedRounds).toEqual([
+    expect(page.setup.roles.map(({ id }) => id)).toEqual(["first", "active"])
+    expect(page.setup.roles[0]?.supportedRounds).toEqual([
       "hr",
       "firstBusiness",
       "technical",
@@ -56,14 +56,14 @@ describe("Interview service", () => {
       availableDifficulties: ["basic", "pressure"],
       availableDurationMinutes: [15, 30, 45],
       defaultConfiguration: {
-        targetRoleId: "active",
+        roleId: "active",
         round: "technical",
         difficulty: "pressure",
         durationMinutes: 30,
       },
     })
-    vi.mocked(getRoles).mockResolvedValue({ ...roles, activeTargetRoleId: "missing" })
-    expect((await getInterviewPage()).setup.defaultConfiguration.targetRoleId).toBe("first")
+    vi.mocked(getRoles).mockResolvedValue({ ...roles, activeRoleId: "missing" })
+    expect((await getInterviewPage()).setup.defaultConfiguration.roleId).toBe("first")
     const session = {
       status: "opening" as const,
       sessionId: interviewFixture.sessionId,
@@ -77,37 +77,31 @@ describe("Interview service", () => {
 
   it.each([
     [[], false, "available", undefined],
-    [roles.targetRoles, false, "blocked", "profileIncomplete"],
-    [
-      roles.targetRoles.filter(({ id }) => id === "missing"),
-      true,
-      "blocked",
-      "jobDescriptionMissing",
-    ],
+    [roles.roles, false, "blocked", "profileIncomplete"],
+    [roles.roles.filter(({ id }) => id === "missing"), true, "blocked", "jobDescriptionMissing"],
   ] as const)(
     "preserves empty and prerequisite availability",
     async (items, complete, status, reason) => {
       vi.mocked(getRoles).mockResolvedValue({
         ...roles,
-        targetRoles: [...items],
+        roles: [...items],
       })
       vi.mocked(getProfile).mockResolvedValue(complete ? careerProfileFixture : null)
       const page = await getInterviewPage()
       expect(page.setup.availability).toEqual({ status, ...(reason ? { reason } : {}) })
-      if (page.setup.targetRoles.length === 0)
-        expect(page.setup.defaultConfiguration.targetRoleId).toBeNull()
+      if (page.setup.roles.length === 0) expect(page.setup.defaultConfiguration.roleId).toBeNull()
     },
   )
 
   it.each([
     ["active", true, undefined],
-    ["archived", true, "targetRoleArchived"],
-    ["deleted", true, "targetRoleDeleted"],
-    ["missing", true, "targetRolePrerequisiteUnavailable"],
-    ["active", false, "targetRolePrerequisiteUnavailable"],
+    ["archived", true, "roleArchived"],
+    ["deleted", true, "roleDeleted"],
+    ["missing", true, "rolePrerequisiteUnavailable"],
+    ["active", false, "rolePrerequisiteUnavailable"],
   ] as const)(
     "prepares history for %s without changing the session",
-    async (targetRoleId, complete, reason) => {
+    async (roleId, complete, reason) => {
       vi.mocked(getRoles).mockResolvedValue(roles)
       vi.mocked(getProfile).mockResolvedValue(
         complete ? careerProfileFixture : { ...careerProfileFixture, skills: [] },
@@ -117,7 +111,7 @@ describe("Interview service", () => {
       const before = interviewFaker.get()
       const start = vi.spyOn(interviewFaker, "start")
       const response = await prepareInterviewTrainingEntry({
-        targetRoleId,
+        roleId,
         round: "hr",
         difficulty: "basic",
         durationMinutes: 45,
@@ -128,7 +122,7 @@ describe("Interview service", () => {
           : {
               status: "available",
               configuration: {
-                targetRoleId,
+                roleId,
                 round: "hr",
                 difficulty: "basic",
                 durationMinutes: 45,

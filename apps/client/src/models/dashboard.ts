@@ -30,7 +30,7 @@ export type DashboardResponse = {
   recommendation: {
     id: string
     sourceRecordId: string
-    targetRoleId: string
+    roleId: string
     recommendation: TrainingRecordRecommendation
     estimatedMinutes: number
   } | null

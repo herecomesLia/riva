@@ -87,7 +87,7 @@ export const trainingRecordsFixture = {
     startedAt: "2026-07-25T07:00:00.000Z",
     endedAt: "2026-07-25T07:10:00.000Z",
     durationSeconds: 600,
-    targetRole: {
+    role: {
       id: "11111111-1111-4111-8111-111111111111",
       title: "Senior Frontend Engineer",
       company: "ByteDance",
@@ -118,7 +118,7 @@ export const trainingRecordsFixture = {
     startedAt: "2026-07-24T07:00:00.000Z",
     endedAt: "2026-07-24T07:30:00.000Z",
     durationSeconds: 1800,
-    targetRole: {
+    role: {
       id: "22222222-2222-4222-8222-222222222222",
       title: "Product Manager",
       company: "Meituan",
@@ -198,7 +198,7 @@ export const trainingRecordsFixture = {
     totalDurationSeconds: 2400,
     answeredQuestionCount: 2,
     averageScore: 83,
-    targetRoles: [
+    roles: [
       {
         id: "11111111-1111-4111-8111-111111111111",
         title: "Senior Frontend Engineer",

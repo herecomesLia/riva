@@ -2,15 +2,9 @@ import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import type { TargetRoleResponse } from "@/api/generated/models"
+import type { RoleResponse } from "@/api/generated/models"
 
-export function RoleStatusBadges({
-  isCurrent,
-  role,
-}: {
-  isCurrent: boolean
-  role: TargetRoleResponse
-}) {
+export function RoleStatusBadges({ isCurrent, role }: { isCurrent: boolean; role: RoleResponse }) {
   const { t } = useTranslation()
   const status = role.isArchived ? "archived" : "active"
 

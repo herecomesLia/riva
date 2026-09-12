@@ -158,7 +158,7 @@ function getStartButton() {
 function getSetupSelectionControls() {
   const setup = screen.getByTestId("practice-setup-state")
   return [
-    screen.getByTestId("practice-target-role-trigger"),
+    screen.getByTestId("practice-role-trigger"),
     ...setup.querySelectorAll<HTMLElement>('[data-slot="toggle-group-item"]'),
     screen.getByRole("switch", {
       name: i18n.t("practice.setup.fields.prioritizeWeaknesses"),
@@ -218,8 +218,8 @@ describe("PracticeView", () => {
     if (data.session.status !== "generatingQuestion") {
       throw new Error("Generating fixture required.")
     }
-    const internalRoleId = data.session.selection.targetRoleId
-    data.setupContext.targetRoles = []
+    const internalRoleId = data.session.selection.roleId
+    data.setupContext.roles = []
 
     renderReadyView(data)
 
@@ -521,7 +521,7 @@ describe("PracticeView", () => {
     const data = createPracticeScenario("setupReady")
     renderReadyView(data)
 
-    expect(await screen.findByTestId("practice-target-role-trigger")).toHaveTextContent(
+    expect(await screen.findByTestId("practice-role-trigger")).toHaveTextContent(
       "Senior Frontend Engineer",
     )
     expect(
@@ -592,13 +592,11 @@ describe("PracticeView", () => {
   it("renders the setup selection returned by the service without reapplying a default", async () => {
     const data = createPracticeScenario("setupReady")
     if (data.session.status !== "setup") return
-    data.session.selection.targetRoleId = "role_product_manager_meituan"
+    data.session.selection.roleId = "role_product_manager_meituan"
 
     renderReadyView(data)
 
-    expect(await screen.findByTestId("practice-target-role-trigger")).toHaveTextContent(
-      "Product Manager",
-    )
+    expect(await screen.findByTestId("practice-role-trigger")).toHaveTextContent("Product Manager")
   })
 
   it("submits changed question type, difficulty, source, and weakness preference", async () => {
@@ -618,7 +616,7 @@ describe("PracticeView", () => {
     await user.click(getStartButton())
 
     expect(onStart).toHaveBeenCalledWith({
-      targetRoleId: "role_frontend_bytedance",
+      roleId: "role_frontend_bytedance",
       questionType: "behavioral",
       difficulty: "pressure",
       source: "saved",
@@ -635,7 +633,7 @@ describe("PracticeView", () => {
       screen.getByRole("button", { name: i18n.t("practice.questionTypes.technicalFoundation") }),
     ).toBeInTheDocument()
 
-    await user.click(screen.getByTestId("practice-target-role-trigger"))
+    await user.click(screen.getByTestId("practice-role-trigger"))
     await user.click(await screen.findByRole("option", { name: /Product Manager/ }))
 
     expect(
@@ -668,7 +666,7 @@ describe("PracticeView", () => {
     await user.click(getStartButton())
 
     expect(onStart).toHaveBeenCalledWith({
-      targetRoleId: "role_frontend_bytedance",
+      roleId: "role_frontend_bytedance",
       questionType: "behavioral",
       difficulty: "pressure",
       source: "saved",
@@ -699,7 +697,7 @@ describe("PracticeView", () => {
       screen.getByRole("button", { name: i18n.t("practice.questionTypes.motivation") }),
     ).toHaveAttribute("aria-pressed", "true")
     expect(onStart).toHaveBeenCalledWith({
-      targetRoleId: "role_frontend_bytedance",
+      roleId: "role_frontend_bytedance",
       questionType: "behavioral",
       difficulty: "pressure",
       source: "saved",

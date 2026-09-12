@@ -70,7 +70,7 @@ describe("RolesPage", () => {
     vi.mocked(getMatchingAnalysis).mockResolvedValue({ status: "none" })
   })
 
-  it("loads TargetRoleListResponse and keeps selection separate from the active role", async () => {
+  it("loads RoleListResponse and keeps selection separate from the active role", async () => {
     const user = userEvent.setup()
     const data = createRoleStoryResponse("multipleRoles")
     vi.mocked(getRoles).mockResolvedValue(data)
@@ -78,7 +78,7 @@ describe("RolesPage", () => {
 
     renderPage()
 
-    const otherRole = data.targetRoles.find((role) => role.id !== data.activeTargetRoleId)!
+    const otherRole = data.roles.find((role) => role.id !== data.activeRoleId)!
     await user.click(await screen.findByRole("button", { name: new RegExp(`^${otherRole.title}`) }))
     expect(setActiveRole).not.toHaveBeenCalled()
 
@@ -100,10 +100,10 @@ describe("RolesPage", () => {
   it("polls an active JD extraction and replaces the role with the ready formal result", async () => {
     const user = userEvent.setup()
     const extracting = createRoleStoryResponse("roleWithJobDescriptionExtracting")
-    const ready = createRoleStoryResponse("roleWithExtractedJobDescription").targetRoles[0]!
+    const ready = createRoleStoryResponse("roleWithExtractedJobDescription").roles[0]!
     vi.mocked(getRoles)
       .mockResolvedValueOnce(extracting)
-      .mockResolvedValue({ ...extracting, targetRoles: [ready] })
+      .mockResolvedValue({ ...extracting, roles: [ready] })
     vi.mocked(getJdExtractionState)
       .mockResolvedValueOnce({ status: "running", error: null })
       .mockResolvedValue({ status: "idle", error: null })
@@ -111,7 +111,7 @@ describe("RolesPage", () => {
     renderPage()
     await waitFor(() =>
       expect(getJdExtractionState).toHaveBeenCalledWith(
-        extracting.targetRoles[0]!.id,
+        extracting.roles[0]!.id,
         expect.any(AbortSignal),
       ),
     )
@@ -125,16 +125,14 @@ describe("RolesPage", () => {
     const user = userEvent.setup()
     const generating = createRoleStoryResponse("matchingAnalysisGenerating")
     const completed = createRoleStoryResponse("matchingAnalysisCurrent")
-    const current = completed.matchingByRoleId[completed.targetRoles[0]!.id]!
+    const current = completed.matchingByRoleId[completed.roles[0]!.id]!
     vi.mocked(getRoles).mockResolvedValue(generating)
     vi.mocked(getMatchingAnalysis)
       .mockResolvedValueOnce({ status: "generating" })
       .mockResolvedValue(current)
 
     renderPage()
-    await waitFor(() =>
-      expect(getMatchingAnalysis).toHaveBeenCalledWith(generating.targetRoles[0]!.id),
-    )
+    await waitFor(() => expect(getMatchingAnalysis).toHaveBeenCalledWith(generating.roles[0]!.id))
     await user.click(
       await screen.findByRole("tab", { name: i18n.t("roles.tabs.matchingAnalysis") }),
     )
@@ -144,11 +142,11 @@ describe("RolesPage", () => {
   it("keeps the extracting state recoverable when synchronization fails", async () => {
     const user = userEvent.setup()
     const extracting = createRoleStoryResponse("roleWithJobDescriptionExtracting")
-    const ready = createRoleStoryResponse("roleWithExtractedJobDescription").targetRoles[0]!
+    const ready = createRoleStoryResponse("roleWithExtractedJobDescription").roles[0]!
     vi.mocked(getRoles)
       .mockResolvedValueOnce(extracting)
       .mockRejectedValueOnce(new Error("network details"))
-      .mockResolvedValue({ ...extracting, targetRoles: [ready] })
+      .mockResolvedValue({ ...extracting, roles: [ready] })
     vi.mocked(getJdExtractionState).mockResolvedValue({ status: "idle", error: null })
 
     renderPage()

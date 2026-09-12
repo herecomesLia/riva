@@ -80,7 +80,7 @@ export function TargetedPracticeHistoryView({
                 <Link
                   search={{
                     entry: "history",
-                    targetRoleId: state.data.targetRole.id,
+                    roleId: state.data.role.id,
                     questionType: toPracticeQuestionType(state.data.setup.questionType),
                     difficulty: state.data.setup.difficulty,
                     source: state.data.setup.source,
@@ -154,10 +154,7 @@ function DetailReady({
       </section>
       <div className="grid gap-4 lg:grid-cols-2">
         <PracticeWeaknesses items={record.exposedWeaknesses} />
-        <Recommendation
-          recommendation={record.recommendation}
-          targetRoleId={record.targetRole.id}
-        />
+        <Recommendation recommendation={record.recommendation} roleId={record.role.id} />
       </div>
     </div>
   )
@@ -228,15 +225,15 @@ function Summary({ record }: { record: TargetedPracticeRecordDetailResponse }) {
 
 function Recommendation({
   recommendation,
-  targetRoleId,
-}: Pick<TargetedPracticeRecordDetailResponse, "recommendation"> & { targetRoleId: string }) {
+  roleId,
+}: Pick<TargetedPracticeRecordDetailResponse, "recommendation"> & { roleId: string }) {
   const { t } = useTranslation()
 
   return (
     <TrainingRecommendationCard
       recommendation={recommendation}
       size="sm"
-      targetRoleId={targetRoleId}
+      roleId={roleId}
       title={t("history.detail.recommendation")}
     />
   )
@@ -304,9 +301,7 @@ function DetailNotFound({ historySearch }: { historySearch: HistoryRouteSearch }
 }
 
 function formatRole(record: TargetedPracticeRecordDetailResponse) {
-  return record.targetRole.company
-    ? `${record.targetRole.company} · ${record.targetRole.title}`
-    : record.targetRole.title
+  return record.role.company ? `${record.role.company} · ${record.role.title}` : record.role.title
 }
 
 function statusVariant(status: TrainingRecordStatus): "default" | "secondary" | "outline" {
