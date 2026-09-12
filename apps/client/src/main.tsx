@@ -15,7 +15,13 @@ async function enableMocking() {
     serviceWorker: {
       url: "/mockServiceWorker.js",
     },
-    onUnhandledRequest: "error",
+    onUnhandledRequest(request, print) {
+      const { pathname } = new URL(request.url)
+      // Only API requests require mocks; page and asset requests belong to Vite.
+      if (pathname === "/api" || pathname.startsWith("/api/")) {
+        print.error()
+      }
+    },
   })
 }
 
