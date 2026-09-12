@@ -31,7 +31,7 @@ export const BalancedReview = meta.story({
 export const ReviewWithPersonalizedExample = meta.story({
   args: withReferenceAnswer("reviewBalanced", "projectDeepDive", 1, false),
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /展开参考答案|expand reference/i }))
+    await userEvent.click(canvas.getAllByRole("button", { name: /^查看复盘：|^View review:/i })[0])
     await expect(canvas.getByText(/我会选用推荐材料中的/)).toBeVisible()
   },
 })
@@ -39,6 +39,7 @@ export const ReviewWithPersonalizedExample = meta.story({
 export const ReviewWithTechnicalReference = meta.story({
   args: withReferenceAnswer("reviewBalanced", "technicalFoundation", 1, false),
   play: async ({ canvas }) => {
+    await userEvent.click(canvas.getAllByRole("button", { name: /^查看复盘：|^View review:/i })[0])
     await expect(canvas.getByText(/技术参考答案|technical reference answer/i)).toBeVisible()
   },
 })
@@ -46,7 +47,7 @@ export const ReviewWithTechnicalReference = meta.story({
 export const ReviewWithReactReference = meta.story({
   args: withReferenceAnswer("reviewBalanced", "technicalFoundation", 1, false),
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /展开参考答案|expand reference/i }))
+    await userEvent.click(canvas.getAllByRole("button", { name: /^查看复盘：|^View review:/i })[0])
     await expect(canvas.getByText(/React 重复渲染首先要区分/)).toBeVisible()
   },
 })
@@ -54,7 +55,7 @@ export const ReviewWithReactReference = meta.story({
 export const ReviewWithRequestLayerReference = meta.story({
   args: withReferenceAnswer("reviewBalanced", "technicalFoundation", 2, false),
   play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /展开参考答案|expand reference/i }))
+    await userEvent.click(canvas.getAllByRole("button", { name: /^查看复盘：|^View review:/i })[0])
     await expect(canvas.getByText(/长期演进的数据请求层/)).toBeVisible()
     await expect(canvas.queryByText(/React 重复渲染首先要区分/)).not.toBeInTheDocument()
   },
@@ -63,6 +64,7 @@ export const ReviewWithRequestLayerReference = meta.story({
 export const ReviewAssistedAttempt = meta.story({
   args: withReferenceAnswer("reviewBalanced", "projectDeepDive", 1, true),
   play: async ({ canvas }) => {
+    await userEvent.click(canvas.getAllByRole("button", { name: /^查看复盘：|^View review:/i })[0])
     await expect(canvas.getByText(/作答前已查看|viewed before submission/i)).toBeVisible()
   },
 })
@@ -82,9 +84,10 @@ export const FollowUpEndedEarlyReview = meta.story({
 export const FollowUpReviewWithReferences = meta.story({
   args: createPracticeViewArgs("reviewBalanced"),
   play: async ({ canvas }) => {
+    await userEvent.click(canvas.getAllByRole("button", { name: /^查看复盘：|^View review:/i })[0])
     await expect(canvas.getByTestId("practice-follow-up-review")).toBeVisible()
     await expect(
-      canvas.getAllByRole("button", { name: /展开 RIVA|expand RIVA/i }),
+      canvas.getAllByRole("heading", { name: /RIVA 参考答案|RIVA reference answer/i }),
     ).not.toHaveLength(0)
   },
 })
@@ -92,9 +95,8 @@ export const FollowUpReviewWithReferences = meta.story({
 export const FollowUpReviewWithUnansweredReference = meta.story({
   args: createPracticeViewArgs("reviewFollowUpEndedEarly"),
   play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getAllByRole("button", { name: /^查看复盘：|^View review:/i })[0])
     const review = canvas.getByTestId("practice-follow-up-review")
-    const buttons = within(review).getAllByRole("button", { name: /展开 RIVA|expand RIVA/i })
-    await userEvent.click(buttons.at(-1)!)
     await expect(within(review).getByText(/未回答|Unanswered/i)).toBeVisible()
   },
 })

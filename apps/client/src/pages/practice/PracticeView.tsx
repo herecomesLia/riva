@@ -53,7 +53,7 @@ import { PracticeSessionHeader } from "./components/PracticeSessionHeader"
 import { PracticeConversationTimeline } from "./components/PracticeConversationTimeline"
 import { PracticeFollowUpComposer } from "./components/PracticeFollowUpComposer"
 import { PracticeFollowUpAssistance } from "./components/PracticeFollowUpAssistance"
-import { PracticeQuestionReview } from "./components/PracticeQuestionReview"
+import { PracticeReviewWorkspace } from "./components/PracticeReviewWorkspace"
 import { PracticeEvaluationStatus } from "./components/PracticeEvaluationStatus"
 import { PracticeScoreOverview } from "./components/PracticeScoreOverview"
 import { PracticeDimensionScores } from "./components/PracticeDimensionScores"
@@ -463,13 +463,8 @@ function PracticeReviewView({
           <PracticeScoreOverview evaluation={session.evaluation} />
         </div>
       </div>
-      <PracticeConversationTimeline
-        followUpCompletion={session.followUpCompletion}
-        followUps={session.followUps}
+      <PracticeReviewWorkspace
         mainAnswer={session.mainAnswer}
-        question={session.question}
-      />
-      <PracticeQuestionReview
         question={session.question}
         followUpCompletion={session.followUpCompletion}
         followUps={session.followUps}

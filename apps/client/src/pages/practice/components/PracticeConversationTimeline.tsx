@@ -84,30 +84,53 @@ export function PracticeConversationTimeline({
   )
 }
 
-function CoachMessage({
+export function CoachMessage({
   current = false,
   incomplete = false,
   label,
   text,
+  onReview,
 }: {
   current?: boolean
   incomplete?: boolean
   label: string
   text: string
+  onReview?: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <Message align="start" aria-current={current ? "step" : undefined}>
       <MessageContent>
         <MessageHeader>{label}</MessageHeader>
         <Bubble align="start" variant={current ? "tinted" : incomplete ? "secondary" : "muted"}>
-          <BubbleContent>{text}</BubbleContent>
+          {onReview ? (
+            <BubbleContent
+              render={<button type="button" />}
+              className="cursor-pointer text-left hover:bg-muted!"
+              aria-label={t("practice.questionReview.viewQuestion", { question: text })}
+              onClick={(event) => {
+                const selection = window.getSelection()
+                if (
+                  selection &&
+                  !selection.isCollapsed &&
+                  event.currentTarget.contains(selection.anchorNode)
+                )
+                  return
+                onReview()
+              }}
+            >
+              {text}
+            </BubbleContent>
+          ) : (
+            <BubbleContent>{text}</BubbleContent>
+          )}
         </Bubble>
       </MessageContent>
     </Message>
   )
 }
 
-function CandidateMessage({ label, text }: { label: string; text: string }) {
+export function CandidateMessage({ label, text }: { label: string; text: string }) {
   return (
     <Message align="end">
       <MessageContent>

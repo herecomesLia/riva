@@ -23,7 +23,7 @@ export const FollowUpReviewReadOnly = meta.story({
   },
   play: async ({ canvas }) => {
     await expect(
-      canvas.getAllByRole("button", { name: /展开 RIVA|expand RIVA/i }),
+      canvas.getAllByRole("heading", { name: /RIVA 参考答案|RIVA reference answer/i }),
     ).not.toHaveLength(0)
   },
 })
@@ -33,9 +33,7 @@ export const FollowUpUnansweredReview = meta.story({
     exchanges: ended.session.followUps,
     completion: ended.session.followUpCompletion,
   },
-  play: async ({ canvas, userEvent }) => {
-    const buttons = canvas.getAllByRole("button", { name: /展开 RIVA|expand RIVA/i })
-    await userEvent.click(buttons.at(-1)!)
+  play: async ({ canvas }) => {
     await expect(canvas.getByText(/未回答|Unanswered/i)).toBeVisible()
   },
 })

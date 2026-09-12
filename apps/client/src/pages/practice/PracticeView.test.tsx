@@ -1672,7 +1672,7 @@ describe("PracticeView", () => {
     ).toBeEnabled()
   })
 
-  it("keeps the complete read-only conversation in the review context", async () => {
+  it("keeps the complete conversation and navigates to the selected question review", async () => {
     const data = createPracticeScenario("reviewFollowUpEndedEarly")
     renderReadyView(data)
     if (
@@ -1693,15 +1693,26 @@ describe("PracticeView", () => {
     expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
     const review = screen.getByTestId("practice-follow-up-review")
     expect(review).toHaveTextContent(i18n.t("practice.followUpAssistance.unanswered"))
-    const expandButtons = within(review).getAllByRole("button", {
-      name: i18n.t("practice.followUpReview.expandReference"),
-    })
-    await userEvent.click(expandButtons.at(-1)!)
     expect(review).toHaveTextContent(
       data.session.followUpCompletion.unanswered.referenceAnswer.status === "revealed"
         ? data.session.followUpCompletion.unanswered.referenceAnswer.content.addressedGap
         : "",
     )
+    const target = review.querySelector<HTMLElement>(
+      `[data-review-index="${data.session.followUps.length + 1}"]`,
+    )!
+    target.scrollIntoView = vi.fn()
+    const lastQuestion = within(timeline).getAllByRole("button").at(-1)!
+    await userEvent.click(lastQuestion)
+    expect(lastQuestion).not.toHaveAttribute("aria-pressed")
+    expect(target.scrollIntoView).toHaveBeenCalledWith({ block: "start", behavior: "smooth" })
+    expect(target).toHaveFocus()
+    const recordTab = screen.getByRole("button", {
+      name: i18n.t("practice.questionReview.recordTab"),
+    })
+    await userEvent.click(recordTab)
+    expect(recordTab).toHaveAttribute("aria-pressed", "true")
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "instant" })
   })
 
   it("renders long review content and the no-new-weaknesses state", async () => {

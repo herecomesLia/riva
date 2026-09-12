@@ -114,9 +114,9 @@ export const practice = {
     submitting: "Submitting",
   },
   followUp: {
-    timelineTitle: "Question conversation",
+    timelineTitle: "Conversation",
     timelineDescription: "Submitted answers are read-only. The current follow-up is highlighted.",
-    mainQuestion: "Riva · Main question",
+    mainQuestion: "Main question",
     yourMainAnswer: "Your main answer",
     followUpNumber: "Riva · Follow-up {{count}}",
     yourFollowUpAnswer: "Your follow-up answer {{count}}",
@@ -174,20 +174,25 @@ export const practice = {
     unavailable: "Content is temporarily unavailable.",
   },
   questionReview: {
+    recordTab: "Answers",
+    reviewTab: "Review",
+    switchView: "Switch review view",
+    selectHint: "Select a RIVA question bubble to view its review.",
+    viewQuestion: "View review: {{question}}",
+    referenceAnswer: "RIVA reference answer",
+    aiGeneratedDisclaimer: "AI-generated answer for reference only",
+    keyPoints: "Key points",
+    commonMistakes: "Common mistakes",
     title: "Question review",
     description:
       "Review your expression and knowledge coverage with references for the main question and follow-ups.",
     mainQuestion: "Main question review",
+    followUpNumber: "Follow-up {{count}}",
   },
   followUpReview: {
-    title: "Follow-up review",
-    description: "Review each supplement, assistance usage, and RIVA reference supplement.",
-    followUpNumber: "Follow-up {{count}}",
+    followUpNumber: "Follow-up {{count}} review",
     yourAnswer: "Your answer",
-    assistanceUsed: "Answer assistance",
     notViewedBeforeSubmission: "Reference supplement not viewed before submission",
-    expandReference: "Expand RIVA reference supplement",
-    collapseReference: "Collapse RIVA reference supplement",
   },
   guidance: {
     title: "Answer guidance",
@@ -217,6 +222,7 @@ export const practice = {
     keyPoints: "Key points",
     commonMistakes: "Common mistakes",
     viewedBeforeSubmission: "Reference answer viewed before submission",
+    notViewedBeforeSubmission: "Reference answer not viewed before submission",
     assistedRetry: "Reference-assisted retry",
     disclaimer: {
       personalizedExample:

@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
 import type { ReferenceAnswerState } from "@/models/practice-workflow"
 
@@ -142,6 +143,7 @@ export function PracticeReferenceAnswerContent({
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(mode === "answering")
   const showKindBadge = mode !== "review" || state.content?.kind === "technicalReference"
+  const showViewedStatus = mode !== "review" && state.viewedBeforeSubmission
 
   return (
     <>
@@ -152,16 +154,16 @@ export function PracticeReferenceAnswerContent({
       )}
 
       {state.status === "revealed" && (
-        <Collapsible onOpenChange={setExpanded} open={expanded}>
+        <Collapsible onOpenChange={setExpanded} open={mode === "review" || expanded}>
           <div className="flex min-w-0 flex-col gap-4">
-            {(showKindBadge || state.viewedBeforeSubmission) && (
+            {(showKindBadge || showViewedStatus) && (
               <div className="flex flex-wrap items-center gap-2" aria-live="polite">
                 {showKindBadge && (
                   <Badge variant="secondary">
                     {t(`practice.referenceAnswer.kind.${state.content.kind}`)}
                   </Badge>
                 )}
-                {state.viewedBeforeSubmission && (
+                {showViewedStatus && (
                   <Badge variant="outline">
                     {assistedRetry
                       ? t("practice.referenceAnswer.assistedRetry")
@@ -170,7 +172,7 @@ export function PracticeReferenceAnswerContent({
                 )}
               </div>
             )}
-            {mode !== "answering" && (
+            {mode === "readonly" && (
               <CollapsibleTrigger
                 render={<Button size="sm" variant="outline" />}
                 aria-label={
@@ -186,27 +188,76 @@ export function PracticeReferenceAnswerContent({
               </CollapsibleTrigger>
             )}
             <CollapsibleContent>
-              <div className="flex min-w-0 flex-col gap-5 break-words [overflow-wrap:anywhere]">
-                <p className="whitespace-pre-wrap text-sm leading-7">{state.content.answer}</p>
-                <ReferenceList
-                  heading={headingLevel}
-                  items={state.content.keyPoints}
-                  title={t("practice.referenceAnswer.keyPoints")}
-                />
-                <ReferenceList
-                  heading={headingLevel}
-                  items={state.content.commonMistakes}
-                  title={t("practice.referenceAnswer.commonMistakes")}
-                />
-                <p className="text-sm leading-6 text-muted-foreground">
-                  {t(`practice.referenceAnswer.disclaimer.${state.content.kind}`)}
-                </p>
-              </div>
+              {mode === "review" ? (
+                <PracticeReviewReferenceSections content={state.content} />
+              ) : (
+                <div className="flex min-w-0 flex-col gap-5 break-words [overflow-wrap:anywhere]">
+                  <p className="whitespace-pre-wrap text-sm leading-7">{state.content.answer}</p>
+                  <ReferenceList
+                    heading={headingLevel}
+                    items={state.content.keyPoints}
+                    title={t("practice.referenceAnswer.keyPoints")}
+                  />
+                  <ReferenceList
+                    heading={headingLevel}
+                    items={state.content.commonMistakes}
+                    title={t("practice.referenceAnswer.commonMistakes")}
+                  />
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    {t(`practice.referenceAnswer.disclaimer.${state.content.kind}`)}
+                  </p>
+                </div>
+              )}
             </CollapsibleContent>
           </div>
         </Collapsible>
       )}
     </>
+  )
+}
+
+export function PracticeReviewReferenceSections({
+  content,
+  addressedGap,
+}: {
+  content: {
+    answer: string
+    keyPoints: string[]
+    commonMistakes: string[]
+  }
+  addressedGap?: string
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="flex min-w-0 flex-col break-words [overflow-wrap:anywhere]">
+      <section className="flex min-w-0 flex-col gap-2 pb-5">
+        <h4 className="font-heading text-sm font-medium">
+          {t("practice.questionReview.referenceAnswer")}
+        </h4>
+        <p className="text-xs leading-5 text-muted-foreground">
+          {t("practice.questionReview.aiGeneratedDisclaimer")}
+        </p>
+        {addressedGap ? <p className="text-sm text-muted-foreground">{addressedGap}</p> : null}
+        <p className="whitespace-pre-wrap text-sm leading-7">{content.answer}</p>
+      </section>
+      <Separator />
+      <div className="py-5">
+        <ReferenceList
+          heading="h4"
+          items={content.keyPoints}
+          title={t("practice.questionReview.keyPoints")}
+        />
+      </div>
+      <Separator />
+      <div className="pt-5">
+        <ReferenceList
+          heading="h4"
+          items={content.commonMistakes}
+          title={t("practice.questionReview.commonMistakes")}
+        />
+      </div>
+    </div>
   )
 }
 
