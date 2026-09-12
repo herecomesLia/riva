@@ -243,13 +243,10 @@ export const roles = {
     result: {
       overallMatch: "总体匹配度",
       coreRequirements: "岗位核心要求",
-      matchedCapabilities: "高匹配能力",
-      missingCapabilities: "缺失能力",
-      underrepresentedCapabilities: "有能力但表达不足",
-      resumeHighlights: "可重点准备的项目或经历",
-      resumeGaps: "简历薄弱点",
-      highRiskQuestions: "高风险追问",
-      preparationRecommendations: "面试准备建议",
+      resumeStrengths: "简历优势",
+      resumeGaps: "简历缺口",
+      resumeOptimizationSuggestions: "简历优化建议",
+      interviewPreparationSuggestions: "面试准备建议",
     },
   },
   list: {

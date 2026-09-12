@@ -267,14 +267,14 @@ export function createLongMatchingAnalysisResponse() {
   const response = createRoleStoryResponse("matchingAnalysisCurrent")
   const match = response.matchingByRoleId[response.roles[0]!.id]!
   if (match.status !== "current") throw new Error("Expected a current match fixture.")
-  match.result.preparationRecommendations.push(
+  match.result.interviewPreparationSuggestions.push(
     "Prepare a concise architecture narrative that connects user impact, system constraints, delivery milestones, and measurable reliability improvements.",
     "Rehearse trade-off discussions for performance budgets, observability coverage, and incremental platform migration.",
     "Select two cross-functional projects that demonstrate technical leadership without relying on formal authority.",
   )
-  match.result.highRiskQuestions.push(
-    "How would you recover a multi-quarter platform migration that is missing both its reliability goals and product milestones?",
-    "Which frontend metrics would you use to distinguish perceived speed problems from backend latency or workflow design issues?",
+  match.result.resumeOptimizationSuggestions.push(
+    "Expand the existing project descriptions with documented accessibility audit findings, the improvements you implemented, and the validation results.",
+    "Clarify the scale of products you worked on with verified usage metrics and your personal architecture responsibilities.",
   )
   return response
 }

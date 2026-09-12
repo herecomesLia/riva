@@ -1285,8 +1285,26 @@ describe("RolesView", () => {
     expect(
       within(card).queryByText(i18n.t("roles.matchStateStatus.current.label")),
     ).not.toBeInTheDocument()
-    expect(result).toHaveTextContent(analysis.result.coreRequirementsSummary)
-    expect(result).toHaveTextContent(analysis.result.highRiskQuestions[0]!)
+    expect(
+      within(result)
+        .getAllByRole("heading", { level: 4 })
+        .map((heading) => heading.textContent),
+    ).toEqual([
+      i18n.t("roles.matching.result.coreRequirements"),
+      i18n.t("roles.matching.result.resumeStrengths"),
+      i18n.t("roles.matching.result.resumeGaps"),
+      i18n.t("roles.matching.result.resumeOptimizationSuggestions"),
+      i18n.t("roles.matching.result.interviewPreparationSuggestions"),
+    ])
+    expect(result).toHaveTextContent(analysis.result.coreRequirements)
+    for (const items of [
+      analysis.result.resumeStrengths,
+      analysis.result.resumeGaps,
+      analysis.result.resumeOptimizationSuggestions,
+      analysis.result.interviewPreparationSuggestions,
+    ]) {
+      for (const item of items) expect(result).toHaveTextContent(item)
+    }
     expect(within(card).queryByRole("button")).not.toBeInTheDocument()
   })
 
@@ -1298,7 +1316,7 @@ describe("RolesView", () => {
 
     const card = await screen.findByTestId("matching-analysis-card")
     expect(card).toHaveTextContent(i18n.t("roles.matching.stale.title"))
-    expect(card).toHaveTextContent(analysis.result.matchedCapabilities[0]!)
+    expect(card).toHaveTextContent(analysis.result.resumeStrengths[0]!)
     expect(
       within(card).getByRole("button", { name: i18n.t("roles.matching.actions.regenerate") }),
     ).toBeEnabled()
@@ -1322,7 +1340,7 @@ describe("RolesView", () => {
 
     const card = await screen.findByTestId("matching-analysis-card")
     expect(card).toHaveTextContent(i18n.t("roles.matching.stale.title"))
-    expect(card).toHaveTextContent(analysis.result.matchedCapabilities[0]!)
+    expect(card).toHaveTextContent(analysis.result.resumeStrengths[0]!)
     expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.jd.extracting.title"))
     expect(
       within(card).queryByRole("button", { name: i18n.t("roles.matching.actions.regenerate") }),
@@ -1344,7 +1362,7 @@ describe("RolesView", () => {
 
     const card = await screen.findByTestId("matching-analysis-card")
     expect(card).toHaveTextContent(i18n.t("roles.matching.stale.title"))
-    expect(card).toHaveTextContent(analysis.result.matchedCapabilities[0]!)
+    expect(card).toHaveTextContent(analysis.result.resumeStrengths[0]!)
     expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.profile.incomplete.title"))
     expect(
       within(card).queryByRole("button", { name: i18n.t("roles.matching.actions.regenerate") }),

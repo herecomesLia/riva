@@ -1,13 +1,12 @@
 export type MatchingAnalysisResult = {
   overallMatchScore: number
-  coreRequirementsSummary: string
-  matchedCapabilities: string[]
-  missingCapabilities: string[]
-  underrepresentedCapabilities: string[]
-  resumeHighlights: string[]
+  coreRequirements: string
+  /** Summarized from reasons of matching items with scores > 80. */
+  resumeStrengths: string[]
+  /** Summarized from reasons of matching items with scores < 60. */
   resumeGaps: string[]
-  highRiskQuestions: string[]
-  preparationRecommendations: string[]
+  resumeOptimizationSuggestions: string[]
+  interviewPreparationSuggestions: string[]
 }
 
 export type MatchingAnalysisState =

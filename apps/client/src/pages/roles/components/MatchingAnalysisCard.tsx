@@ -2,13 +2,10 @@ import { Link } from "@tanstack/react-router"
 import {
   ArrowRightIcon,
   CircleCheckIcon,
-  CircleXIcon,
   ClipboardCheckIcon,
-  EyeOffIcon,
   FileCheckIcon,
   FileWarningIcon,
   LightbulbIcon,
-  MessageCircleQuestionIcon,
   RefreshCwIcon,
   SparklesIcon,
   type LucideIcon,
@@ -271,29 +268,14 @@ function MatchingAnalysisResultView({ result }: { result: MatchingAnalysisResult
     <div className="flex flex-col gap-4" data-testid="matching-analysis-result">
       <ResultText
         icon={ClipboardCheckIcon}
-        text={result.coreRequirementsSummary}
+        text={result.coreRequirements}
         title={t("roles.matching.result.coreRequirements")}
       />
       <div className="grid gap-4 xl:grid-cols-2">
         <ResultList
           icon={CircleCheckIcon}
-          items={result.matchedCapabilities}
-          title={t("roles.matching.result.matchedCapabilities")}
-        />
-        <ResultList
-          icon={CircleXIcon}
-          items={result.missingCapabilities}
-          title={t("roles.matching.result.missingCapabilities")}
-        />
-        <ResultList
-          icon={EyeOffIcon}
-          items={result.underrepresentedCapabilities}
-          title={t("roles.matching.result.underrepresentedCapabilities")}
-        />
-        <ResultList
-          icon={FileCheckIcon}
-          items={result.resumeHighlights}
-          title={t("roles.matching.result.resumeHighlights")}
+          items={result.resumeStrengths}
+          title={t("roles.matching.result.resumeStrengths")}
         />
         <ResultList
           icon={FileWarningIcon}
@@ -301,16 +283,16 @@ function MatchingAnalysisResultView({ result }: { result: MatchingAnalysisResult
           title={t("roles.matching.result.resumeGaps")}
         />
         <ResultList
-          icon={MessageCircleQuestionIcon}
-          items={result.highRiskQuestions}
-          title={t("roles.matching.result.highRiskQuestions")}
+          icon={FileCheckIcon}
+          items={result.resumeOptimizationSuggestions}
+          title={t("roles.matching.result.resumeOptimizationSuggestions")}
+        />
+        <ResultList
+          icon={LightbulbIcon}
+          items={result.interviewPreparationSuggestions}
+          title={t("roles.matching.result.interviewPreparationSuggestions")}
         />
       </div>
-      <ResultList
-        icon={LightbulbIcon}
-        items={result.preparationRecommendations}
-        title={t("roles.matching.result.preparationRecommendations")}
-      />
     </div>
   )
 }

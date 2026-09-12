@@ -60,23 +60,23 @@ export const extractedJdFixture = {
 
 export const matchResultFixture = {
   overallMatchScore: 78,
-  coreRequirementsSummary:
+  coreRequirements:
     "Lead complex React product delivery with strong engineering judgment and measurable impact.",
-  matchedCapabilities: ["React architecture", "TypeScript", "Design systems"],
-  missingCapabilities: ["Large-scale experimentation"],
-  underrepresentedCapabilities: ["Cross-functional technical leadership"],
-  resumeHighlights: [
-    "Led the merchant operations console from architecture through delivery.",
-    "Improved Core Web Vitals pass rate from 71% to 94%.",
+  resumeStrengths: [
+    "React architecture experience aligns closely with the role's frontend delivery responsibilities.",
+    "Production TypeScript experience meets the role's core programming language requirement.",
   ],
-  resumeGaps: ["Describe experimentation design and decision-making with more concrete examples."],
-  highRiskQuestions: [
-    "How did you align partner teams when frontend architecture decisions affected delivery scope?",
-    "Which experiment metrics did you use to decide whether a product change should ship?",
+  resumeGaps: [
+    "The resume provides insufficient evidence of accessibility practices required by the role.",
+    "The resume does not demonstrate experience with large-scale SaaS products, a preferred qualification.",
   ],
-  preparationRecommendations: [
-    "Prepare a STAR narrative about balancing delivery speed and frontend quality.",
-    "Quantify the impact of technical leadership across partner teams.",
+  resumeOptimizationSuggestions: [
+    "Describe any accessibility work actually performed on the merchant operations console, including validation methods and outcomes.",
+    "Add verifiable user scale and architecture details to existing projects to clarify their relevance to large-scale SaaS delivery.",
+  ],
+  interviewPreparationSuggestions: [
+    "Review accessibility principles and prepare to discuss how you would validate an accessible React experience.",
+    "Prepare to explain frontend architecture trade-offs for large-scale SaaS products using your existing project experience.",
   ],
 } satisfies MatchingAnalysisResult
 

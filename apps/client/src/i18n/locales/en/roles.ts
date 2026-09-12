@@ -259,13 +259,10 @@ export const roles = {
     result: {
       overallMatch: "Overall match",
       coreRequirements: "Core role requirements",
-      matchedCapabilities: "Strong matches",
-      missingCapabilities: "Missing capabilities",
-      underrepresentedCapabilities: "Capabilities underrepresented in your profile",
-      resumeHighlights: "Projects and experience to emphasize",
-      resumeGaps: "Resume weaknesses",
-      highRiskQuestions: "High-risk follow-up questions",
-      preparationRecommendations: "Interview preparation recommendations",
+      resumeStrengths: "Resume strengths",
+      resumeGaps: "Resume gaps",
+      resumeOptimizationSuggestions: "Resume optimization suggestions",
+      interviewPreparationSuggestions: "Interview preparation suggestions",
     },
   },
   list: {
