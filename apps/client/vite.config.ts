@@ -15,7 +15,23 @@ function mswWorkerPlugin(): Plugin {
 
     configureServer(server) {
       server.middlewares.use((request, response, next) => {
-        if (request.url?.split("?")[0] !== "/mockServiceWorker.js") {
+        const pathname = request.url?.split("?")[0]
+
+        if (pathname === "/api" || pathname?.startsWith("/api/")) {
+          const message =
+            "API request reached Vite in mock mode without a mocked response. " +
+            "Backend forwarding is disabled. Check MSW in the browser console and " +
+            "DevTools > Application > Service Workers (including Bypass for network)."
+
+          server.config.logger.error(`[mock] ${request.method} ${pathname}: ${message}`)
+          response.statusCode = 503
+          response.setHeader("Content-Type", "text/plain; charset=utf-8")
+          response.setHeader("Cache-Control", "no-store")
+          response.end(message)
+          return
+        }
+
+        if (pathname !== "/mockServiceWorker.js") {
           return next()
         }
 
@@ -44,12 +60,14 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   server: {
-    proxy: {
-      "/api": {
-        target: process.env.RIVA_API_PROXY_TARGET ?? "http://localhost:7482",
-        changeOrigin: true,
-      },
-    },
+    proxy: mock
+      ? undefined
+      : {
+          "/api": {
+            target: process.env.RIVA_API_PROXY_TARGET ?? "http://localhost:7482",
+            changeOrigin: true,
+          },
+        },
   },
   test: {
     environment: "jsdom",
