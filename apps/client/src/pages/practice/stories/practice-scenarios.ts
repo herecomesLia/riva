@@ -273,5 +273,22 @@ const scenarios = {
 export type PracticeScenario = keyof typeof scenarios
 
 export function createPracticeScenario(scenario: PracticeScenario = "setupReady"): PracticeData {
-  return structuredClone(scenarios[scenario])
+  const result = structuredClone(scenarios[scenario])
+  if (result.session.status === "review") {
+    const revealGuidance = (
+      question: PracticeQuestion | PracticeFollowUp,
+      help: { hints: string[]; framework: string[] },
+    ) => {
+      if (question.hints.status === "notRequested")
+        question.hints = { status: "revealed", content: structuredClone(help.hints) }
+      if (question.framework.status === "notRequested")
+        question.framework = { status: "revealed", content: structuredClone(help.framework) }
+    }
+    revealGuidance(result.session.question, practiceFixture.questionHelp)
+    for (const exchange of result.session.followUps)
+      revealGuidance(exchange.question, practiceFixture.followUp)
+    if (result.session.followUpCompletion.status === "endedEarly")
+      revealGuidance(result.session.followUpCompletion.unanswered, practiceFixture.followUp)
+  }
+  return result
 }

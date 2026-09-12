@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { ReviewSession } from "@/models/practice-workflow"
 
 import { PracticeFollowUpReview } from "./PracticeFollowUpReview"
-import { PracticeReferenceAnswerContent } from "./PracticeReferenceAnswer"
+import { PracticeReviewReferenceSections } from "./PracticeReferenceAnswer"
 
 type Props = Pick<ReviewSession, "question" | "followUps" | "followUpCompletion"> & {
   scrollRef?: Ref<HTMLDivElement>
@@ -53,11 +53,13 @@ export function PracticeQuestionReview({
               </Badge>
             )}
           </div>
-          <PracticeReferenceAnswerContent
-            headingLevel="h4"
-            mode="review"
-            state={question.referenceAnswer}
-          />
+          {question.referenceAnswer.status === "revealed" &&
+            question.referenceAnswer.content.kind === "technicalReference" && (
+              <Badge className="self-start" variant="secondary">
+                {t("practice.referenceAnswer.kind.technicalReference")}
+              </Badge>
+            )}
+          <PracticeReviewReferenceSections question={question} />
         </section>
         <PracticeFollowUpReview completion={followUpCompletion} exchanges={followUps} />
       </CardContent>

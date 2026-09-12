@@ -43,8 +43,6 @@ export const practiceFixture = {
     reference: {
       kind: "personalizedExample",
       answer: "我先明确目标和约束，再用小范围验证选择方案，推动落地后对比结果并复盘。",
-      keyPoints: ["明确个人行动"],
-      commonMistakes: ["只描述团队成果"],
     } satisfies PracticeReferenceAnswer,
   },
   followUp: {
@@ -60,8 +58,6 @@ export const practiceFixture = {
       kind: "personalizedSupplement",
       addressedGap: "结果归因证据不足。",
       answer: "我会对比行动前后的结果，排查同期变化，并说明证据能支持的结论范围。",
-      keyPoints: ["排除干扰因素"],
-      commonMistakes: ["把相关性当作因果"],
     } satisfies FollowUpReferenceAnswer,
   },
   evaluation: {

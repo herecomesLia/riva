@@ -86,10 +86,8 @@ describe("PracticeReferenceAnswer", () => {
     await user.click(
       screen.getByRole("button", { name: i18n.t("practice.referenceAnswer.expand") }),
     )
-    expect(
-      screen.getByRole("heading", { name: i18n.t("practice.referenceAnswer.keyPoints") }),
-    ).toBeVisible()
-    expect(screen.getAllByRole("list")).toHaveLength(2)
+    if (archivedState.status !== "revealed") throw new Error("Reference content required.")
+    expect(screen.getByText(archivedState.content.answer)).toBeVisible()
   })
 
   it("keeps confirmation available without an error when the interaction is ignored", async () => {

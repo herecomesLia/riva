@@ -190,6 +190,12 @@ export function createPracticeFaker() {
 
       const questionHelp = practiceFixture.questionHelp
       const question = structuredClone(session.question)
+      if (question.hints.status === "notRequested") {
+        question.hints = { status: "revealed", content: questionHelp.hints }
+      }
+      if (question.framework.status === "notRequested") {
+        question.framework = { status: "revealed", content: questionHelp.framework }
+      }
       question.referenceAnswer = {
         status: "revealed",
         content: questionHelp.reference,
@@ -200,6 +206,14 @@ export function createPracticeFaker() {
 
       const revealFollowUp = (followUp: PracticeFollowUp): PracticeFollowUp => ({
         ...followUp,
+        hints:
+          followUp.hints.status === "notRequested"
+            ? { status: "revealed", content: practiceFixture.followUp.hints }
+            : followUp.hints,
+        framework:
+          followUp.framework.status === "notRequested"
+            ? { status: "revealed", content: practiceFixture.followUp.framework }
+            : followUp.framework,
         referenceAnswer: {
           status: "revealed",
           content: practiceFixture.followUp.reference,

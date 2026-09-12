@@ -61,23 +61,12 @@ function FollowUpReviewItem({
         )}
       </div>
       {unanswered && <Badge variant="outline">{t("practice.followUpAssistance.unanswered")}</Badge>}
-      {reference.status === "revealed" ? (
-        <>
-          {reference.content.kind === "technicalReference" && (
-            <Badge className="self-start" variant="secondary">
-              {t("practice.followUpAssistance.kind.technicalReference")}
-            </Badge>
-          )}
-          <PracticeReviewReferenceSections
-            addressedGap={reference.content.addressedGap}
-            content={reference.content}
-          />
-        </>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          {t("practice.followUpAssistance.unavailable")}
-        </p>
+      {reference.status === "revealed" && reference.content.kind === "technicalReference" && (
+        <Badge className="self-start" variant="secondary">
+          {t("practice.followUpAssistance.kind.technicalReference")}
+        </Badge>
       )}
+      <PracticeReviewReferenceSections question={question} />
     </article>
   )
 }

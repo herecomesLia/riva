@@ -25,8 +25,6 @@ export type Guidance<T> =
 export type PracticeReferenceAnswer = {
   kind: "personalizedExample" | "technicalReference"
   answer: string
-  keyPoints: string[]
-  commonMistakes: string[]
 }
 
 export type ReferenceAnswerState =
@@ -65,8 +63,6 @@ export type FollowUpReferenceAnswer = {
   kind: "personalizedSupplement" | "technicalReference"
   addressedGap: string
   answer: string
-  keyPoints: string[]
-  commonMistakes: string[]
 }
 
 export type FollowUpReferenceState =

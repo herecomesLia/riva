@@ -822,8 +822,6 @@ describe("PracticeView", () => {
       content: {
         kind: "personalizedExample",
         answer: "后端返回的参考答案",
-        keyPoints: ["后端返回的要点"],
-        commonMistakes: ["后端返回的常见问题"],
       },
       viewedBeforeSubmission: false,
     }
@@ -1201,8 +1199,6 @@ describe("PracticeView", () => {
         kind: "personalizedSupplement",
         addressedGap: "需要补充的缺口",
         answer: "参考补充内容",
-        keyPoints: ["参考关键点"],
-        commonMistakes: ["参考常见误区"],
       },
       viewedBeforeSubmission: true,
     }
@@ -1692,6 +1688,25 @@ describe("PracticeView", () => {
     expect(timeline).toHaveTextContent(data.session.followUpCompletion.unanswered.prompt)
     expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
     const review = screen.getByTestId("practice-follow-up-review")
+    const questionReview = screen.getByTestId("practice-question-review")
+    const questions = [
+      data.session.question,
+      ...data.session.followUps.map((exchange) => exchange.question),
+      data.session.followUpCompletion.unanswered,
+    ]
+    for (const [index, question] of questions.entries()) {
+      const card = questionReview.querySelector<HTMLElement>(`[data-review-index="${index}"]`)!
+      expect(
+        within(card).getByRole("heading", { name: i18n.t("practice.guidance.hintTitle") }),
+      ).toBeInTheDocument()
+      expect(
+        within(card).getByRole("heading", { name: i18n.t("practice.guidance.frameworkTitle") }),
+      ).toBeInTheDocument()
+      for (const guidance of [question.hints, question.framework]) {
+        if (guidance.status !== "revealed") throw new Error("Review guidance required.")
+        for (const item of guidance.content) expect(card).toHaveTextContent(item)
+      }
+    }
     expect(review).toHaveTextContent(i18n.t("practice.followUpAssistance.unanswered"))
     expect(review).toHaveTextContent(
       data.session.followUpCompletion.unanswered.referenceAnswer.status === "revealed"

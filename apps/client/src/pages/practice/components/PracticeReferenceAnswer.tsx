@@ -19,7 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
-import type { ReferenceAnswerState } from "@/models/practice-workflow"
+import type { Guidance, PracticeFollowUp, ReferenceAnswerState } from "@/models/practice-workflow"
 
 import type { PracticeInteractionResult } from "../practice-interaction"
 
@@ -133,12 +133,10 @@ export function PracticeReferenceAnswerContent({
   state,
   mode,
   assistedRetry = false,
-  headingLevel = "h3",
 }: {
   state: ReferenceAnswerState
   mode: "answering" | "review" | "readonly"
   assistedRetry?: boolean
-  headingLevel?: "h3" | "h4"
 }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(mode === "answering")
@@ -188,26 +186,12 @@ export function PracticeReferenceAnswerContent({
               </CollapsibleTrigger>
             )}
             <CollapsibleContent>
-              {mode === "review" ? (
-                <PracticeReviewReferenceSections content={state.content} />
-              ) : (
-                <div className="flex min-w-0 flex-col gap-5 break-words [overflow-wrap:anywhere]">
-                  <p className="whitespace-pre-wrap text-sm leading-7">{state.content.answer}</p>
-                  <ReferenceList
-                    heading={headingLevel}
-                    items={state.content.keyPoints}
-                    title={t("practice.referenceAnswer.keyPoints")}
-                  />
-                  <ReferenceList
-                    heading={headingLevel}
-                    items={state.content.commonMistakes}
-                    title={t("practice.referenceAnswer.commonMistakes")}
-                  />
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    {t(`practice.referenceAnswer.disclaimer.${state.content.kind}`)}
-                  </p>
-                </div>
-              )}
+              <div className="flex min-w-0 flex-col gap-5 break-words [overflow-wrap:anywhere]">
+                <p className="whitespace-pre-wrap text-sm leading-7">{state.content.answer}</p>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {t(`practice.referenceAnswer.disclaimer.${state.content.kind}`)}
+                </p>
+              </div>
             </CollapsibleContent>
           </div>
         </Collapsible>
@@ -217,18 +201,14 @@ export function PracticeReferenceAnswerContent({
 }
 
 export function PracticeReviewReferenceSections({
-  content,
-  addressedGap,
+  question,
 }: {
-  content: {
-    answer: string
-    keyPoints: string[]
-    commonMistakes: string[]
+  question: Pick<PracticeFollowUp, "hints" | "framework"> & {
+    referenceAnswer: ReferenceAnswerState | PracticeFollowUp["referenceAnswer"]
   }
-  addressedGap?: string
 }) {
   const { t } = useTranslation()
-
+  const reference = question.referenceAnswer
   return (
     <div className="flex min-w-0 flex-col break-words [overflow-wrap:anywhere]">
       <section className="flex min-w-0 flex-col gap-2 pb-5">
@@ -238,48 +218,66 @@ export function PracticeReviewReferenceSections({
         <p className="text-xs leading-5 text-muted-foreground">
           {t("practice.questionReview.aiGeneratedDisclaimer")}
         </p>
-        {addressedGap ? <p className="text-sm text-muted-foreground">{addressedGap}</p> : null}
-        <p className="whitespace-pre-wrap text-sm leading-7">{content.answer}</p>
+        {reference.status === "revealed" ? (
+          <>
+            {"addressedGap" in reference.content && (
+              <p className="text-sm text-muted-foreground">{reference.content.addressedGap}</p>
+            )}
+            <p className="whitespace-pre-wrap text-sm leading-7">{reference.content.answer}</p>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {t("practice.referenceAnswer.unavailable")}
+          </p>
+        )}
       </section>
       <Separator />
       <div className="py-5">
-        <ReferenceList
-          heading="h4"
-          items={content.keyPoints}
-          title={t("practice.questionReview.keyPoints")}
+        <ReviewGuidance
+          state={question.hints}
+          title={t("practice.guidance.hintTitle")}
+          unavailable={t("practice.guidance.hintUnavailable")}
         />
       </div>
       <Separator />
       <div className="pt-5">
-        <ReferenceList
-          heading="h4"
-          items={content.commonMistakes}
-          title={t("practice.questionReview.commonMistakes")}
+        <ReviewGuidance
+          state={question.framework}
+          title={t("practice.guidance.frameworkTitle")}
+          unavailable={t("practice.guidance.frameworkUnavailable")}
+          ordered
         />
       </div>
     </div>
   )
 }
 
-function ReferenceList({
-  items,
+function ReviewGuidance({
+  state,
   title,
-  heading: Heading,
+  unavailable,
+  ordered = false,
 }: {
-  items: string[]
+  state: Guidance<string[]>
   title: string
-  heading: "h3" | "h4"
+  unavailable: string
+  ordered?: boolean
 }) {
+  const List = ordered ? "ol" : "ul"
   return (
     <section className="flex min-w-0 flex-col gap-2">
-      <Heading className="font-heading text-sm font-medium">{title}</Heading>
-      <ul className="list-disc pl-5 text-sm leading-6">
-        {items.map((item) => (
-          <li className="break-words [overflow-wrap:anywhere]" key={item}>
-            {item}
-          </li>
-        ))}
-      </ul>
+      <h4 className="font-heading text-sm font-medium">{title}</h4>
+      {state.status === "revealed" && state.content.length > 0 ? (
+        <List className={`${ordered ? "list-decimal" : "list-disc"} pl-5 text-sm leading-6`}>
+          {state.content.map((item) => (
+            <li className="break-words [overflow-wrap:anywhere]" key={item}>
+              {item}
+            </li>
+          ))}
+        </List>
+      ) : (
+        <p className="text-sm text-muted-foreground">{unavailable}</p>
+      )}
     </section>
   )
 }

@@ -149,14 +149,6 @@ export function PracticeFollowUpAssistance({
               <p className="whitespace-pre-wrap text-sm leading-7">
                 {question.referenceAnswer.content.answer}
               </p>
-              <AssistanceList
-                items={question.referenceAnswer.content.keyPoints}
-                title={t("practice.followUpAssistance.keyPoints")}
-              />
-              <AssistanceList
-                items={question.referenceAnswer.content.commonMistakes}
-                title={t("practice.followUpAssistance.commonMistakes")}
-              />
             </div>
           ) : null}
           {question.referenceAnswer.status === "unavailable" ? (
@@ -286,14 +278,5 @@ function AssistanceError() {
         {t("practice.followUpAssistance.requestErrorDescription")}
       </AlertDescription>
     </Alert>
-  )
-}
-
-function AssistanceList({ items, title }: { items: string[]; title: string }) {
-  return (
-    <section className="flex min-w-0 flex-col gap-2">
-      <h3 className="font-heading text-sm font-medium">{title}</h3>
-      <AssistanceItems items={items} />
-    </section>
   )
 }

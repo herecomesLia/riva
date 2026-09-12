@@ -91,10 +91,16 @@ describe("practiceFaker", () => {
     await faker.endFollowUps()
     expect(await faker.pollEvaluation()).toMatchObject({
       status: "review",
-      question: { referenceAnswer: { status: "revealed", viewedBeforeSubmission: false } },
+      question: {
+        hints: { status: "revealed", content: practiceFixture.questionHelp.hints },
+        framework: { status: "revealed", content: practiceFixture.questionHelp.framework },
+        referenceAnswer: { status: "revealed", viewedBeforeSubmission: false },
+      },
       followUpCompletion: {
         status: "endedEarly",
         unanswered: {
+          hints: { status: "revealed", content: practiceFixture.followUp.hints },
+          framework: { status: "revealed", content: practiceFixture.followUp.framework },
           referenceAnswer: {
             status: "revealed",
             content: practiceFixture.followUp.reference,
@@ -118,7 +124,11 @@ describe("practiceFaker", () => {
       attemptNumber: 1,
       followUps: [
         {
-          question: { referenceAnswer: { status: "revealed", viewedBeforeSubmission: false } },
+          question: {
+            hints: { status: "revealed", content: practiceFixture.followUp.hints },
+            framework: { status: "revealed", content: practiceFixture.followUp.framework },
+            referenceAnswer: { status: "revealed", viewedBeforeSubmission: false },
+          },
         },
       ],
     })
