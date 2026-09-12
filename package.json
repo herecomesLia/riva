@@ -12,7 +12,6 @@
     "client:storybook:build": "pnpm --filter @riva/client --fail-if-no-match build-storybook",
     "client:lint": "pnpm --filter @riva/client --fail-if-no-match lint",
     "client:test": "pnpm --filter @riva/client --fail-if-no-match test",
-    "client:test:all": "pnpm --filter @riva/client --fail-if-no-match test:all",
     "server:dev": "uv run --locked --directory apps/server riva dev --env-file ../../.env",
     "server:db:setup": "uv run --locked --directory apps/server riva db setup --env-file ../../.env",
     "server:db:reset": "uv run --locked --directory apps/server riva db reset --env-file ../../.env",

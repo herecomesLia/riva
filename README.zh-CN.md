@@ -83,7 +83,7 @@ podman compose -f infra/local/docker-compose.yml down
 
 ```bash
 pnpm client:lint
-pnpm client:test:all
+pnpm client:test
 pnpm server:test
 pnpm format:check
 ```
