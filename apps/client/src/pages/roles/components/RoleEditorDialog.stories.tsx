@@ -11,7 +11,7 @@ const meta = preview.meta({
   title: "Roles/RoleEditorDialog",
 })
 
-const role = createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!
+const role = createRoleStoryResponse("singleRoleWithoutJobDescription").targetRoles[0]!
 
 function DialogHarness({ mode }: { mode: "create" | "edit" }) {
   const [open, setOpen] = useState(true)

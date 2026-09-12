@@ -54,7 +54,7 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import type { CreateTargetRoleRequest } from "@/api/generated/models"
-import type { RecognizeRoleInput } from "@/models/target-role-workflow"
+import type { RecognizeRoleInput } from "@/mocks/models/role"
 
 import { RoleEditorForm } from "./RoleEditorDialog"
 

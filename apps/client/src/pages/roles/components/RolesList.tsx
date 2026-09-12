@@ -1,9 +1,11 @@
+import type { MatchingAnalysisState } from "@/mocks/models/role"
+import type { RoleResources } from "../types"
 import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import type { RoleView } from "@/models/target-role-workflow"
+import type { TargetRoleResponse } from "@/api/generated/models"
 
 import { RoleStatusBadges } from "./RoleStatusBadges"
 import { getRolesForCategory, type TargetRoleListCategory } from "./roles-list-utils"
@@ -14,6 +16,7 @@ export function RolesList({
   activeRoleId,
   onCategoryChange,
   roles,
+  matchingByRoleId,
   selectedRoleId,
   onSelectRole,
 }: {
@@ -21,7 +24,8 @@ export function RolesList({
   className?: string
   activeRoleId: string | null
   onCategoryChange: (category: TargetRoleListCategory) => void
-  roles: RoleView[]
+  roles: TargetRoleResponse[]
+  matchingByRoleId: RoleResources["matchingByRoleId"]
   selectedRoleId: string | null
   onSelectRole: (roleId: string) => void
 }) {
@@ -78,6 +82,7 @@ export function RolesList({
                 isCurrent={role.id === activeRoleId}
                 onSelectRole={onSelectRole}
                 role={role}
+                analysis={matchingByRoleId[role.id]}
                 selected={selectedRoleId === role.id}
               />
             </div>
@@ -97,16 +102,18 @@ function RoleListItem({
   isCurrent,
   onSelectRole,
   role,
+  analysis,
   selected,
 }: {
   isCurrent: boolean
   onSelectRole: (roleId: string) => void
-  role: RoleView
+  role: TargetRoleResponse
+  analysis: MatchingAnalysisState | undefined
   selected: boolean
 }) {
   const { t } = useTranslation()
   const isArchived = role.isArchived
-  const score = getRoleMatchScore(role)
+  const score = getRoleMatchScore(analysis)
 
   return (
     <Button
@@ -178,9 +185,8 @@ function RoleMatchScoreRing({ archived, score }: { archived: boolean; score: num
   )
 }
 
-function getRoleMatchScore(role: RoleView): number | null {
-  const match = role.matchState
-  return match.status === "current" || match.status === "stale"
+function getRoleMatchScore(match: MatchingAnalysisState | undefined): number | null {
+  return match?.status === "current" || match?.status === "stale"
     ? match.result.overallMatchScore
     : null
 }

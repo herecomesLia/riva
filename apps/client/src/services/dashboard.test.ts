@@ -1,25 +1,38 @@
-import { describe, expect, it, vi } from "vitest"
+import { getProfile } from "@/services/profile"
+import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
+import { createRoleStoryResponse } from "@/pages/roles/stories/role-story-fixtures"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { dashboardFixture } from "@/mocks/fixtures/dashboard"
 import { matchResultFixture, targetRoleFixture } from "@/mocks/fixtures/target-role"
-import type { RoleView } from "@/models/target-role-workflow"
-import { getRoles } from "@/services/roles"
+import type { TargetRoleResponse } from "@/api/generated/models"
+import { getRoles, getMatchingAnalysis, getJdExtractionState } from "@/services/roles"
 import { getDashboardData } from "./dashboard"
 
-vi.mock("@/services/roles", () => ({ getRoles: vi.fn() }))
+vi.mock("@/services/roles", () => ({
+  getRoles: vi.fn(),
+  getMatchingAnalysis: vi.fn(),
+  getJdExtractionState: vi.fn(),
+}))
+vi.mock("@/services/profile", () => ({ getProfile: vi.fn() }))
+beforeEach(() => {
+  vi.mocked(getProfile).mockResolvedValue(careerProfileFixture)
+  vi.mocked(getJdExtractionState).mockResolvedValue({ status: "idle", error: null })
+  vi.mocked(getMatchingAnalysis).mockResolvedValue({
+    status: "current",
+    result: matchResultFixture,
+  })
+})
 
 const role = {
   ...structuredClone(targetRoleFixture),
-  jdState: { status: "ready", result: structuredClone(targetRoleFixture.jd) },
-  matchState: { status: "current", result: structuredClone(matchResultFixture) },
-} satisfies RoleView
+} satisfies TargetRoleResponse
 
 describe("getDashboardData", () => {
   it("projects the active role and uses fixed training data", async () => {
     vi.mocked(getRoles).mockResolvedValue({
-      roles: [role],
-      activeRoleId: role.id,
-      profile: { exists: true, complete: true },
+      targetRoles: [role],
+      activeTargetRoleId: role.id,
     })
 
     const response = await getDashboardData()
@@ -43,21 +56,23 @@ describe("getDashboardData", () => {
 
   it("keeps training data when no role is active", async () => {
     vi.mocked(getRoles).mockResolvedValue({
-      roles: [role],
-      activeRoleId: null,
-      profile: { exists: true, complete: true },
+      targetRoles: [role],
+      activeTargetRoleId: null,
     })
     expect(await getDashboardData()).toEqual(dashboardFixture)
   })
 
   it("projects incomplete prerequisites without exposing a stale score", async () => {
-    const incomplete: RoleView = structuredClone(role)
-    incomplete.jdState = { status: "missing" }
-    incomplete.matchState = { status: "stale", result: structuredClone(matchResultFixture) }
+    const incomplete: TargetRoleResponse = structuredClone(role)
+    incomplete.jd = createRoleStoryResponse("singleRoleWithoutJobDescription").targetRoles[0]!.jd
+    vi.mocked(getProfile).mockResolvedValue({ ...careerProfileFixture, skills: [] })
+    vi.mocked(getMatchingAnalysis).mockResolvedValue({
+      status: "stale",
+      result: matchResultFixture,
+    })
     vi.mocked(getRoles).mockResolvedValue({
-      roles: [incomplete],
-      activeRoleId: incomplete.id,
-      profile: { exists: true, complete: false },
+      targetRoles: [incomplete],
+      activeTargetRoleId: incomplete.id,
     })
     const response = await getDashboardData()
     expect(response.currentRole).toMatchObject({

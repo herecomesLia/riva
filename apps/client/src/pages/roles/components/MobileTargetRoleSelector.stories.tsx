@@ -18,7 +18,7 @@ function SelectorHarness({
   selectedRoleId,
 }: {
   activeRoleId: string | null
-  roles: ReturnType<typeof createRoleStoryResponse>["roles"]
+  roles: ReturnType<typeof createRoleStoryResponse>["targetRoles"]
   selectedRoleId: string
 }) {
   const [selectedId, setSelectedId] = useState(selectedRoleId)
@@ -50,25 +50,29 @@ function SelectorHarness({
 }
 
 const multipleRoles = createRoleStoryResponse("multipleRoles")
-const currentRole = multipleRoles.roles.find((role) => role.id === multipleRoles.activeRoleId)!
-const nonCurrentRole = multipleRoles.roles.find((role) => role.id !== multipleRoles.activeRoleId)!
+const currentRole = multipleRoles.targetRoles.find(
+  (role) => role.id === multipleRoles.activeTargetRoleId,
+)!
+const nonCurrentRole = multipleRoles.targetRoles.find(
+  (role) => role.id !== multipleRoles.activeTargetRoleId,
+)!
 
 export const SingleRole = meta.story({
   args: {
     category: "active",
-    activeRoleId: createRoleStoryResponse("singleRoleWithoutJobDescription").activeRoleId,
+    activeRoleId: createRoleStoryResponse("singleRoleWithoutJobDescription").activeTargetRoleId,
     onCategoryChange: fn(),
     onSelectRole: fn(),
-    roles: createRoleStoryResponse("singleRoleWithoutJobDescription").roles,
-    selectedRole: createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!,
+    roles: createRoleStoryResponse("singleRoleWithoutJobDescription").targetRoles,
+    selectedRole: createRoleStoryResponse("singleRoleWithoutJobDescription").targetRoles[0]!,
   },
 })
 
 export const CurrentAndSelectedDifferent = meta.story({
   render: () => (
     <SelectorHarness
-      activeRoleId={multipleRoles.activeRoleId}
-      roles={multipleRoles.roles}
+      activeRoleId={multipleRoles.activeTargetRoleId}
+      roles={multipleRoles.targetRoles}
       selectedRoleId={nonCurrentRole.id}
     />
   ),
@@ -87,11 +91,11 @@ export const CurrentAndSelectedDifferent = meta.story({
 export const ArchivedSelected = meta.story({
   render: () => {
     const response = createRoleStoryResponse("archivedRoles")
-    const archived = response.roles.find((role) => role.isArchived)!
+    const archived = response.targetRoles.find((role) => role.isArchived)!
     return (
       <SelectorHarness
-        activeRoleId={response.activeRoleId}
-        roles={response.roles}
+        activeRoleId={response.activeTargetRoleId}
+        roles={response.targetRoles}
         selectedRoleId={archived.id}
       />
     )
@@ -103,9 +107,9 @@ export const ManyRoles = meta.story({
     const response = createManyRolesResponse()
     return (
       <SelectorHarness
-        activeRoleId={response.activeRoleId}
-        roles={response.roles}
-        selectedRoleId={response.activeRoleId!}
+        activeRoleId={response.activeTargetRoleId}
+        roles={response.targetRoles}
+        selectedRoleId={response.activeTargetRoleId!}
       />
     )
   },

@@ -30,8 +30,8 @@ import type {
   CreateTargetRoleRequest,
   RecruitmentTrack,
   UpdateTargetRoleRequest,
+  TargetRoleResponse,
 } from "@/api/generated/models"
-import type { RoleView } from "@/models/target-role-workflow"
 
 import { getRolesActionErrorCode, type RolesActionErrorCode } from "../roles-errors"
 
@@ -50,7 +50,7 @@ type RoleEditorDialogProps = {
   onSaved: () => void
   onUpdate: (roleId: string, input: UpdateTargetRoleRequest) => Promise<void>
   open: boolean
-  role: RoleView | null
+  role: TargetRoleResponse | null
 }
 
 const roleDraftSchema = z.object({
@@ -254,7 +254,7 @@ function DraftStateSync({
   return null
 }
 
-function createRoleDraft(role: RoleView | null): RoleDraft {
+function createRoleDraft(role: TargetRoleResponse | null): RoleDraft {
   return {
     title: role?.title ?? "",
     company: role?.company ?? "",

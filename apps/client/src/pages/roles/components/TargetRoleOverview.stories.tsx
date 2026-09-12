@@ -28,11 +28,13 @@ const meta = preview.meta({
   title: "Roles/TargetRoleOverview",
 })
 
-const readyRole = createRoleStoryResponse("matchingAnalysisCurrent").roles[0]!
-const activeRole = createRoleStoryResponse("multipleRoles").roles.find(
-  (role) => role.id !== createRoleStoryResponse("multipleRoles").activeRoleId,
+const readyRole = createRoleStoryResponse("matchingAnalysisCurrent").targetRoles[0]!
+const activeRole = createRoleStoryResponse("multipleRoles").targetRoles.find(
+  (role) => role.id !== createRoleStoryResponse("multipleRoles").activeTargetRoleId,
 )!
-const archivedRole = createRoleStoryResponse("archivedRoles").roles.find((role) => role.isArchived)!
+const archivedRole = createRoleStoryResponse("archivedRoles").targetRoles.find(
+  (role) => role.isArchived,
+)!
 
 export const CompleteRole = meta.story({
   args: { actions: createActions(), isCurrent: true, role: readyRole },

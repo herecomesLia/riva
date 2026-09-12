@@ -1,3 +1,4 @@
+import type { RoleResources } from "../types"
 import { useForm } from "@tanstack/react-form"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -19,8 +20,9 @@ import type {
   JobDescriptionResponse,
   JobRequirementsRequest,
   UpdateJobDescriptionRequest,
+  TargetRoleResponse,
 } from "@/api/generated/models"
-import type { JdField, RoleView } from "@/models/target-role-workflow"
+import type { JdField } from "@/pages/roles/types"
 
 import { getRolesActionErrorCode, type RolesActionErrorCode } from "../roles-errors"
 import { JobDescriptionBulletListEditor } from "./JobDescriptionBulletListEditor"
@@ -53,20 +55,18 @@ export function JobDescriptionAnalysisEditorDialog({
   onSave,
   onSaved,
   role,
+  jdTask,
 }: {
   field: JdField | null
   onDirtyChange: (isDirty: boolean) => void
   onOpenChange: (open: boolean) => void
   onSave: (roleId: string, input: UpdateJobDescriptionRequest) => Promise<void>
   onSaved: () => void
-  role: RoleView | null
+  role: TargetRoleResponse | null
+  jdTask: RoleResources["jdTasksByRoleId"][string]
 }) {
   const { t } = useTranslation()
-  const isOpen =
-    field !== null &&
-    role !== null &&
-    !role.isArchived &&
-    (role.jdState.status === "missing" || role.jdState.status === "ready")
+  const isOpen = field !== null && role !== null && !role.isArchived && jdTask?.status === "idle"
 
   return (
     <Dialog onOpenChange={onOpenChange} open={isOpen}>
@@ -105,7 +105,7 @@ function JobDescriptionAnalysisEditorForm({
   onOpenChange: (open: boolean) => void
   onSave: (roleId: string, input: UpdateJobDescriptionRequest) => Promise<void>
   onSaved: () => void
-  role: RoleView
+  role: TargetRoleResponse
   title: string
 }) {
   const { t } = useTranslation()

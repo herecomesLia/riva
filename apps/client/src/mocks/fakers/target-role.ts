@@ -1,3 +1,11 @@
+import { ApiError } from "@/api/error"
+import { getCareerProfile } from "@/api/generated/endpoints/career-profile/career-profile"
+import {
+  listTargetRoles,
+  getJdExtractionState,
+} from "@/api/generated/endpoints/target-roles/target-roles"
+import { hasJobDescription } from "@/lib/job-description"
+import { isCareerProfileComplete } from "@/lib/career-profile"
 import type {
   CreateTargetRoleRequest,
   HardSkillsRequest,
@@ -16,9 +24,9 @@ import type {
 } from "@/api/generated/models"
 import type {
   MatchingAnalysisResult,
-  MatchState,
+  MatchingAnalysisState,
   RecognizeRoleInput,
-} from "@/models/target-role-workflow"
+} from "@/mocks/models/role"
 import {
   jdFailInput,
   jdFailReason,
@@ -68,6 +76,7 @@ type JdExtractionMock = {
 type MatchRecord =
   | {
       status: "running"
+      startedAt: number
       result: MatchingAnalysisResult
     }
   | {
@@ -79,7 +88,7 @@ type MatchRecord =
       result: MatchingAnalysisResult
     }
 
-function toMatchState(match: MatchRecord | undefined): MatchState {
+function toMatchState(match: MatchRecord | undefined): MatchingAnalysisState {
   if (!match) return { status: "none" }
   if (match.status === "running") return { status: "generating" }
   return {
@@ -183,6 +192,46 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
     matches.delete(roleId)
   }
 
+  // Provisional matching API: prerequisites are aggregated here, not by the Role UI.
+  async function getMatch(roleId: string): Promise<MatchingAnalysisState> {
+    const task = await getJdExtractionState(roleId)
+    const [roles, profile] = await Promise.all([
+      listTargetRoles(),
+      getCareerProfile().catch((error: unknown) => {
+        if (error instanceof ApiError && error.code === "resource.not_found") return null
+        throw error
+      }),
+    ])
+    const role = roles.targetRoles.find((item) => item.id === roleId)
+    if (!role) throw createMockApiError("resource.not_found", "Target role was not found.")
+    const reason = !profile
+      ? "profileMissing"
+      : !isCareerProfileComplete(profile)
+        ? "profileIncomplete"
+        : task.status === "failed"
+          ? "jobDescriptionFailed"
+          : task.status !== "idle"
+            ? "jobDescriptionExtracting"
+            : !hasJobDescription(role.jd)
+              ? "jobDescriptionMissing"
+              : null
+    let record = matches.get(roleId)
+    if (reason) {
+      return {
+        status: "blocked",
+        reason,
+        ...(record && record.status !== "running"
+          ? { result: structuredClone(record.result) }
+          : {}),
+      }
+    }
+    if (record?.status === "running" && Date.now() - record.startedAt >= 1000) {
+      record = { status: "success", result: record.result }
+      matches.set(roleId, record)
+    }
+    return toMatchState(record)
+  }
+
   async function create(input: CreateTargetRoleRequest): Promise<TargetRoleResponse> {
     const createdAt = nextTime()
     const role: TargetRoleResponse = {
@@ -260,30 +309,19 @@ export function createRoleFaker(initialState: TargetRoleListResponse) {
       jdExtractions.get(roleId)!.abortStartedAt = Date.now()
     },
 
-    async match(roleId: string): Promise<MatchState> {
+    async match(roleId: string): Promise<MatchingAnalysisState> {
+      const analysis = await getMatch(roleId)
+      if (analysis.status === "blocked" || analysis.status === "generating") return analysis
       const task = {
         status: "running",
+        startedAt: Date.now(),
         result: structuredClone(matchResultFixture),
       } satisfies MatchRecord
       matches.set(roleId, task)
       return { status: "generating" }
     },
 
-    async getMatch(roleId: string): Promise<MatchState> {
-      return toMatchState(matches.get(roleId))
-    },
-
-    async pollMatch(roleId: string): Promise<MatchState> {
-      const match = matches.get(roleId)
-      if (!match || match.status !== "running") return toMatchState(match)
-
-      const doneMatch = {
-        status: "success",
-        result: structuredClone(match.result),
-      } satisfies MatchRecord
-      matches.set(roleId, doneMatch)
-      return toMatchState(doneMatch)
-    },
+    getMatch,
 
     staleMatch,
 

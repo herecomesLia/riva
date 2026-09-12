@@ -3,7 +3,7 @@ import { useState } from "react"
 import preview from "#storybook/preview"
 import { expect, fn, screen, waitFor, within } from "storybook/test"
 
-import type { RecognizeRoleInput } from "@/models/target-role-workflow"
+import type { RecognizeRoleInput } from "@/mocks/models/role"
 
 import { TargetRoleCreationDialog } from "./TargetRoleCreationDialog"
 

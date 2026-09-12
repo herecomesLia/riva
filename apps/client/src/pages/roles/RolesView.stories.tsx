@@ -34,6 +34,8 @@ export const Error = meta.story({
 export const NoRoles = meta.story({
   args: {
     content: { status: "ready", data: createRoleStoryResponse("noRoles") },
+    jdTasksByRoleId: createRoleStoryResponse("noRoles").jdTasksByRoleId,
+    matchingByRoleId: createRoleStoryResponse("noRoles").matchingByRoleId,
     variant: "default",
   },
 })
@@ -44,6 +46,8 @@ export const SingleRole = meta.story({
       status: "ready",
       data: createRoleStoryResponse("singleRoleWithoutJobDescription"),
     },
+    jdTasksByRoleId: createRoleStoryResponse("singleRoleWithoutJobDescription").jdTasksByRoleId,
+    matchingByRoleId: createRoleStoryResponse("singleRoleWithoutJobDescription").matchingByRoleId,
     variant: "default",
   },
 })
@@ -51,6 +55,8 @@ export const SingleRole = meta.story({
 export const MultipleRoles = meta.story({
   args: {
     content: { status: "ready", data: createRoleStoryResponse("multipleRoles") },
+    jdTasksByRoleId: createRoleStoryResponse("multipleRoles").jdTasksByRoleId,
+    matchingByRoleId: createRoleStoryResponse("multipleRoles").matchingByRoleId,
     variant: "default",
   },
 })
@@ -58,32 +64,38 @@ export const MultipleRoles = meta.story({
 export const NoCurrentRole = meta.story({
   args: {
     content: { status: "ready", data: createRoleStoryResponse("rolesWithoutCurrent") },
+    jdTasksByRoleId: createRoleStoryResponse("rolesWithoutCurrent").jdTasksByRoleId,
+    matchingByRoleId: createRoleStoryResponse("rolesWithoutCurrent").matchingByRoleId,
     variant: "default",
   },
 })
 
 const archivedRoles = createRoleStoryResponse("archivedRoles")
-const archivedRole = archivedRoles.roles.find((role) => role.isArchived)!
+const archivedRole = archivedRoles.targetRoles.find((role) => role.isArchived)!
 
 export const ArchivedRoleSelected = meta.story({
   args: {
     content: { status: "ready", data: archivedRoles },
+    jdTasksByRoleId: archivedRoles.jdTasksByRoleId,
+    matchingByRoleId: archivedRoles.matchingByRoleId,
     initialSelectedRoleId: archivedRole.id,
     variant: "default",
   },
 })
 
 const selectedDifferent = createRoleStoryResponse("multipleRoles")
-const currentRole = selectedDifferent.roles.find(
-  (role) => role.id === selectedDifferent.activeRoleId,
+const currentRole = selectedDifferent.targetRoles.find(
+  (role) => role.id === selectedDifferent.activeTargetRoleId,
 )!
-const selectedRole = selectedDifferent.roles.find(
-  (role) => role.id !== selectedDifferent.activeRoleId,
+const selectedRole = selectedDifferent.targetRoles.find(
+  (role) => role.id !== selectedDifferent.activeTargetRoleId,
 )!
 
 export const SelectedRoleDifferentFromCurrent = meta.story({
   args: {
     content: { status: "ready", data: selectedDifferent },
+    jdTasksByRoleId: selectedDifferent.jdTasksByRoleId,
+    matchingByRoleId: selectedDifferent.matchingByRoleId,
     initialSelectedRoleId: selectedRole.id,
     variant: "default",
   },
@@ -110,6 +122,8 @@ export const SelectedRoleDifferentFromCurrent = meta.story({
 export const ManyTargetRoles = meta.story({
   args: {
     content: { status: "ready", data: createManyRolesResponse() },
+    jdTasksByRoleId: createManyRolesResponse().jdTasksByRoleId,
+    matchingByRoleId: createManyRolesResponse().matchingByRoleId,
     variant: "default",
   },
 })
@@ -117,6 +131,8 @@ export const ManyTargetRoles = meta.story({
 export const MobileLayout = meta.story({
   args: {
     content: { status: "ready", data: createRoleStoryResponse("multipleRoles") },
+    jdTasksByRoleId: createRoleStoryResponse("multipleRoles").jdTasksByRoleId,
+    matchingByRoleId: createRoleStoryResponse("multipleRoles").matchingByRoleId,
     variant: "default",
   },
   globals: { viewport: { isRotated: false, value: "mobile1" } },
@@ -136,6 +152,8 @@ export const MobileLayout = meta.story({
 export const LongJobDescriptionPage = meta.story({
   args: {
     content: { status: "ready", data: createLongJobDescriptionResponse() },
+    jdTasksByRoleId: createLongJobDescriptionResponse().jdTasksByRoleId,
+    matchingByRoleId: createLongJobDescriptionResponse().matchingByRoleId,
     variant: "default",
   },
   play: async ({ userEvent }) => {
@@ -148,6 +166,8 @@ export const LongJobDescriptionPage = meta.story({
 export const LongMatchingAnalysisPage = meta.story({
   args: {
     content: { status: "ready", data: createLongMatchingAnalysisResponse() },
+    jdTasksByRoleId: createLongMatchingAnalysisResponse().jdTasksByRoleId,
+    matchingByRoleId: createLongMatchingAnalysisResponse().matchingByRoleId,
     variant: "default",
   },
   play: async ({ userEvent }) => {

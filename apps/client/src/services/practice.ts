@@ -6,10 +6,10 @@ import type {
   PracticeTrainingEntryPreparationResponse,
   TrainingEntryRoleAvailability,
 } from "@/models/training-entry"
-import type { RolesData } from "@/models/target-role-workflow"
+import type { TargetRoleListResponse } from "@/api/generated/models"
 import { getRoles } from "@/services/roles"
 
-function setupContext(roles: RolesData["roles"]): PracticeSetupContext {
+function setupContext(roles: TargetRoleListResponse["targetRoles"]): PracticeSetupContext {
   const supportedQuestionTypes: QuestionType[] = [
     "projectDeepDive",
     "behavioral",
@@ -33,13 +33,13 @@ function setupContext(roles: RolesData["roles"]): PracticeSetupContext {
 
 export async function getPracticePage(): Promise<PracticeData> {
   const [roles, session] = await Promise.all([getRoles(), practiceFaker.get()])
-  const context = setupContext(roles.roles)
+  const context = setupContext(roles.targetRoles)
   if (session.status === "setup") {
     const available = (id: string | null) => context.targetRoles.some((role) => role.id === id)
     session.selection.targetRoleId = available(session.selection.targetRoleId)
       ? session.selection.targetRoleId
-      : available(roles.activeRoleId)
-        ? roles.activeRoleId
+      : available(roles.activeTargetRoleId)
+        ? roles.activeTargetRoleId
         : (context.targetRoles[0]?.id ?? null)
   }
   return { setupContext: context, session }
@@ -49,8 +49,8 @@ export async function preparePracticeTrainingEntry(
   input: PracticeTrainingEntryParameters,
 ): Promise<PracticeTrainingEntryPreparationResponse> {
   const [roles, session] = await Promise.all([getRoles(), practiceFaker.get()])
-  const context = setupContext(roles.roles)
-  const role = roles.roles.find((role) => role.id === input.targetRoleId)
+  const context = setupContext(roles.targetRoles)
+  const role = roles.targetRoles.find((role) => role.id === input.targetRoleId)
   const availability: TrainingEntryRoleAvailability = !role
     ? { status: "unavailable", reason: "targetRoleDeleted" }
     : role.isArchived

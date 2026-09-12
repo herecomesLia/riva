@@ -15,81 +15,28 @@ import {
 import type {
   CreateTargetRoleRequest,
   TargetRoleResponse,
-  JobDescriptionResponse,
   TaskStatusResponse,
   TaskFailureResponse,
   UpdateJobDescriptionRequest,
   UpdateTargetRoleRequest,
+  TargetRoleListResponse,
 } from "@/api/generated/models"
 import { targetRoleFaker } from "@/mocks/fakers/target-role"
-import type {
-  JdState,
-  MatchState,
-  RecognizeRoleInput,
-  RolesData,
-} from "@/models/target-role-workflow"
-import { getProfile } from "@/services/profile"
+import type { MatchingAnalysisState, RecognizeRoleInput } from "@/mocks/models/role"
 
 export function getJdExtractionState(
   roleId: string,
+  signal?: AbortSignal,
 ): Promise<TaskStatusResponse | TaskFailureResponse> {
-  return getJdExtractionStateRequest(roleId)
+  return getJdExtractionStateRequest(roleId, { signal })
 }
 
 export function abortJdExtraction(roleId: string): Promise<void> {
   return abortJdExtractionRequest(roleId)
 }
 
-export function toJdState(
-  state: TaskStatusResponse | TaskFailureResponse,
-  jd: JobDescriptionResponse,
-): JdState {
-  if (state.status === "failed") return { status: "failed", reason: state.error.message }
-  if (state.status !== "idle") return { status: "extracting", phase: state.status }
-  const hasContent =
-    jd.responsibilities.length > 0 ||
-    Object.values(jd.requirements).some((items) => items.length > 0) ||
-    Object.values(jd.hardSkills).some((items) => items.length > 0) ||
-    jd.softSkills.length > 0 ||
-    jd.preferredQualifications.length > 0 ||
-    jd.businessDomains.length > 0
-  return hasContent ? { status: "ready", result: jd } : { status: "missing" }
-}
-
-export async function getRoles(): Promise<RolesData> {
-  const [initialResponse, profile] = await Promise.all([listTargetRoles(), getProfile()])
-  const states = new Map(
-    await Promise.all(
-      initialResponse.targetRoles.map(
-        async (role) => [role.id, await getJdExtractionState(role.id)] as const,
-      ),
-    ),
-  )
-  // Read results after observing idle: extraction may have completed since the first list.
-  const response = [...states.values()].some((state) => state.status === "idle")
-    ? await listTargetRoles()
-    : initialResponse
-  const roles = await Promise.all(
-    response.targetRoles.map(async (role) => ({
-      ...role,
-      jdState: toJdState(states.get(role.id) ?? (await getJdExtractionState(role.id)), role.jd),
-      matchState: await targetRoleFaker.getMatch(role.id),
-    })),
-  )
-
-  return {
-    roles,
-    activeRoleId: response.activeTargetRoleId,
-    profile: {
-      exists: profile !== null,
-      complete:
-        profile !== null &&
-        profile.education.length > 0 &&
-        profile.workExperiences.length > 0 &&
-        profile.projects.length > 0 &&
-        profile.skills.length > 0,
-    },
-  }
+export function getRoles(): Promise<TargetRoleListResponse> {
+  return listTargetRoles()
 }
 
 export function createRole(input: CreateTargetRoleRequest): Promise<TargetRoleResponse> {
@@ -143,10 +90,10 @@ export async function updateJd(
   return role
 }
 
-export function match(roleId: string): Promise<MatchState> {
+export function match(roleId: string): Promise<MatchingAnalysisState> {
   return targetRoleFaker.match(roleId)
 }
 
-export function pollMatch(roleId: string): Promise<MatchState> {
-  return targetRoleFaker.pollMatch(roleId)
+export function getMatchingAnalysis(roleId: string): Promise<MatchingAnalysisState> {
+  return targetRoleFaker.getMatch(roleId)
 }

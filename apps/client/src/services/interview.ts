@@ -5,23 +5,30 @@ import type {
   InterviewReview,
   InterviewSetup,
 } from "@/models/interview-workflow"
-import type { RolesData } from "@/models/target-role-workflow"
+import type { TargetRoleListResponse } from "@/api/generated/models"
 import { resolveInterviewTrainingEntry } from "@/models/training-entry"
 import type {
   InterviewTrainingEntryParameters,
   InterviewTrainingEntryPreparationResponse,
   TrainingEntryRoleAvailability,
 } from "@/models/training-entry"
-import { getRoles } from "@/services/roles"
+import { getRoles, getJdExtractionState } from "@/services/roles"
+import { getProfile } from "@/services/profile"
+import { isCareerProfileComplete } from "@/lib/career-profile"
+import { hasJobDescription } from "@/lib/job-description"
 
-function buildSetup(data: RolesData): InterviewSetup {
-  const roles = data.roles.filter((role) => !role.isArchived)
-  const ready = roles.filter((role) => role.jdState.status === "ready")
+function buildSetup(
+  data: TargetRoleListResponse,
+  profileComplete: boolean,
+  readyRoleIds: Set<string>,
+): InterviewSetup {
+  const roles = data.targetRoles.filter((role) => !role.isArchived)
+  const ready = roles.filter((role) => readyRoleIds.has(role.id))
   return {
     availability:
       roles.length === 0
         ? { status: "available" }
-        : !data.profile.complete
+        : !profileComplete
           ? { status: "blocked", reason: "profileIncomplete" }
           : ready.length === 0
             ? { status: "blocked", reason: "jobDescriptionMissing" }
@@ -35,7 +42,8 @@ function buildSetup(data: RolesData): InterviewSetup {
     availableDifficulties: ["basic", "pressure"],
     availableDurationMinutes: [15, 30, 45],
     defaultConfiguration: {
-      targetRoleId: ready.find(({ id }) => id === data.activeRoleId)?.id ?? ready[0]?.id ?? null,
+      targetRoleId:
+        ready.find(({ id }) => id === data.activeTargetRoleId)?.id ?? ready[0]?.id ?? null,
       round: "technical",
       difficulty: "pressure",
       durationMinutes: 30,
@@ -44,20 +52,42 @@ function buildSetup(data: RolesData): InterviewSetup {
 }
 
 export async function getInterviewPage(): Promise<InterviewData> {
-  return { setup: buildSetup(await getRoles()), session: interviewFaker.get() }
+  const { roles, profileComplete, readyRoleIds } = await getSetupResources()
+  return { setup: buildSetup(roles, profileComplete, readyRoleIds), session: interviewFaker.get() }
+}
+
+async function getSetupResources() {
+  const [initialRoles, profile] = await Promise.all([getRoles(), getProfile()])
+  const tasks = new Map(
+    await Promise.all(
+      initialRoles.targetRoles
+        .filter((role) => !role.isArchived)
+        .map(async (role) => [role.id, await getJdExtractionState(role.id)] as const),
+    ),
+  )
+  // Read the saved JD after observing completion, as extraction can finish during these reads.
+  const roles = [...tasks.values()].some((task) => task.status === "idle")
+    ? await getRoles()
+    : initialRoles
+  const readyRoleIds = new Set(
+    roles.targetRoles
+      .filter((role) => tasks.get(role.id)?.status === "idle" && hasJobDescription(role.jd))
+      .map((role) => role.id),
+  )
+  return { roles, profileComplete: isCareerProfileComplete(profile), readyRoleIds }
 }
 
 export async function prepareInterviewTrainingEntry(
   input: InterviewTrainingEntryParameters,
 ): Promise<InterviewTrainingEntryPreparationResponse> {
-  const roles = await getRoles()
-  const setup = buildSetup(roles)
-  const role = roles.roles.find(({ id }) => id === input.targetRoleId)
+  const { roles, profileComplete, readyRoleIds } = await getSetupResources()
+  const setup = buildSetup(roles, profileComplete, readyRoleIds)
+  const role = roles.targetRoles.find(({ id }) => id === input.targetRoleId)
   const availability: TrainingEntryRoleAvailability = !role
     ? { status: "unavailable", reason: "targetRoleDeleted" }
     : role.isArchived
       ? { status: "unavailable", reason: "targetRoleArchived" }
-      : !roles.profile.complete || role.jdState.status !== "ready"
+      : !profileComplete || !readyRoleIds.has(role.id)
         ? { status: "unavailable", reason: "targetRolePrerequisiteUnavailable" }
         : { status: "available" }
   const resolution = resolveInterviewTrainingEntry(setup, input, availability)

@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ApiError } from "@/api/error"
-import type { TargetRoleResponse } from "@/api/generated/models"
-import type { RolesData } from "@/models/target-role-workflow"
+import type { TargetRoleResponse, TargetRoleListResponse } from "@/api/generated/models"
 
 import {
   archiveRole,
@@ -17,46 +16,35 @@ import {
   setActiveRole,
   updateJd,
   updateRole,
-  toJdState,
 } from "@/services/roles"
 
 import { RolesView, type RolesViewActions } from "./RolesView"
 import {
   ROLES_QUERY_KEY,
-  useJdExtractionSynchronization,
-  useMatchingAnalysisSynchronization,
-} from "./hooks/useRoleSynchronization"
+  jdTaskQueryKey,
+  matchingQueryKey,
+  useRoleQueries,
+} from "./hooks/useRoleQueries"
 import { RolesActionError } from "./roles-errors"
 
 export function RolesPage() {
   const queryClient = useQueryClient()
   const rolesQuery = useQuery({ queryFn: getRoles, queryKey: ROLES_QUERY_KEY, retry: false })
-  const {
-    clearSynchronizationError,
-    pauseSynchronization,
-    restartSynchronization,
-    synchronizationErrorRoleIds,
-  } = useJdExtractionSynchronization(rolesQuery.data)
-  const {
-    clearSynchronizationError: clearMatchSynchronizationError,
-    restartSynchronization: restartMatchSynchronization,
-    synchronizationErrorRoleIds: matchSynchronizationErrorRoleIds,
-  } = useMatchingAnalysisSynchronization(rolesQuery.data)
-
-  const refreshRoles = () => queryClient.invalidateQueries({ queryKey: ROLES_QUERY_KEY })
+  const resources = useRoleQueries(rolesQuery.data?.targetRoles ?? [])
+  const refreshRoles = () =>
+    queryClient.invalidateQueries({ queryKey: ROLES_QUERY_KEY, exact: true })
+  const refreshRoleResources = async (roleId: string) => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: jdTaskQueryKey(roleId) }),
+      queryClient.invalidateQueries({ queryKey: matchingQueryKey(roleId) }),
+    ])
+  }
   const cacheCreatedRole = (role: TargetRoleResponse) => {
-    queryClient.setQueryData<RolesData>(ROLES_QUERY_KEY, (current) =>
+    queryClient.setQueryData<TargetRoleListResponse>(ROLES_QUERY_KEY, (current) =>
       current
         ? {
             ...current,
-            roles: [
-              {
-                ...role,
-                jdState: toJdState({ status: "idle", error: null }, role.jd),
-                matchState: { status: "none" },
-              },
-              ...current.roles.filter((item) => item.id !== role.id),
-            ],
+            targetRoles: [role, ...current.targetRoles.filter((item) => item.id !== role.id)],
           }
         : current,
     )
@@ -104,12 +92,16 @@ export function RolesPage() {
   })
   const matchMutation = useMutation({
     mutationFn: (roleId: string) => match(roleId),
-    onSuccess: refreshRoles,
+    onMutate: (roleId) => queryClient.cancelQueries({ queryKey: matchingQueryKey(roleId) }),
+    onSuccess: (analysis, roleId) => queryClient.setQueryData(matchingQueryKey(roleId), analysis),
   })
   const updateJdMutation = useMutation({
     mutationFn: ({ roleId, input }: { roleId: string; input: Parameters<typeof updateJd>[1] }) =>
       updateJd(roleId, input),
-    onSuccess: refreshRoles,
+    onSuccess: async (_, { roleId }) => {
+      await refreshRoles()
+      await refreshRoleResources(roleId)
+    },
   })
 
   async function runMutation<Input, Output>(
@@ -127,42 +119,12 @@ export function RolesPage() {
     }
   }
 
-  async function runExtractionCommand(
-    roleId: string,
-    command: () => Promise<void>,
-    phase: "queued" | "aborting",
-  ) {
-    pauseSynchronization(roleId)
-    await queryClient.cancelQueries({ queryKey: ROLES_QUERY_KEY })
+  async function runExtractionCommand(roleId: string, command: () => Promise<void>) {
+    await queryClient.cancelQueries({ queryKey: jdTaskQueryKey(roleId) })
     try {
       await runMutation(command, undefined)
-      queryClient.setQueryData<RolesData>(ROLES_QUERY_KEY, (current) =>
-        current
-          ? {
-              ...current,
-              roles: current.roles.map((role) =>
-                role.id === roleId
-                  ? {
-                      ...role,
-                      jdState: { status: "extracting", phase },
-                      matchState:
-                        phase === "queued"
-                          ? role.matchState.status === "current"
-                            ? { status: "stale", result: role.matchState.result }
-                            : role.matchState.status === "generating"
-                              ? { status: "none" }
-                              : role.matchState
-                          : role.matchState,
-                    }
-                  : role,
-              ),
-            }
-          : current,
-      )
-      clearMatchSynchronizationError(roleId)
-      await refreshRoles()
     } finally {
-      restartSynchronization(roleId)
+      await refreshRoleResources(roleId)
     }
   }
 
@@ -170,32 +132,21 @@ export function RolesPage() {
     archiveRole: (roleId) => runMutation(archiveMutation.mutateAsync, roleId),
     createRole: (input) => runMutation(createMutation.mutateAsync, input),
     deleteRole: (roleId) => runMutation(deleteMutation.mutateAsync, roleId),
-    match: async (roleId) => {
-      const result = await runMutation(matchMutation.mutateAsync, roleId)
-      clearMatchSynchronizationError(roleId)
-      return result
-    },
-    retryJdSynchronization: async (roleId) => {
-      if (!restartSynchronization(roleId)) throw new RolesActionError("requestFailed")
-    },
-    retryMatchSynchronization: async (roleId) => {
-      if (!restartMatchSynchronization(roleId)) throw new RolesActionError("requestFailed")
-    },
+    match: (roleId) => runMutation(matchMutation.mutateAsync, roleId),
+    retryJdSynchronization: (roleId) =>
+      queryClient.refetchQueries({ queryKey: jdTaskQueryKey(roleId) }, { throwOnError: true }),
+    retryMatchSynchronization: (roleId) =>
+      queryClient.refetchQueries({ queryKey: matchingQueryKey(roleId) }, { throwOnError: true }),
     recognizeRole: (input) => runMutation(recognizeMutation.mutateAsync, input),
     restoreRole: (roleId) => runMutation(restoreMutation.mutateAsync, roleId),
     extractJd: (roleId, text) =>
-      runExtractionCommand(roleId, () => extractMutation.mutateAsync({ roleId, text }), "queued"),
+      runExtractionCommand(roleId, () => extractMutation.mutateAsync({ roleId, text })),
     retryJdExtraction: (roleId) =>
-      runExtractionCommand(roleId, () => retryExtractionMutation.mutateAsync(roleId), "queued"),
+      runExtractionCommand(roleId, () => retryExtractionMutation.mutateAsync(roleId)),
     abortJdExtraction: (roleId) =>
-      runExtractionCommand(roleId, () => abortExtractionMutation.mutateAsync(roleId), "aborting"),
+      runExtractionCommand(roleId, () => abortExtractionMutation.mutateAsync(roleId)),
     setActiveRole: (roleId) => runMutation(setActiveMutation.mutateAsync, roleId),
-    updateJd: async (roleId, input) => {
-      const result = await runMutation(updateJdMutation.mutateAsync, { roleId, input })
-      clearSynchronizationError(roleId)
-      clearMatchSynchronizationError(roleId)
-      return result
-    },
+    updateJd: (roleId, input) => runMutation(updateJdMutation.mutateAsync, { roleId, input }),
     updateRole: (roleId, input) => runMutation(updateMutation.mutateAsync, { roleId, input }),
   }
 
@@ -204,8 +155,7 @@ export function RolesPage() {
       <RolesView
         actions={actions}
         content={{ status: "ready", data: rolesQuery.data }}
-        jdSynchronizationErrorRoleIds={synchronizationErrorRoleIds}
-        matchSynchronizationErrorRoleIds={matchSynchronizationErrorRoleIds}
+        {...resources}
         variant="default"
       />
     )

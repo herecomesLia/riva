@@ -3,8 +3,6 @@ import { useState } from "react"
 import preview from "#storybook/preview"
 import { expect, fn, screen } from "storybook/test"
 
-import type { RoleView } from "@/models/target-role-workflow"
-
 import {
   createLongJobDescriptionResponse,
   createRoleStoryResponse,
@@ -17,7 +15,7 @@ const meta = preview.meta({
 })
 
 function roleFor(scenario: Parameters<typeof createRoleStoryResponse>[0]) {
-  return createRoleStoryResponse(scenario).roles[0]!
+  return createRoleStoryResponse(scenario).targetRoles[0]!
 }
 
 export const Missing = meta.story({
@@ -25,6 +23,9 @@ export const Missing = meta.story({
     onEdit: fn(),
     onEditAnalysisModule: fn(),
     role: roleFor("singleRoleWithoutJobDescription"),
+    jdTask: createRoleStoryResponse("singleRoleWithoutJobDescription").jdTasksByRoleId[
+      roleFor("singleRoleWithoutJobDescription").id
+    ],
     synchronizationError: false,
   },
 })
@@ -33,6 +34,9 @@ export const Extracting = meta.story({
   args: {
     onAbortExtraction: fn(),
     role: roleFor("roleWithJobDescriptionExtracting"),
+    jdTask: createRoleStoryResponse("roleWithJobDescriptionExtracting").jdTasksByRoleId[
+      roleFor("roleWithJobDescriptionExtracting").id
+    ],
     synchronizationError: false,
   },
 })
@@ -42,8 +46,8 @@ export const Aborting = meta.story({
     onAbortExtraction: fn(),
     role: {
       ...roleFor("roleWithJobDescriptionExtracting"),
-      jdState: { status: "extracting", phase: "aborting" },
     },
+    jdTask: { status: "aborting", error: null },
     synchronizationError: false,
   },
 })
@@ -52,6 +56,9 @@ export const SynchronizationError = meta.story({
   args: {
     onRetrySynchronization: fn(),
     role: roleFor("roleWithJobDescriptionExtracting"),
+    jdTask: createRoleStoryResponse("roleWithJobDescriptionExtracting").jdTasksByRoleId[
+      roleFor("roleWithJobDescriptionExtracting").id
+    ],
     synchronizationError: true,
   },
 })
@@ -59,15 +66,16 @@ export const SynchronizationError = meta.story({
 function SynchronizationRetryHarness() {
   const extracting = createRoleStoryResponse("roleWithJobDescriptionExtracting")
   const ready = createRoleStoryResponse("roleWithExtractedJobDescription")
-  const [role, setRole] = useState<RoleView>(extracting.roles[0]!)
+  const [response, setResponse] = useState(extracting)
   const [synchronizationError, setSynchronizationError] = useState(true)
   return (
     <JobDescriptionCard
       onRetrySynchronization={() => {
         setSynchronizationError(false)
-        setRole(ready.roles[0]!)
+        setResponse(ready)
       }}
-      role={role}
+      role={response.targetRoles[0]!}
+      jdTask={response.jdTasksByRoleId[response.targetRoles[0]!.id]}
       synchronizationError={synchronizationError}
     />
   )
@@ -86,6 +94,9 @@ export const Failed = meta.story({
     onRetryExtraction: fn(),
     onEdit: fn(),
     role: roleFor("roleWithJobDescriptionFailed"),
+    jdTask: createRoleStoryResponse("roleWithJobDescriptionFailed").jdTasksByRoleId[
+      roleFor("roleWithJobDescriptionFailed").id
+    ],
     synchronizationError: false,
   },
 })
@@ -94,6 +105,9 @@ export const Ready = meta.story({
   args: {
     onEdit: fn(),
     role: roleFor("roleWithExtractedJobDescription"),
+    jdTask: createRoleStoryResponse("roleWithExtractedJobDescription").jdTasksByRoleId[
+      roleFor("roleWithExtractedJobDescription").id
+    ],
     synchronizationError: false,
   },
 })
@@ -105,6 +119,9 @@ export const EditAnalysisModule = meta.story({
     onEdit: fn(),
     onEditAnalysisModule,
     role: roleFor("roleWithExtractedJobDescription"),
+    jdTask: createRoleStoryResponse("roleWithExtractedJobDescription").jdTasksByRoleId[
+      roleFor("roleWithExtractedJobDescription").id
+    ],
     synchronizationError: false,
   },
   play: async ({ userEvent }) => {
@@ -118,7 +135,8 @@ export const EditAnalysisModule = meta.story({
 export const LongContent = meta.story({
   args: {
     onEdit: fn(),
-    role: createLongJobDescriptionResponse().roles[0]!,
+    role: createLongJobDescriptionResponse().targetRoles[0]!,
+    jdTask: { status: "idle", error: null },
     synchronizationError: false,
   },
 })
@@ -134,7 +152,12 @@ export const InternshipJobDescription = meta.story({
       }
       role.jd.hardSkills.platforms = ["云原生平台"]
     }
-    return { onEditAnalysisModule: fn(), role, synchronizationError: false }
+    return {
+      onEditAnalysisModule: fn(),
+      role,
+      jdTask: { status: "idle" as const, error: null },
+      synchronizationError: false,
+    }
   })(),
 })
 
@@ -149,7 +172,12 @@ export const CampusJobDescription = meta.story({
       }
       role.jd.preferredQualifications = ["有开源项目贡献", "有相关竞赛经历"]
     }
-    return { onEditAnalysisModule: fn(), role, synchronizationError: false }
+    return {
+      onEditAnalysisModule: fn(),
+      role,
+      jdTask: { status: "idle" as const, error: null },
+      synchronizationError: false,
+    }
   })(),
 })
 
@@ -157,6 +185,9 @@ export const SocialRecruitmentJobDescription = meta.story({
   args: {
     onEditAnalysisModule: fn(),
     role: roleFor("roleWithExtractedJobDescription"),
+    jdTask: createRoleStoryResponse("roleWithExtractedJobDescription").jdTasksByRoleId[
+      roleFor("roleWithExtractedJobDescription").id
+    ],
     synchronizationError: false,
   },
 })
@@ -169,6 +200,11 @@ export const EmptyOptionalModules = meta.story({
       role.jd.softSkills = []
       role.jd.businessDomains = []
     }
-    return { onEditAnalysisModule: fn(), role, synchronizationError: false }
+    return {
+      onEditAnalysisModule: fn(),
+      role,
+      jdTask: { status: "idle" as const, error: null },
+      synchronizationError: false,
+    }
   })(),
 })

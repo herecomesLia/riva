@@ -1,18 +1,24 @@
+import type { RoleResources } from "../types"
+import { getJobDescriptionUiStatus } from "../job-description-status"
 import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import type { RoleView } from "@/models/target-role-workflow"
+import type { TargetRoleResponse } from "@/api/generated/models"
 
 export function TargetRoleProgressSummary({
   isCurrent,
   role,
+  jdTask,
+  analysis,
 }: {
   isCurrent: boolean
-  role: RoleView
+  jdTask: RoleResources["jdTasksByRoleId"][string]
+  analysis: RoleResources["matchingByRoleId"][string]
+  role: TargetRoleResponse
 }) {
   const { i18n, t } = useTranslation()
-  const matchingStatus = role.matchState.status
+  const matchingStatus = analysis?.status ?? "loading"
   const roleStatus = role.isArchived ? "archived" : "active"
   const updatedAt = new Intl.DateTimeFormat(i18n.language, {
     dateStyle: "medium",
@@ -39,7 +45,7 @@ export function TargetRoleProgressSummary({
           />
           <SummaryRow
             label={t("roles.summary.jobDescription")}
-            value={t(`roles.jobDescriptionStatus.${role.jdState.status}.label`)}
+            value={t(`roles.jobDescriptionStatus.${getJobDescriptionUiStatus(role, jdTask)}.label`)}
           />
           <SummaryRow
             label={t("roles.summary.matchingAnalysis")}

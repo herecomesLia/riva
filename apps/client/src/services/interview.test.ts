@@ -1,33 +1,39 @@
+import { getProfile } from "@/services/profile"
+import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
+import { createRoleStoryResponse } from "@/pages/roles/stories/role-story-fixtures"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { interviewFaker } from "@/mocks/fakers/interview"
 import { interviewFixture } from "@/mocks/fixtures/interview"
 import { targetRoleFixture } from "@/mocks/fixtures/target-role"
-import type { RolesData } from "@/models/target-role-workflow"
-import { getRoles } from "@/services/roles"
+import type { TargetRoleListResponse } from "@/api/generated/models"
+import { getRoles, getJdExtractionState } from "@/services/roles"
 import {
   getInterviewPage,
   getInterviewReview,
   prepareInterviewTrainingEntry,
 } from "@/services/interview"
 
-vi.mock("@/services/roles", () => ({ getRoles: vi.fn() }))
+vi.mock("@/services/roles", () => ({ getRoles: vi.fn(), getJdExtractionState: vi.fn() }))
+vi.mock("@/services/profile", () => ({ getProfile: vi.fn() }))
 
-const roles: RolesData = {
-  roles: ["first", "active", "missing", "archived"].map((id) => ({
+const roles: TargetRoleListResponse = {
+  targetRoles: ["first", "active", "missing", "archived"].map((id) => ({
     ...structuredClone(targetRoleFixture),
     id,
     isArchived: id === "archived",
-    jdState:
-      id === "missing" ? { status: "missing" } : { status: "ready", result: targetRoleFixture.jd },
-    matchState: { status: "none" },
+    jd:
+      id === "missing"
+        ? createRoleStoryResponse("singleRoleWithoutJobDescription").targetRoles[0]!.jd
+        : targetRoleFixture.jd,
   })),
-  activeRoleId: "active",
-  profile: { exists: true, complete: true },
+  activeTargetRoleId: "active",
 }
 
 beforeEach(() => {
   vi.restoreAllMocks()
+  vi.mocked(getProfile).mockResolvedValue(careerProfileFixture)
+  vi.mocked(getJdExtractionState).mockResolvedValue({ status: "idle", error: null })
   vi.mocked(getRoles).mockResolvedValue(structuredClone(roles))
   vi.spyOn(interviewFaker, "get").mockReturnValue(null)
 })
@@ -56,7 +62,7 @@ describe("Interview service", () => {
         durationMinutes: 30,
       },
     })
-    vi.mocked(getRoles).mockResolvedValue({ ...roles, activeRoleId: "missing" })
+    vi.mocked(getRoles).mockResolvedValue({ ...roles, activeTargetRoleId: "missing" })
     expect((await getInterviewPage()).setup.defaultConfiguration.targetRoleId).toBe("first")
     const session = {
       status: "opening" as const,
@@ -71,16 +77,21 @@ describe("Interview service", () => {
 
   it.each([
     [[], false, "available", undefined],
-    [roles.roles, false, "blocked", "profileIncomplete"],
-    [roles.roles.filter(({ id }) => id === "missing"), true, "blocked", "jobDescriptionMissing"],
+    [roles.targetRoles, false, "blocked", "profileIncomplete"],
+    [
+      roles.targetRoles.filter(({ id }) => id === "missing"),
+      true,
+      "blocked",
+      "jobDescriptionMissing",
+    ],
   ] as const)(
     "preserves empty and prerequisite availability",
     async (items, complete, status, reason) => {
       vi.mocked(getRoles).mockResolvedValue({
         ...roles,
-        roles: [...items],
-        profile: { exists: complete, complete },
+        targetRoles: [...items],
       })
+      vi.mocked(getProfile).mockResolvedValue(complete ? careerProfileFixture : null)
       const page = await getInterviewPage()
       expect(page.setup.availability).toEqual({ status, ...(reason ? { reason } : {}) })
       if (page.setup.targetRoles.length === 0)
@@ -97,7 +108,10 @@ describe("Interview service", () => {
   ] as const)(
     "prepares history for %s without changing the session",
     async (targetRoleId, complete, reason) => {
-      vi.mocked(getRoles).mockResolvedValue({ ...roles, profile: { exists: true, complete } })
+      vi.mocked(getRoles).mockResolvedValue(roles)
+      vi.mocked(getProfile).mockResolvedValue(
+        complete ? careerProfileFixture : { ...careerProfileFixture, skills: [] },
+      )
       vi.mocked(interviewFaker.get).mockRestore()
       interviewFaker.start(interviewFixture.configuration)
       const before = interviewFaker.get()

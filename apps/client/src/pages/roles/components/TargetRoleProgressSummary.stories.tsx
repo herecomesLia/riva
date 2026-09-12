@@ -10,8 +10,13 @@ const meta = preview.meta({
 
 function argsFor(scenario: Parameters<typeof createRoleStoryResponse>[0]) {
   const response = createRoleStoryResponse(scenario)
-  const role = response.roles[0]!
-  return { isCurrent: role.id === response.activeRoleId, role }
+  const role = response.targetRoles[0]!
+  return {
+    isCurrent: role.id === response.activeTargetRoleId,
+    role,
+    jdTask: response.jdTasksByRoleId[role.id],
+    analysis: response.matchingByRoleId[role.id],
+  }
 }
 
 export const ExtractedJobDescription = meta.story({
@@ -36,6 +41,8 @@ const archivedResponse = createRoleStoryResponse("archivedRoles")
 export const ArchivedRole = meta.story({
   args: {
     isCurrent: false,
-    role: archivedResponse.roles.find((role) => role.isArchived)!,
+    jdTask: { status: "idle", error: null },
+    analysis: { status: "none" },
+    role: archivedResponse.targetRoles.find((role) => role.isArchived)!,
   },
 })

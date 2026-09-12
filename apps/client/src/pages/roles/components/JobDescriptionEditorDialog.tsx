@@ -1,3 +1,4 @@
+import { hasJobDescription } from "@/lib/job-description"
 import { useForm } from "@tanstack/react-form"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -16,7 +17,7 @@ import {
 import { Field, FieldControl, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
-import type { RoleView } from "@/models/target-role-workflow"
+import type { TargetRoleResponse } from "@/api/generated/models"
 
 import { getRolesActionErrorCode, type RolesActionErrorCode } from "../roles-errors"
 
@@ -35,7 +36,7 @@ export function JobDescriptionEditorDialog({
   onSave: (roleId: string, text: string) => Promise<void>
   onSaved: () => void
   open: boolean
-  role: RoleView | null
+  role: TargetRoleResponse | null
 }) {
   const { t } = useTranslation()
 
@@ -45,7 +46,7 @@ export function JobDescriptionEditorDialog({
         <DialogHeader className="border-b px-6 py-5 pr-14">
           <DialogTitle className="text-xl font-medium leading-tight">
             {t(
-              role?.jdState.status === "missing"
+              role && !hasJobDescription(role.jd)
                 ? "roles.jd.editor.addTitle"
                 : "roles.jd.editor.replaceTitle",
             )}
@@ -78,7 +79,7 @@ function JobDescriptionEditorForm({
   onOpenChange: (open: boolean) => void
   onSave: (roleId: string, text: string) => Promise<void>
   onSaved: () => void
-  role: RoleView
+  role: TargetRoleResponse
 }) {
   const { t } = useTranslation()
   const [saveError, setSaveError] = useState<RolesActionErrorCode | null>(null)

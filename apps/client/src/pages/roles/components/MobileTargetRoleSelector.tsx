@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { RoleView } from "@/models/target-role-workflow"
+import type { TargetRoleResponse } from "@/api/generated/models"
 
 import { RoleStatusBadges } from "./RoleStatusBadges"
 import { getRolesForCategory, type TargetRoleListCategory } from "./roles-list-utils"
@@ -26,8 +26,8 @@ export function MobileTargetRoleSelector({
   activeRoleId: string | null
   onCategoryChange: (category: TargetRoleListCategory) => void
   onSelectRole: (roleId: string) => void
-  roles: RoleView[]
-  selectedRole: RoleView | null
+  roles: TargetRoleResponse[]
+  selectedRole: TargetRoleResponse | null
 }) {
   const { t } = useTranslation()
   const activeCount = getRolesForCategory(roles, "active").length

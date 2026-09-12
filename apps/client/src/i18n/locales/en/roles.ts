@@ -331,6 +331,7 @@ export const roles = {
     experienced: "Experienced hire",
   },
   jobDescriptionStatus: {
+    loading: { label: "Loading" },
     missing: {
       label: "Not added",
       description: "No job description has been saved yet.",
@@ -349,6 +350,8 @@ export const roles = {
     },
   },
   matchingAnalysisStatus: {
+    blocked: { label: "Prerequisites required" },
+    loading: { label: "Loading" },
     none: {
       label: "Not generated",
       description: "This role does not have a match analysis yet.",

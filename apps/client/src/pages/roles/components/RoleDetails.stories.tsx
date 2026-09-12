@@ -17,10 +17,11 @@ function DetailsHarness({ initialTab = "overview" }: { initialTab?: TargetRoleTa
   return (
     <RoleDetails
       activeTab={activeTab}
-      activeRoleId={response.activeRoleId}
+      activeRoleId={response.activeTargetRoleId}
       onTabChange={setActiveTab}
-      profile={response.profile}
-      role={response.roles[0]!}
+      role={response.targetRoles[0]!}
+      jdTask={response.jdTasksByRoleId[response.targetRoles[0]!.id]}
+      analysis={response.matchingByRoleId[response.targetRoles[0]!.id]}
     />
   )
 }
@@ -28,14 +29,15 @@ function DetailsHarness({ initialTab = "overview" }: { initialTab?: TargetRoleTa
 function ArchivedDetailsHarness() {
   const [activeTab, setActiveTab] = useState<TargetRoleTab>("overview")
   const response = createRoleStoryResponse("archivedRoles")
-  const archivedRole = response.roles.find((role) => role.isArchived)!
+  const archivedRole = response.targetRoles.find((role) => role.isArchived)!
   return (
     <RoleDetails
       activeTab={activeTab}
-      activeRoleId={response.activeRoleId}
+      activeRoleId={response.activeTargetRoleId}
       onTabChange={setActiveTab}
-      profile={response.profile}
       role={archivedRole}
+      jdTask={response.jdTasksByRoleId[archivedRole.id]}
+      analysis={response.matchingByRoleId[archivedRole.id]}
     />
   )
 }

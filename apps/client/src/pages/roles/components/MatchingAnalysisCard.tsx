@@ -20,34 +20,24 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
-import type {
-  JdState,
-  MatchingAnalysisResult,
-  ProfileState,
-  RoleView,
-} from "@/models/target-role-workflow"
+import type { MatchingAnalysisResult, MatchingAnalysisState } from "@/mocks/models/role"
 
 export function MatchingAnalysisCard({
   onGenerate,
   onRetrySynchronization,
   pending,
-  profile,
-  role,
+  analysis,
   synchronizationError,
 }: {
   onGenerate?: () => void
   onRetrySynchronization?: () => void
   pending?: boolean
-  profile: ProfileState
-  role: RoleView
+  analysis: MatchingAnalysisState | undefined
   synchronizationError: boolean
 }) {
   const { t } = useTranslation()
-  const analysis = role.matchState
-  const status = analysis.status
-  const result =
-    analysis.status === "current" || analysis.status === "stale" ? analysis.result : null
-  const canGenerate = profile.exists && profile.complete && role.jdState.status === "ready"
+  const status = analysis?.status ?? "loading"
+  const result = analysis && "result" in analysis ? analysis.result : null
 
   return (
     <Card
@@ -87,20 +77,32 @@ export function MatchingAnalysisCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        {analysis.status === "stale" ? (
+        {synchronizationError ? (
+          <AnalysisGenerating
+            onRetrySynchronization={onRetrySynchronization}
+            pending={pending}
+            synchronizationError
+          />
+        ) : !analysis ? (
+          <Spinner />
+        ) : analysis.status === "blocked" ? (
+          <>
+            {analysis.result && (
+              <Alert>
+                <AlertTitle>{t("roles.matching.stale.title")}</AlertTitle>
+                <AlertDescription>{t("roles.matching.stale.description")}</AlertDescription>
+              </Alert>
+            )}
+            <MatchingPrerequisite reason={analysis.reason} />
+            {analysis.result && <MatchingAnalysisResultView result={analysis.result} />}
+          </>
+        ) : analysis.status === "stale" ? (
           <>
             <Alert>
               <AlertTitle>{t("roles.matching.stale.title")}</AlertTitle>
               <AlertDescription>{t("roles.matching.stale.description")}</AlertDescription>
             </Alert>
-            {!profile.exists ? (
-              <ProfilePrerequisite exists={false} />
-            ) : !profile.complete ? (
-              <ProfilePrerequisite exists />
-            ) : role.jdState.status !== "ready" ? (
-              <JobDescriptionPrerequisite status={role.jdState.status} />
-            ) : null}
-            {canGenerate && onGenerate && (
+            {onGenerate && (
               <div className="flex justify-end">
                 <Button disabled={pending} onClick={onGenerate} size="sm">
                   {pending ? (
@@ -114,19 +116,13 @@ export function MatchingAnalysisCard({
             )}
             <MatchingAnalysisResultView result={analysis.result} />
           </>
-        ) : !profile.exists ? (
-          <ProfilePrerequisite exists={false} />
-        ) : !profile.complete ? (
-          <ProfilePrerequisite exists />
-        ) : role.jdState.status !== "ready" ? (
-          <JobDescriptionPrerequisite status={role.jdState.status} />
         ) : analysis.status === "none" ? (
           <AnalysisEmpty onGenerate={onGenerate} pending={pending} />
         ) : analysis.status === "generating" ? (
           <AnalysisGenerating
             onRetrySynchronization={onRetrySynchronization}
             pending={pending}
-            synchronizationError={synchronizationError}
+            synchronizationError={false}
           />
         ) : analysis.status === "failed" ? (
           <AnalysisFailed failureReason={analysis.reason} onRetry={onGenerate} pending={pending} />
@@ -155,7 +151,24 @@ function ProfilePrerequisite({ exists }: { exists: boolean }) {
   )
 }
 
-function JobDescriptionPrerequisite({ status }: { status: Exclude<JdState["status"], "ready"> }) {
+function MatchingPrerequisite({
+  reason,
+}: {
+  reason: Extract<MatchingAnalysisState, { status: "blocked" }>["reason"]
+}) {
+  if (reason === "profileMissing" || reason === "profileIncomplete") {
+    return <ProfilePrerequisite exists={reason === "profileIncomplete"} />
+  }
+  const status =
+    reason === "jobDescriptionMissing"
+      ? "missing"
+      : reason === "jobDescriptionFailed"
+        ? "failed"
+        : "extracting"
+  return <JobDescriptionPrerequisite status={status} />
+}
+
+function JobDescriptionPrerequisite({ status }: { status: "missing" | "failed" | "extracting" }) {
   const { t } = useTranslation()
   return (
     <Alert>

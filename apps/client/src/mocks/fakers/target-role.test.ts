@@ -1,3 +1,9 @@
+import { getCareerProfile } from "@/api/generated/endpoints/career-profile/career-profile"
+import {
+  listTargetRoles,
+  getJdExtractionState,
+} from "@/api/generated/endpoints/target-roles/target-roles"
+import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { createRoleFaker } from "@/mocks/fakers/target-role"
@@ -11,10 +17,26 @@ import {
   textRoleFixture,
 } from "@/mocks/fixtures/target-role"
 
+vi.mock("@/api/generated/endpoints/target-roles/target-roles", () => ({
+  listTargetRoles: vi.fn(),
+  getJdExtractionState: vi.fn(),
+}))
+vi.mock("@/api/generated/endpoints/career-profile/career-profile", () => ({
+  getCareerProfile: vi.fn(),
+}))
+
+function createFaker(initial: Parameters<typeof createRoleFaker>[0]) {
+  const faker = createRoleFaker(initial)
+  vi.mocked(listTargetRoles).mockImplementation(faker.list)
+  vi.mocked(getJdExtractionState).mockImplementation(faker.getJdExtractionState)
+  vi.mocked(getCareerProfile).mockResolvedValue(careerProfileFixture)
+  return faker
+}
+
 describe("targetRoleFaker", () => {
   afterEach(() => vi.restoreAllMocks())
   it("keeps CRUD and active-role lifecycle state consistent", async () => {
-    const faker = createRoleFaker({ targetRoles: [], activeTargetRoleId: null })
+    const faker = createFaker({ targetRoles: [], activeTargetRoleId: null })
 
     const created = await faker.create({ title: "Staff Platform Engineer" })
     let state = await faker.list()
@@ -35,7 +57,7 @@ describe("targetRoleFaker", () => {
   })
 
   it("rejects activation of an archived role without changing active state", async () => {
-    const faker = createRoleFaker(roleListFixture)
+    const faker = createFaker(roleListFixture)
 
     await faker.archive(targetRoleFixture.id)
     await expect(faker.setActive({ targetRoleId: targetRoleFixture.id })).rejects.toMatchObject({
@@ -48,7 +70,7 @@ describe("targetRoleFaker", () => {
   })
 
   it("patches role fields while replacing provided nested JD sections", async () => {
-    const faker = createRoleFaker(roleListFixture)
+    const faker = createFaker(roleListFixture)
 
     const updated = await faker.update(targetRoleFixture.id, { company: null })
     expect(updated).toMatchObject({
@@ -79,7 +101,7 @@ describe("targetRoleFaker", () => {
   })
 
   it("recognizes and creates a role with mock JD content", async () => {
-    const faker = createRoleFaker(roleListFixture)
+    const faker = createFaker(roleListFixture)
     const role = await faker.recognizeRole({ sourceType: "text", text: "Job posting" })
     expect(role).toMatchObject({ ...textRoleFixture, jd: extractedJdFixture })
     expect((await faker.list()).targetRoles).toContainEqual(role)
@@ -87,7 +109,7 @@ describe("targetRoleFaker", () => {
 
   it("advances extraction by elapsed time and preserves JD when aborted", async () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(0)
-    const faker = createRoleFaker({ targetRoles: [], activeTargetRoleId: null })
+    const faker = createFaker({ targetRoles: [], activeTargetRoleId: null })
     const role = await faker.create({ title: "Staff Platform Engineer" })
     await faker.extractJd(role.id, { text: "JD text" })
     await expect(faker.getJdExtractionState(role.id)).resolves.toEqual({
@@ -128,7 +150,7 @@ describe("targetRoleFaker", () => {
 
   it("keeps failure stable until retry or manual update", async () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(0)
-    const faker = createRoleFaker(roleListFixture)
+    const faker = createFaker(roleListFixture)
     await faker.extractJd(targetRoleFixture.id, { text: jdFailInput })
     now.mockReturnValue(2500)
     const failed = { status: "failed", error: { code: "invalid_output", message: jdFailReason } }
@@ -160,7 +182,8 @@ describe("targetRoleFaker", () => {
   })
 
   it("advances a match from running to an idempotent fixed success", async () => {
-    const faker = createRoleFaker(roleListFixture)
+    const now = vi.spyOn(Date, "now").mockReturnValue(0)
+    const faker = createFaker(roleListFixture)
 
     await expect(faker.getMatch(targetRoleFixture.id)).resolves.toEqual({ status: "none" })
     await expect(faker.match(targetRoleFixture.id)).resolves.toEqual({
@@ -168,13 +191,14 @@ describe("targetRoleFaker", () => {
     })
 
     await expect(faker.getMatch(targetRoleFixture.id)).resolves.toEqual({ status: "generating" })
-    const success = await faker.pollMatch(targetRoleFixture.id)
+    now.mockReturnValue(1000)
+    const success = await faker.getMatch(targetRoleFixture.id)
     expect(success).toEqual({ status: "current", result: matchResultFixture })
     await expect(faker.getMatch(targetRoleFixture.id)).resolves.toEqual(success)
   })
 
   it("clears workflow state without deleting the formal role", async () => {
-    const faker = createRoleFaker({ targetRoles: [], activeTargetRoleId: null })
+    const faker = createFaker({ targetRoles: [], activeTargetRoleId: null })
     const role = await faker.create({ title: "Staff Platform Engineer" })
     await faker.extractJd(role.id, { text: "JD text" })
     await faker.match(role.id)
@@ -185,14 +209,19 @@ describe("targetRoleFaker", () => {
       status: "idle",
       error: null,
     })
-    await expect(faker.getMatch(role.id)).resolves.toEqual({ status: "none" })
+    await expect(faker.getMatch(role.id)).resolves.toEqual({
+      status: "blocked",
+      reason: "jobDescriptionMissing",
+    })
     expect((await faker.list()).targetRoles).toContainEqual(role)
   })
 
   it("keeps a successful match stale across JD changes until regeneration", async () => {
-    const faker = createRoleFaker(roleListFixture)
+    const now = vi.spyOn(Date, "now").mockReturnValue(0)
+    const faker = createFaker(roleListFixture)
     await faker.match(targetRoleFixture.id)
-    await faker.pollMatch(targetRoleFixture.id)
+    now.mockReturnValue(1000)
+    await faker.getMatch(targetRoleFixture.id)
 
     await faker.updateJd(targetRoleFixture.id, { softSkills: ["Stakeholder management"] })
     await faker.staleMatch(targetRoleFixture.id)
@@ -207,7 +236,8 @@ describe("targetRoleFaker", () => {
     await expect(faker.getMatch(targetRoleFixture.id)).resolves.toEqual({
       status: "generating",
     })
-    await expect(faker.pollMatch(targetRoleFixture.id)).resolves.toEqual({
+    now.mockReturnValue(2000)
+    await expect(faker.getMatch(targetRoleFixture.id)).resolves.toEqual({
       status: "current",
       result: matchResultFixture,
     })
@@ -215,11 +245,14 @@ describe("targetRoleFaker", () => {
     await faker.extractJd(targetRoleFixture.id, { text: "Replacement JD" })
     await faker.staleMatch(targetRoleFixture.id)
     await expect(faker.getMatch(targetRoleFixture.id)).resolves.toEqual({
-      status: "stale",
+      status: "blocked",
+      reason: "jobDescriptionExtracting",
       result: matchResultFixture,
     })
 
     await faker.delete(targetRoleFixture.id)
-    await expect(faker.getMatch(targetRoleFixture.id)).resolves.toEqual({ status: "none" })
+    await expect(faker.getMatch(targetRoleFixture.id)).rejects.toMatchObject({
+      code: "resource.not_found",
+    })
   })
 })

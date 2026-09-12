@@ -1,8 +1,10 @@
+import type { RoleResources } from "../types"
 import { useTranslation } from "react-i18next"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { JdField, ProfileState, RoleView } from "@/models/target-role-workflow"
+import type { JdField } from "@/pages/roles/types"
+import type { TargetRoleResponse } from "@/api/generated/models"
 
 import { JobDescriptionCard } from "./JobDescriptionCard"
 import { MatchingAnalysisCard } from "./MatchingAnalysisCard"
@@ -32,7 +34,8 @@ export function RoleDetails({
   activeRoleId,
   onTabChange,
   pending,
-  profile,
+  jdTask,
+  analysis,
   role,
   jdSynchronizationError = false,
   matchSynchronizationError = false,
@@ -44,8 +47,9 @@ export function RoleDetails({
   matchSynchronizationError?: boolean
   onTabChange: (tab: TargetRoleTab) => void
   pending?: boolean
-  profile: ProfileState
-  role: RoleView
+  jdTask: RoleResources["jdTasksByRoleId"][string]
+  analysis: RoleResources["matchingByRoleId"][string]
+  role: TargetRoleResponse
 }) {
   const { t } = useTranslation()
   const isCurrent = role.id === activeRoleId
@@ -116,6 +120,7 @@ export function RoleDetails({
                 onAbortExtraction={actions?.abortJdExtraction}
                 pending={pending}
                 role={role}
+                jdTask={jdTask}
                 synchronizationError={jdSynchronizationError}
               />
             )}
@@ -126,8 +131,7 @@ export function RoleDetails({
                 onGenerate={actions?.generateMatch}
                 onRetrySynchronization={actions?.retryMatchSynchronization}
                 pending={pending}
-                profile={profile}
-                role={role}
+                analysis={analysis}
                 synchronizationError={matchSynchronizationError}
               />
             )}

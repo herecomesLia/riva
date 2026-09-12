@@ -1,10 +1,10 @@
-import type { RoleView } from "@/models/target-role-workflow"
+import type { TargetRoleResponse } from "@/api/generated/models"
 
 export type TargetRoleListCategory = "active" | "archived"
 
 export function getRolesForCategory(
-  roles: RoleView[],
+  roles: TargetRoleResponse[],
   category: TargetRoleListCategory,
-): RoleView[] {
+): TargetRoleResponse[] {
   return roles.filter((role) => (category === "archived" ? role.isArchived : !role.isArchived))
 }

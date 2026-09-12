@@ -315,6 +315,7 @@ export const roles = {
     experienced: "社招",
   },
   jobDescriptionStatus: {
+    loading: { label: "加载中" },
     missing: {
       label: "未添加",
       description: "尚未保存岗位 JD。",
@@ -333,6 +334,8 @@ export const roles = {
     },
   },
   matchingAnalysisStatus: {
+    blocked: { label: "前置条件未满足" },
+    loading: { label: "加载中" },
     none: {
       label: "未生成",
       description: "当前岗位还没有匹配分析。",

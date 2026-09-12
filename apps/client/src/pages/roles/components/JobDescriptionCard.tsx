@@ -1,3 +1,4 @@
+import type { RoleResources } from "../types"
 import {
   AwardIcon,
   BrainIcon,
@@ -21,8 +22,9 @@ import type {
   HardSkillsResponse,
   JobDescriptionResponse,
   JobRequirementsResponse,
+  TargetRoleResponse,
 } from "@/api/generated/models"
-import type { JdField, RoleView } from "@/models/target-role-workflow"
+import type { JdField } from "@/pages/roles/types"
 
 export function JobDescriptionCard({
   onEdit,
@@ -32,6 +34,7 @@ export function JobDescriptionCard({
   onAbortExtraction,
   pending,
   role,
+  jdTask,
   synchronizationError,
 }: {
   onEdit?: () => void
@@ -40,12 +43,12 @@ export function JobDescriptionCard({
   onRetryExtraction?: () => void
   onAbortExtraction?: () => void
   pending?: boolean
-  role: RoleView
+  jdTask: RoleResources["jdTasksByRoleId"][string]
+  role: TargetRoleResponse
   synchronizationError: boolean
 }) {
   const { t } = useTranslation()
-  const { jdState } = role
-  const showSections = jdState.status === "missing" || jdState.status === "ready"
+  const showSections = jdTask?.status === "idle" && !synchronizationError
 
   return (
     <Card className="bg-card shadow-none ring-border" data-testid="job-description-card" size="sm">
@@ -74,18 +77,27 @@ export function JobDescriptionCard({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        {jdState.status === "extracting" && (
+        {synchronizationError ? (
           <ExtractingState
-            phase={jdState.phase}
+            phase="running"
+            onRetrySynchronization={onRetrySynchronization}
+            pending={pending}
+            synchronizationError
+          />
+        ) : !jdTask ? (
+          <Spinner />
+        ) : jdTask.status !== "idle" && jdTask.status !== "failed" ? (
+          <ExtractingState
+            phase={jdTask.status}
             onAbortExtraction={onAbortExtraction}
             onRetrySynchronization={onRetrySynchronization}
             pending={pending}
             synchronizationError={synchronizationError}
           />
-        )}
-        {jdState.status === "failed" && (
+        ) : null}
+        {!synchronizationError && jdTask?.status === "failed" && (
           <FailedState
-            failureReason={jdState.reason}
+            failureReason={jdTask.error.message}
             onEdit={onEdit}
             onRetryExtraction={onRetryExtraction}
             pending={pending}

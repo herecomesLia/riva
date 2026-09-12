@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import type { RoleView } from "@/models/target-role-workflow"
+import type { TargetRoleResponse } from "@/api/generated/models"
 
 import type { RoleDetailsActions } from "./RoleDetails"
 
@@ -25,7 +25,7 @@ export function TargetRoleOverview({
   actions?: RoleDetailsActions
   isCurrent: boolean
   pending?: boolean
-  role: RoleView
+  role: TargetRoleResponse
 }) {
   const { t } = useTranslation()
 
