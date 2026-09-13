@@ -188,7 +188,7 @@ class RoleMatchScores(BaseModel):
     hard_skills: float | None
     preferred_qualifications: float | None
     responsibilities: float | None
-    overall: float | None
+    overall: float
 
 
 class RoleMatchingReport(BaseModel):
@@ -209,9 +209,8 @@ class RoleMatchingReport(BaseModel):
     )
 
 
-class RoleMatchingResult(BaseModel):
-    score: float | None
-    report: RoleMatchingReport
+class RoleMatchingResult(RoleMatchingReport):
+    score: float
 
 
 type _MatchingModule = Literal[
@@ -495,7 +494,9 @@ def _calculate_matching_scores(
         if score is not None:
             total += score * module_weights[module]
             weight += module_weights[module]
-    return RoleMatchScores(**module_scores, overall=total / weight if weight else None)
+    if weight == 0:
+        raise ValueError("Role matching requires at least one scoring criterion.")
+    return RoleMatchScores(**module_scores, overall=total / weight)
 
 
 def _build_report_payload(
@@ -603,7 +604,7 @@ class RoleMatchingAnalyzer:
             criteria=criteria, evaluation=evaluation, scores=scores, profile=profile
         )
         report = await self._generate_report(report_payload)
-        return RoleMatchingResult(score=scores.overall, report=report)
+        return RoleMatchingResult(**report.model_dump(), score=scores.overall)
 
     async def _evaluate(
         self, criteria: MatchingCriteria, profile: CareerProfileContent

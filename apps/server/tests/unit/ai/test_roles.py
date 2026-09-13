@@ -391,10 +391,10 @@ def test_overall_renormalizes_present_modules():
     ["requirements", "hard_skills", "preferred_qualifications", "responsibilities"],
 )
 def test_missing_module_is_distinct_from_zero(module):
-    empty = _calculate_matching_scores(
-        _criteria(module, []), RoleMatchingEvaluation(matches=[])
-    )
-    assert all(value is None for value in empty.model_dump().values())
+    with pytest.raises(ValueError, match="at least one scoring criterion"):
+        _calculate_matching_scores(
+            _criteria(module, []), RoleMatchingEvaluation(matches=[])
+        )
     zero = _calculate_matching_scores(
         _criteria(module, ["a"]), RoleMatchingEvaluation(matches=[_match("a", 0)])
     )
