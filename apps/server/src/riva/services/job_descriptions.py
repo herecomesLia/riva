@@ -61,10 +61,9 @@ class JobDescriptionService:
         if any(
             getattr(jd, field) != value for field, value in previous_content.items()
         ):
-            jd.updated_at = utc_now()
+            jd.updated_at = role.updated_at = utc_now()
         jd.extraction_job_id = None
         jd.extraction_error_code = None
-        role.updated_at = utc_now()
         await self.session.commit()
         return role
 

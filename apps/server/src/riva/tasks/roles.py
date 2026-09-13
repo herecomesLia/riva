@@ -75,14 +75,19 @@ async def _can_write_jd_extraction(
 async def _apply_jd_extraction(
     session: AsyncSession, jd: JobDescription, content: JobDescriptionContent
 ) -> None:
+    content_changed = any(
+        getattr(jd, field) != getattr(content, field)
+        for field in JobDescriptionContent.model_fields
+    )
     for field in JobDescriptionContent.model_fields:
         setattr(jd, field, getattr(content, field))
-    jd.updated_at = utc_now()
     jd.extraction_job_id = None
     jd.extraction_error_code = None
-    await session.execute(
-        update(Role).where(Role.id == jd.role_id).values(updated_at=utc_now())
-    )
+    if content_changed:
+        jd.updated_at = utc_now()
+        await session.execute(
+            update(Role).where(Role.id == jd.role_id).values(updated_at=jd.updated_at)
+        )
 
 
 @app.task(

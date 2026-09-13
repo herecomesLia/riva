@@ -250,6 +250,32 @@ async def test_late_extraction_cannot_write_after_lifecycle_change(
             assert role.jd.extraction_error_code is None
 
 
+async def test_identical_extraction_preserves_content_versions(
+    extraction_database,
+    matching_role,
+    extract,
+    run_extraction_worker,
+):
+    async with extraction_database.sessionmaker() as session:
+        role = await session.get(Role, matching_role)
+        extract.return_value = JobDescriptionContent.model_validate(
+            role.jd, from_attributes=True
+        )
+        versions = (role.updated_at, role.jd.updated_at)
+        saved = _saved_matching(role.matching)
+        await JobDescriptionService(session).extract_text(role, text="Same JD")
+        job_id = role.jd.extraction_job_id
+    await run_extraction_worker()
+    async with extraction_database.sessionmaker() as session:
+        role = await session.get(Role, matching_role)
+        assert (role.updated_at, role.jd.updated_at) == versions
+        assert _saved_matching(role.matching) == saved
+        assert role.matching.jd_updated_at == role.jd.updated_at
+        assert role.jd.extraction_job_id is None
+        assert role.jd.extraction_error_code is None
+        assert await get_job_status(session, job_id) is JobStatus.SUCCEEDED
+
+
 MATCHING_RESULT = RoleMatchingResult(
     score=75,
     core_requirements="Backend development",

@@ -93,7 +93,10 @@ async def test_unchanged_jd_and_role_metadata_preserve_jd_version(
     async with extraction_database.sessionmaker() as session:
         role = await session.get(Role, extraction_role)
         previous = role.jd.updated_at
+        previous_role_updated_at = role.updated_at
         await JobDescriptionService(session).update(role, **changes)
+        await session.refresh(role)
+        assert role.updated_at == previous_role_updated_at
         from riva.models import User
 
         user = await session.get(User, role.user_id)
