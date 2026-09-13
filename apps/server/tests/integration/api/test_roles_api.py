@@ -204,13 +204,13 @@ async def _fail_extraction(
     async with database.sessionmaker() as session:
         role = await session.get(Role, UUID(role_id))
         assert role is not None
-        role.jd.extraction_error_code = code
+        role.jd_extraction.error_code = code
         # The job status triggers need Procrastinate's schema on the search path.
         search_path = await session.scalar(text("SHOW search_path"))
         await session.execute(text("SET LOCAL search_path TO procrastinate, public"))
         await session.execute(
             text("UPDATE procrastinate_jobs SET status = 'failed' WHERE id = :id"),
-            {"id": role.jd.extraction_job_id},
+            {"id": role.jd_extraction.job_id},
         )
         await session.execute(
             text("SELECT set_config('search_path', :path, true)"),
@@ -396,11 +396,11 @@ async def test_matching_failure_public_state(client, database, code, message):
     assert (await client.post(path, headers=ORIGIN_HEADERS)).status_code == 202
     async with database.sessionmaker() as session:
         stored = await session.get(Role, UUID(role["id"]))
-        stored.matching.error_code = code
+        stored.matching_analysis.error_code = code
         await session.execute(text("SET LOCAL search_path TO procrastinate, public"))
         await session.execute(
             text("UPDATE procrastinate_jobs SET status = 'failed' WHERE id = :id"),
-            {"id": stored.matching.job_id},
+            {"id": stored.matching_analysis.job_id},
         )
         await session.commit()
     response = await client.get(path)

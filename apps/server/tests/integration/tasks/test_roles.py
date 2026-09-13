@@ -21,6 +21,7 @@ from riva.models.role import (
     JobRequirements,
     Role,
     RoleMatching,
+    RoleMatchingAnalysis,
     RoleMatchingResult,
 )
 from riva.services.job_descriptions import JobDescriptionService
@@ -107,7 +108,7 @@ async def test_failure_preserves_content_and_can_be_resolved(
             previous_updated_at = role.updated_at
             previous_jd_updated_at = role.jd.updated_at
             await JobDescriptionService(session).extract_text(role, text="Source JD")
-            job_id = role.jd.extraction_job_id
+            job_id = role.jd_extraction.job_id
         state = await JobDescriptionService(reader).get_extraction_state(old_role)
         assert state.status is TaskStatus.QUEUED
         await reader.commit()
@@ -118,7 +119,7 @@ async def test_failure_preserves_content_and_can_be_resolved(
         assert state.status is TaskStatus.FAILED
         assert state.error_code is code
         assert old_role.jd.responsibilities == ["Original"]
-        assert old_role.jd.extraction_job_id == job_id
+        assert old_role.jd_extraction.job_id == job_id
         assert old_role.jd.updated_at == previous_jd_updated_at
         await reader.refresh(old_role, attribute_names=["updated_at"])
         assert old_role.updated_at == previous_updated_at
@@ -131,8 +132,8 @@ async def test_failure_preserves_content_and_can_be_resolved(
             await service.update(role, responsibilities=["Manual"])
         else:
             await service.retry_extraction(role)
-            assert role.jd.extraction_job_id == job_id
-        assert role.jd.extraction_error_code is None
+            assert role.jd_extraction.job_id == job_id
+        assert role.jd_extraction.error_code is None
 
     if resolution == "retry":
         extract.side_effect = None
@@ -142,8 +143,8 @@ async def test_failure_preserves_content_and_can_be_resolved(
 
     async with extraction_database.sessionmaker() as session:
         role = await session.get(Role, extraction_role)
-        assert role.jd.extraction_job_id is None
-        assert role.jd.extraction_error_code is None
+        assert role.jd_extraction.job_id is None
+        assert role.jd_extraction.error_code is None
         assert role.updated_at > previous_updated_at
         assert role.jd.updated_at > previous_jd_updated_at
         if resolution == "manual":
@@ -171,7 +172,7 @@ async def test_late_extraction_cannot_write_after_lifecycle_change(
         role = await session.get(Role, extraction_role)
         user_id = role.user_id
         await JobDescriptionService(session).extract_text(role, text="Source JD")
-        job_id = role.jd.extraction_job_id
+        job_id = role.jd_extraction.job_id
         # Execute the task directly so a late LLM result can arrive after abort_requested.
         await session.execute(text("SET LOCAL search_path TO procrastinate, public"))
         await session.execute(
@@ -214,7 +215,7 @@ async def test_late_extraction_cannot_write_after_lifecycle_change(
                 service = JobDescriptionService(session)
                 if action == "supersede":
                     await service.extract_text(role, text="Replacement JD")
-                    current_job_id = role.jd.extraction_job_id
+                    current_job_id = role.jd_extraction.job_id
                     assert current_job_id != job_id
                 elif action == "abort":
                     await service.abort_extraction(role)
@@ -246,8 +247,8 @@ async def test_late_extraction_cannot_write_after_lifecycle_change(
         else:
             role = await session.get(Role, extraction_role)
             assert role.jd.responsibilities == ["Original"]
-            assert role.jd.extraction_job_id == current_job_id
-            assert role.jd.extraction_error_code is None
+            assert role.jd_extraction.job_id == current_job_id
+            assert role.jd_extraction.error_code is None
 
 
 async def test_identical_extraction_preserves_content_versions(
@@ -264,15 +265,15 @@ async def test_identical_extraction_preserves_content_versions(
         versions = (role.updated_at, role.jd.updated_at)
         saved = _saved_matching(role.matching)
         await JobDescriptionService(session).extract_text(role, text="Same JD")
-        job_id = role.jd.extraction_job_id
+        job_id = role.jd_extraction.job_id
     await run_extraction_worker()
     async with extraction_database.sessionmaker() as session:
         role = await session.get(Role, matching_role)
         assert (role.updated_at, role.jd.updated_at) == versions
         assert _saved_matching(role.matching) == saved
         assert role.matching.jd_updated_at == role.jd.updated_at
-        assert role.jd.extraction_job_id is None
-        assert role.jd.extraction_error_code is None
+        assert role.jd_extraction.job_id is None
+        assert role.jd_extraction.error_code is None
         assert await get_job_status(session, job_id) is JobStatus.SUCCEEDED
 
 
@@ -338,7 +339,7 @@ async def test_matching_failure_preserves_result_and_manual_restart_succeeds(
         expected_versions = (profile.updated_at, role.jd.updated_at)
         previous = _saved_matching(role.matching)
         await RoleService(session).start_matching_analysis(user, role.id)
-        job_id = role.matching.job_id
+        job_id = role.matching_analysis.job_id
         assert _saved_matching(role.matching) == previous
     analyze.side_effect = failure
     await run_extraction_worker()
@@ -350,8 +351,8 @@ async def test_matching_failure_preserves_result_and_manual_restart_succeeds(
         assert (state.status, state.error_code) == (TaskStatus.FAILED, code)
         assert _saved_matching(role.matching) == previous
         await service.start_matching_analysis(user, role.id)
-        assert role.matching.job_id != job_id
-        assert role.matching.error_code is None
+        assert role.matching_analysis.job_id != job_id
+        assert role.matching_analysis.error_code is None
         assert _saved_matching(role.matching) == previous
     analyze.side_effect = None
     await run_extraction_worker()
@@ -363,8 +364,8 @@ async def test_matching_failure_preserves_result_and_manual_restart_succeeds(
             role.matching.jd_updated_at,
         ) == expected_versions
         assert role.matching.generated_at > previous[3]
-        assert role.matching.job_id is None
-        assert role.matching.error_code is None
+        assert role.matching_analysis.job_id is None
+        assert role.matching_analysis.error_code is None
     profile_input, jd_input = analyze.await_args.args
     assert isinstance(profile_input, CareerProfileContent)
     assert profile_input.skills == ["Python"]
@@ -390,7 +391,7 @@ async def test_matching_late_completion_respects_ownership_and_input_snapshots(
         versions = (profile.updated_at, role.jd.updated_at)
         previous = _saved_matching(role.matching)
         await RoleService(session).start_matching_analysis(user, role.id)
-        job_id = role.matching.job_id
+        job_id = role.matching_analysis.job_id
         await session.execute(text("SET LOCAL search_path TO procrastinate, public"))
         await session.execute(
             text("UPDATE procrastinate_jobs SET status = 'doing' WHERE id = :id"),
@@ -434,7 +435,7 @@ async def test_matching_late_completion_respects_ownership_and_input_snapshots(
                 service = RoleService(session)
                 if action == "supersede":
                     await service.start_matching_analysis(user, role.id)
-                    current_job_id = role.matching.job_id
+                    current_job_id = role.matching_analysis.job_id
                     assert current_job_id != job_id
                 elif action == "abort":
                     await service.abort_matching_analysis(user, role.id)
@@ -452,7 +453,7 @@ async def test_matching_late_completion_respects_ownership_and_input_snapshots(
                     await JobDescriptionService(session).update(
                         role, responsibilities=["New JD"]
                     )
-                    assert role.matching.job_id == job_id
+                    assert role.matching_analysis.job_id == job_id
                     assert _saved_matching(role.matching) == previous
                 assert not running.done()
             release.set()
@@ -466,6 +467,7 @@ async def test_matching_late_completion_respects_ownership_and_input_snapshots(
         await asyncio.gather(running, return_exceptions=True)
     async with extraction_database.sessionmaker() as session:
         matching = await session.get(RoleMatching, matching_role)
+        analysis = await session.get(RoleMatchingAnalysis, matching_role)
         if action == "delete":
             assert matching is None
             assert await session.get(JobDescription, matching_role) is None
@@ -473,12 +475,12 @@ async def test_matching_late_completion_respects_ownership_and_input_snapshots(
         elif action == "edit-inputs" and not fails:
             assert matching.result == analyze.return_value
             assert (matching.profile_updated_at, matching.jd_updated_at) == versions
-            assert matching.job_id is None
+            assert analysis.job_id is None
         else:
             assert _saved_matching(matching) == previous
-            assert matching.error_code == (
+            assert analysis.error_code == (
                 TaskErrorCode.INVALID_OUTPUT if action == "edit-inputs" else None
             )
-            assert matching.job_id == (
+            assert analysis.job_id == (
                 current_job_id if action == "supersede" else job_id
             )

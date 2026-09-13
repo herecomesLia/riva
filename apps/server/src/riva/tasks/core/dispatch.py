@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from riva.tasks.core.app import TASK_SCHEMA, app
 from riva.tasks.errors import TaskError
 from riva.tasks.registry import Task
-from riva.tasks.types import JobStatus
+from riva.tasks.types import JobStatus, TaskErrorCode, TaskState, TaskStatus
 from riva.utils import utc_now
 
 
@@ -53,6 +53,24 @@ async def get_job_status(session: AsyncSession, job_id: int) -> JobStatus:
         Status.ABORTED: JobStatus.ABORTED,
         Status.CANCELLED: JobStatus.CANCELLED,
     }[status]
+
+
+async def get_task_state(
+    session: AsyncSession, job_id: int | None, error_code: TaskErrorCode | None
+) -> TaskState:
+    """Read task state while the caller holds its operation row lock."""
+    if job_id is None:
+        return TaskState(TaskStatus.IDLE)
+    status = await get_job_status(session, job_id)
+    if status is JobStatus.FAILED:
+        return TaskState(TaskStatus.FAILED, error_code or TaskErrorCode.INTERNAL_ERROR)
+    return TaskState(
+        {
+            JobStatus.QUEUED: TaskStatus.QUEUED,
+            JobStatus.RUNNING: TaskStatus.RUNNING,
+            JobStatus.ABORTING: TaskStatus.ABORTING,
+        }.get(status, TaskStatus.IDLE)
+    )
 
 
 async def retry_job(session: AsyncSession, job_id: int) -> None:

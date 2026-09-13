@@ -1,6 +1,12 @@
 from riva.tasks.core.app import app
 from riva.tasks.core.context import TaskResources, get_task_resources
-from riva.tasks.core.dispatch import cancel_job, defer_job, get_job_status, retry_job
+from riva.tasks.core.dispatch import (
+    cancel_job,
+    defer_job,
+    get_job_status,
+    get_task_state,
+    retry_job,
+)
 from riva.tasks.core.schema import reset_task_schema, setup_task_schema
 from riva.tasks.core.worker import run_worker
 from riva.tasks.errors import TaskError
@@ -20,6 +26,7 @@ __all__ = [
     "defer_job",
     "get_job_status",
     "get_task_resources",
+    "get_task_state",
     "reset_task_schema",
     "retry_job",
     "run_worker",

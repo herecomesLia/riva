@@ -122,21 +122,21 @@ async def test_matching_rejects_active_extraction_without_changing_matching(
         role = await session.get(Role, extraction_role)
         user = await session.get(User, role.user_id)
         session.add(CareerProfile(user_id=user.id))
-        role.matching.error_code = TaskErrorCode.INVALID_OUTPUT
+        role.matching_analysis.error_code = TaskErrorCode.INVALID_OUTPUT
         await JobDescriptionService(session).extract_text(role, text="JD")
         previous_version = role.jd.updated_at
         await session.execute(text("SET LOCAL search_path TO procrastinate, public"))
         await session.execute(
             text("UPDATE procrastinate_jobs SET status = :status WHERE id = :id"),
-            {"status": status, "id": role.jd.extraction_job_id},
+            {"status": status, "id": role.jd_extraction.job_id},
         )
         await session.commit()
         with pytest.raises(ConflictError):
             await RoleService(session).start_matching_analysis(user, role.id)
         await session.rollback()
         role = await session.get(Role, extraction_role)
-        assert role.matching.job_id is None
-        assert role.matching.error_code is TaskErrorCode.INVALID_OUTPUT
+        assert role.matching_analysis.job_id is None
+        assert role.matching_analysis.error_code is TaskErrorCode.INVALID_OUTPUT
         assert role.jd.updated_at == previous_version
 
 
@@ -152,4 +152,4 @@ async def test_matching_requires_profile_before_dispatch(
             await RoleService(session).start_matching_analysis(user, role.id)
         await session.rollback()
         role = await session.get(Role, extraction_role)
-        assert role.matching.job_id is None
+        assert role.matching_analysis.job_id is None

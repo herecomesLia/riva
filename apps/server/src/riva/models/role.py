@@ -115,15 +115,6 @@ class JobDescription(Base):
         ForeignKey("roles.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    extraction_job_id: Mapped[int | None] = mapped_column(BigInteger)
-    extraction_error_code: Mapped[TaskErrorCode | None] = mapped_column(
-        Enum(
-            TaskErrorCode,
-            values_callable=lambda enum: [member.value for member in enum],
-            native_enum=False,
-            validate_strings=True,
-        ),
-    )
     responsibilities: Mapped[list[NonBlankStr]] = mapped_column(
         PydanticJSONB(list[NonBlankStr]),
         default=list,
@@ -156,6 +147,23 @@ class JobDescription(Base):
     )
 
 
+class JobDescriptionExtraction(Base):
+    __tablename__ = "job_description_extractions"
+
+    role_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
+    )
+    job_id: Mapped[int | None] = mapped_column(BigInteger)
+    error_code: Mapped[TaskErrorCode | None] = mapped_column(
+        Enum(
+            TaskErrorCode,
+            values_callable=lambda enum: [member.value for member in enum],
+            native_enum=False,
+            validate_strings=True,
+        )
+    )
+
+
 class RoleMatchingReport(BaseModel):
     core_requirements: NonBlankStr = Field(
         description="Summary of the role's core requirements."
@@ -178,8 +186,8 @@ class RoleMatchingResult(RoleMatchingReport):
     score: float
 
 
-class RoleMatching(Base):
-    __tablename__ = "role_matchings"
+class RoleMatchingAnalysis(Base):
+    __tablename__ = "role_matching_analyses"
 
     role_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
@@ -192,6 +200,14 @@ class RoleMatching(Base):
             native_enum=False,
             validate_strings=True,
         )
+    )
+
+
+class RoleMatching(Base):
+    __tablename__ = "role_matchings"
+
+    role_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
     )
     result: Mapped[RoleMatchingResult | None] = mapped_column(
         PydanticJSONB(RoleMatchingResult)
@@ -246,5 +262,11 @@ class Role(Base):
         uselist=False,
     )
     matching: Mapped[RoleMatching] = relationship(
+        cascade="all, delete-orphan", lazy="selectin", uselist=False
+    )
+    jd_extraction: Mapped[JobDescriptionExtraction] = relationship(
+        cascade="all, delete-orphan", lazy="selectin", uselist=False
+    )
+    matching_analysis: Mapped[RoleMatchingAnalysis] = relationship(
         cascade="all, delete-orphan", lazy="selectin", uselist=False
     )

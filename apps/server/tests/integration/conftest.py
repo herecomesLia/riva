@@ -18,7 +18,13 @@ from riva.core.config import DatabaseSettings, Settings
 from riva.db import Database
 from riva.db.base import Base
 from riva.models import User
-from riva.models.role import JobDescription, Role, RoleMatching
+from riva.models.role import (
+    JobDescription,
+    JobDescriptionExtraction,
+    Role,
+    RoleMatching,
+    RoleMatchingAnalysis,
+)
 from riva.services.users import UserService
 from riva.tasks import setup_task_schema
 from tests.support.clock import Clock
@@ -155,6 +161,8 @@ async def extraction_role(extraction_database: Database) -> UUID:
             title="Engineer",
             jd=JobDescription(responsibilities=["Original"], soft_skills=["Teamwork"]),
             matching=RoleMatching(),
+            jd_extraction=JobDescriptionExtraction(),
+            matching_analysis=RoleMatchingAnalysis(),
         )
         session.add(role)
         await session.commit()
