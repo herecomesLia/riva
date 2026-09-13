@@ -1,7 +1,7 @@
 import type { RoleResources } from "./types"
 import { AlertCircleIcon } from "lucide-react"
 import { useBlocker } from "@tanstack/react-router"
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -48,12 +48,13 @@ export type RolesViewActions = {
   archiveRole: (roleId: string) => Promise<unknown>
   createRole: (input: CreateRoleRequest) => Promise<RoleResponse>
   deleteRole: (roleId: string) => Promise<unknown>
-  match: (roleId: string) => Promise<unknown>
+  startRoleMatching: (roleId: string) => Promise<unknown>
   retryJdSynchronization: (roleId: string) => Promise<unknown>
-  retryMatchSynchronization: (roleId: string) => Promise<unknown>
+  abortRoleMatching: (roleId: string) => Promise<unknown>
+  retryMatchingState: (roleId: string) => Promise<unknown>
   recognizeRole: (input: RecognizeRoleInput) => Promise<RoleResponse>
   restoreRole: (roleId: string) => Promise<unknown>
-  extractJd: (roleId: string, text: string) => Promise<unknown>
+  extractJdFromText: (roleId: string, text: string) => Promise<unknown>
   retryJdExtraction: (roleId: string) => Promise<unknown>
   abortJdExtraction: (roleId: string) => Promise<unknown>
   setActiveRole: (roleId: string) => Promise<unknown>
@@ -66,8 +67,9 @@ export type RolesViewProps =
       variant: "default"
       content: Loadable<RoleListResponse>
       jdTasksByRoleId?: RoleResources["jdTasksByRoleId"]
-      matchingByRoleId?: RoleResources["matchingByRoleId"]
+      matchingStatesByRoleId?: RoleResources["matchingStatesByRoleId"]
       actions?: RolesViewActions
+      onSelectedRoleChange?: (roleId: string | null) => void
       initialActiveTab?: RoleTab
       initialSelectedRoleId?: string
       jdSynchronizationErrorRoleIds?: string[]
@@ -93,10 +95,11 @@ export function RolesView(props: RolesViewProps) {
         </>
       ) : (
         <RolesReadyView
+          onSelectedRoleChange={props.onSelectedRoleChange}
           actions={props.actions}
           data={props.content.data}
           jdTasksByRoleId={props.jdTasksByRoleId ?? {}}
-          matchingByRoleId={props.matchingByRoleId ?? {}}
+          matchingStatesByRoleId={props.matchingStatesByRoleId ?? {}}
           initialActiveTab={props.initialActiveTab}
           initialSelectedRoleId={props.initialSelectedRoleId}
           jdSynchronizationErrorRoleIds={props.jdSynchronizationErrorRoleIds ?? []}
@@ -108,18 +111,20 @@ export function RolesView(props: RolesViewProps) {
 }
 
 function RolesReadyView({
+  onSelectedRoleChange,
   actions,
   data,
   jdTasksByRoleId,
-  matchingByRoleId,
+  matchingStatesByRoleId,
   initialActiveTab,
   initialSelectedRoleId,
   jdSynchronizationErrorRoleIds,
   matchSynchronizationErrorRoleIds,
 }: {
+  onSelectedRoleChange?: (roleId: string | null) => void
   actions?: RolesViewActions
   jdTasksByRoleId: RoleResources["jdTasksByRoleId"]
-  matchingByRoleId: RoleResources["matchingByRoleId"]
+  matchingStatesByRoleId: RoleResources["matchingStatesByRoleId"]
   data: RoleListResponse
   initialActiveTab?: RoleTab
   initialSelectedRoleId?: string
@@ -188,8 +193,12 @@ function RolesReadyView({
     visibleRoles[0] ??
     null
 
+  useEffect(() => {
+    onSelectedRoleChange?.(selectedRole?.id ?? null)
+  }, [onSelectedRoleChange, selectedRole?.id])
+
   const jdTask = selectedRole ? jdTasksByRoleId[selectedRole.id] : undefined
-  const analysis = selectedRole ? matchingByRoleId[selectedRole.id] : undefined
+  const analysis = selectedRole ? matchingStatesByRoleId[selectedRole.id] : undefined
 
   function handleRoleCategoryChange(category: RoleListCategory) {
     const nextRoles = getRolesForCategory(data.roles, category)
@@ -232,7 +241,6 @@ function RolesReadyView({
                 onCategoryChange={handleRoleCategoryChange}
                 onSelectRole={setSelectedRoleId}
                 roles={data.roles}
-                matchingByRoleId={matchingByRoleId}
                 selectedRoleId={selectedRole?.id ?? null}
               />
               {selectedRole && (
@@ -240,7 +248,7 @@ function RolesReadyView({
                   isCurrent={selectedRole.id === data.activeRoleId}
                   role={selectedRole}
                   jdTask={jdTask}
-                  analysis={analysis}
+                  matchingState={analysis}
                 />
               )}
             </aside>
@@ -259,7 +267,7 @@ function RolesReadyView({
                     isCurrent={selectedRole.id === data.activeRoleId}
                     role={selectedRole}
                     jdTask={jdTask}
-                    analysis={analysis}
+                    matchingState={analysis}
                   />
                 </div>
               )}
@@ -274,16 +282,11 @@ function RolesReadyView({
                           edit: () => setEditorMode("edit"),
                           editJd: () => setIsJobDescriptionEditorOpen(true),
                           editJdField: setJdEditorField,
-                          generateMatch: () => {
-                            if (
-                              !analysis ||
-                              analysis.status === "blocked" ||
-                              analysis.status === "generating" ||
-                              analysis.status === "current"
-                            ) {
-                              return
-                            }
-                            void runAction(() => actions.match(selectedRole.id))
+                          startMatching: () => {
+                            void runAction(() => actions.startRoleMatching(selectedRole.id))
+                          },
+                          abortMatching: () => {
+                            void runAction(() => actions.abortRoleMatching(selectedRole.id))
                           },
                           retryJdSynchronization: () => {
                             void runAction(() => actions.retryJdSynchronization(selectedRole.id))
@@ -297,8 +300,8 @@ function RolesReadyView({
                               return
                             void runAction(() => actions.abortJdExtraction(selectedRole.id))
                           },
-                          retryMatchSynchronization: () => {
-                            void runAction(() => actions.retryMatchSynchronization(selectedRole.id))
+                          retryMatchingState: () => {
+                            void runAction(() => actions.retryMatchingState(selectedRole.id))
                           },
                           restore: () => {
                             const restoredRoleId = selectedRole.id
@@ -320,7 +323,7 @@ function RolesReadyView({
                   pending={pendingAction}
                   role={selectedRole}
                   jdTask={jdTask}
-                  analysis={analysis}
+                  matchingState={analysis}
                   jdSynchronizationError={jdSynchronizationErrorRoleIds.includes(selectedRole.id)}
                   matchSynchronizationError={matchSynchronizationErrorRoleIds.includes(
                     selectedRole.id,
@@ -372,7 +375,7 @@ function RolesReadyView({
             onDirtyChange={handleDirtyChange}
             onOpenChange={(open) => !open && requestCloseEditor()}
             onSave={async (roleId, text) => {
-              await actions.extractJd(roleId, text)
+              await actions.extractJdFromText(roleId, text)
             }}
             onSaved={closeEditor}
             open={isJobDescriptionEditorOpen}

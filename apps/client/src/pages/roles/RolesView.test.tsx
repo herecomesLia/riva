@@ -23,17 +23,18 @@ function createActions(
       async () => createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!,
     ),
     deleteRole: vi.fn(async () => data),
-    match: vi.fn(async () => data),
+    abortRoleMatching: vi.fn(async () => undefined),
+    startRoleMatching: vi.fn(async () => data),
     retryJdSynchronization: vi.fn(async () => data),
     retryJdExtraction: vi.fn(async () => data),
     abortJdExtraction: vi.fn(async () => data),
-    retryMatchSynchronization: vi.fn(async () => data),
+    retryMatchingState: vi.fn(async () => data),
     recognizeRole: vi.fn(
       async (_input: RecognizeRoleInput) =>
         data.roles[0] ?? createRoleStoryResponse("roleWithExtractedJobDescription").roles[0]!,
     ),
     restoreRole: vi.fn(async () => data),
-    extractJd: vi.fn(async () => data),
+    extractJdFromText: vi.fn(async () => data),
     setActiveRole: vi.fn(async () => data),
     updateJd: vi.fn(async () => data),
     updateRole: vi.fn(async () => data),
@@ -56,7 +57,7 @@ function renderReadyView(
       actions={options.actions ?? createActions(data)}
       content={{ status: "ready", data: data }}
       jdTasksByRoleId={data.jdTasksByRoleId}
-      matchingByRoleId={data.matchingByRoleId}
+      matchingStatesByRoleId={data.matchingStatesByRoleId}
       initialActiveTab={options.initialActiveTab}
       initialSelectedRoleId={options.initialSelectedRoleId}
       jdSynchronizationErrorRoleIds={options.jdSynchronizationErrorRoleIds}
@@ -169,7 +170,7 @@ describe("RolesView", () => {
     const data = createRoleStoryResponse("archivedRoles")
     const currentRole = data.roles.find((role) => role.id === data.activeRoleId)!
     const archivedRole = data.roles.find((role) => role.isArchived)!
-    data.matchingByRoleId[archivedRole.id] = structuredClone(data.matchingByRoleId[currentRole.id])
+    archivedRole.matching = structuredClone(currentRole.matching)
     renderReadyView(data, { initialSelectedRoleId: archivedRole.id })
 
     const archivedButton = await screen.findByRole("button", {
@@ -214,9 +215,7 @@ describe("RolesView", () => {
 
   it("does not reserve a match-score ring for roles without an eligible analysis", async () => {
     const data = createRoleStoryResponse("multipleRoles")
-    const roleWithoutAnalysis = data.roles.find(
-      (role) => data.matchingByRoleId[role.id]?.status === "blocked",
-    )!
+    const roleWithoutAnalysis = data.roles.find((role) => !role.matching.result)!
     renderReadyView(data)
 
     const button = await screen.findByRole("button", {
@@ -438,7 +437,7 @@ describe("RolesView", () => {
         actions={actions}
         content={{ status: "ready", data: nextData }}
         jdTasksByRoleId={nextData.jdTasksByRoleId}
-        matchingByRoleId={nextData.matchingByRoleId}
+        matchingStatesByRoleId={nextData.matchingStatesByRoleId}
         variant="default"
       />,
     )
@@ -1204,11 +1203,11 @@ describe("RolesView", () => {
   it("keeps the pasted JD draft when saving fails", async () => {
     const user = userEvent.setup()
     const data = createRoleStoryResponse("singleRoleWithoutJobDescription")
-    const extractJd = vi.fn(async () => {
+    const extractJdFromText = vi.fn(async () => {
       throw new Error("unsafe transport failure")
     })
     renderReadyView(data, {
-      actions: createActions(data, { extractJd }),
+      actions: createActions(data, { extractJdFromText }),
       initialActiveTab: "job-description",
     })
 
@@ -1227,61 +1226,15 @@ describe("RolesView", () => {
     expect(within(dialog).queryByText("unsafe transport failure")).not.toBeInTheDocument()
   })
 
-  it("links to profile creation when no job profile exists", async () => {
-    const data = createRoleStoryResponse("profileMissing")
-    renderReadyView(data, { initialActiveTab: "matching-analysis" })
-
-    const card = await screen.findByTestId("matching-analysis-card")
-    expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.profile.missing.title"))
-    expect(
-      within(card).getByRole("button", {
-        name: i18n.t("roles.matching.prerequisites.profile.missing.action"),
-      }),
-    ).toHaveAttribute("href", "/profile")
-  })
-
-  it("links to profile completion when the job profile is incomplete", async () => {
-    const data = createRoleStoryResponse("profileIncomplete")
-    renderReadyView(data, { initialActiveTab: "matching-analysis" })
-
-    const card = await screen.findByTestId("matching-analysis-card")
-    expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.profile.incomplete.title"))
-    expect(
-      within(card).getByRole("button", {
-        name: i18n.t("roles.matching.prerequisites.profile.incomplete.action"),
-      }),
-    ).toHaveAttribute("href", "/profile")
-  })
-
-  it.each([
-    ["singleRoleWithoutJobDescription", "missing"],
-    ["roleWithJobDescriptionExtracting", "extracting"],
-    ["roleWithJobDescriptionFailed", "failed"],
-  ] as const)("blocks analysis for %s with the %s JD guidance", async (scenario, status) => {
-    const data = createRoleStoryResponse(scenario)
-    renderReadyView(data, { initialActiveTab: "matching-analysis" })
-
-    const card = await screen.findByTestId("matching-analysis-card")
-    expect(card).toHaveTextContent(i18n.t(`roles.matching.prerequisites.jd.${status}.title`))
-    expect(
-      within(card).queryByRole("button", { name: i18n.t("roles.matching.actions.generate") }),
-    ).not.toBeInTheDocument()
-  })
-
   it("renders the complete current matching-analysis result as read-only", async () => {
     const data = createRoleStoryResponse("matchingAnalysisCurrent")
-    const analysis = data.matchingByRoleId[data.roles[0]!.id]!
-    if (analysis?.status !== "current") throw new Error("Expected a current analysis fixture.")
+    const analysis = data.roles[0]!.matching
     renderReadyView(data, { initialActiveTab: "matching-analysis" })
 
     const result = await screen.findByTestId("matching-analysis-result")
     const card = screen.getByTestId("matching-analysis-card")
-    expect(
-      within(result).queryByText(`${analysis.result.overallMatchScore}%`),
-    ).not.toBeInTheDocument()
-    expect(within(card).getByText(`${analysis.result.overallMatchScore}%`)).toHaveClass(
-      "text-primary",
-    )
+    expect(within(result).queryByText(`${analysis.result!.score}%`)).not.toBeInTheDocument()
+    expect(within(card).getByText(`${analysis.result!.score}%`)).toHaveClass("text-primary")
     expect(
       within(card).queryByText(i18n.t("roles.matchStateStatus.current.label")),
     ).not.toBeInTheDocument()
@@ -1296,87 +1249,53 @@ describe("RolesView", () => {
       i18n.t("roles.matching.result.resumeOptimizationSuggestions"),
       i18n.t("roles.matching.result.interviewPreparationSuggestions"),
     ])
-    expect(result).toHaveTextContent(analysis.result.coreRequirements)
+    expect(result).toHaveTextContent(analysis.result!.coreRequirements)
     for (const items of [
-      analysis.result.resumeStrengths,
-      analysis.result.resumeGaps,
-      analysis.result.resumeOptimizationSuggestions,
-      analysis.result.interviewPreparationSuggestions,
+      analysis.result!.resumeStrengths,
+      analysis.result!.resumeGaps,
+      analysis.result!.resumeOptimizationSuggestions,
+      analysis.result!.interviewPreparationSuggestions,
     ]) {
       for (const item of items) expect(result).toHaveTextContent(item)
     }
-    expect(within(card).queryByRole("button")).not.toBeInTheDocument()
-  })
-
-  it("keeps stale results visible and offers regeneration", async () => {
-    const data = createRoleStoryResponse("matchingAnalysisStale")
-    const analysis = data.matchingByRoleId[data.roles[0]!.id]!
-    if (analysis?.status !== "stale") throw new Error("Expected a stale analysis fixture.")
-    renderReadyView(data, { initialActiveTab: "matching-analysis" })
-
-    const card = await screen.findByTestId("matching-analysis-card")
-    expect(card).toHaveTextContent(i18n.t("roles.matching.stale.title"))
-    expect(card).toHaveTextContent(analysis.result.resumeStrengths[0]!)
     expect(
       within(card).getByRole("button", { name: i18n.t("roles.matching.actions.regenerate") }),
     ).toBeEnabled()
   })
 
-  it("keeps stale results visible while a replacement JD is extracting", async () => {
+  it("keeps stale results visible and offers regeneration", async () => {
     const data = createRoleStoryResponse("matchingAnalysisStale")
-    const analysis = data.matchingByRoleId[data.roles[0]!.id]!
-    const extractingRole = createRoleStoryResponse("roleWithJobDescriptionExtracting").roles[0]!
-    if (analysis?.status !== "stale") {
-      throw new Error("Expected stale analysis and extracting JD fixtures.")
-    }
-    data.roles[0] = extractingRole
-    data.jdTasksByRoleId[extractingRole.id] = { status: "running", error: null }
-    data.matchingByRoleId[extractingRole.id] = {
-      status: "blocked",
-      reason: "jobDescriptionExtracting",
-      result: analysis.result,
-    }
+    const analysis = data.roles[0]!.matching
     renderReadyView(data, { initialActiveTab: "matching-analysis" })
 
     const card = await screen.findByTestId("matching-analysis-card")
     expect(card).toHaveTextContent(i18n.t("roles.matching.stale.title"))
-    expect(card).toHaveTextContent(analysis.result.resumeStrengths[0]!)
-    expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.jd.extracting.title"))
+    expect(card).toHaveTextContent(analysis.result!.resumeStrengths[0]!)
     expect(
-      within(card).queryByRole("button", { name: i18n.t("roles.matching.actions.regenerate") }),
-    ).not.toBeInTheDocument()
+      within(card).getByRole("button", { name: i18n.t("roles.matching.actions.regenerate") }),
+    ).toBeEnabled()
   })
 
-  it("keeps stale results visible when the profile becomes incomplete", async () => {
-    const data = createRoleStoryResponse("matchingAnalysisStale")
-    const analysis = data.matchingByRoleId[data.roles[0]!.id]!
-    if (analysis?.status !== "stale") {
-      throw new Error("Expected stale analysis and existing profile fixtures.")
-    }
-    data.matchingByRoleId[data.roles[0]!.id] = {
-      status: "blocked",
-      reason: "profileIncomplete",
-      result: analysis.result,
-    }
-    renderReadyView(data, { initialActiveTab: "matching-analysis" })
-
-    const card = await screen.findByTestId("matching-analysis-card")
-    expect(card).toHaveTextContent(i18n.t("roles.matching.stale.title"))
-    expect(card).toHaveTextContent(analysis.result.resumeStrengths[0]!)
-    expect(card).toHaveTextContent(i18n.t("roles.matching.prerequisites.profile.incomplete.title"))
-    expect(
-      within(card).queryByRole("button", { name: i18n.t("roles.matching.actions.regenerate") }),
-    ).not.toBeInTheDocument()
-  })
+  it.each(["running", "aborting", "failed"] as const)(
+    "preserves an old result while matching is %s",
+    async (status) => {
+      const data = createRoleStoryResponse("matchingAnalysisStale")
+      data.matchingStatesByRoleId[data.roles[0]!.id] =
+        status === "failed"
+          ? { status, error: { code: "llm_unavailable", message: "private upstream details" } }
+          : { status, error: null }
+      renderReadyView(data, { initialActiveTab: "matching-analysis" })
+      expect(await screen.findByTestId("matching-analysis-result")).toBeInTheDocument()
+      expect(screen.queryByText("private upstream details")).not.toBeInTheDocument()
+    },
+  )
 
   it("shows a safe matching-analysis business failure and retry action", async () => {
     const data = createRoleStoryResponse("matchingAnalysisFailed")
-    const analysis = data.matchingByRoleId[data.roles[0]!.id]!
-    if (analysis?.status !== "failed") throw new Error("Expected a failed analysis fixture.")
     renderReadyView(data, { initialActiveTab: "matching-analysis" })
 
     const card = await screen.findByTestId("matching-analysis-card")
-    expect(card).toHaveTextContent(analysis.reason)
+    expect(card).toHaveTextContent(i18n.t("roles.matching.failureCodes.invalid_output"))
     expect(
       within(card).getByRole("button", { name: i18n.t("roles.matching.actions.retry") }),
     ).toBeEnabled()
@@ -1386,14 +1305,14 @@ describe("RolesView", () => {
     const user = userEvent.setup()
     const data = createRoleStoryResponse("roleWithExtractedJobDescription")
     let resolveGeneration!: (response: RoleStoryData) => void
-    const match = vi.fn(
+    const startRoleMatching = vi.fn(
       () =>
         new Promise<RoleStoryData>((resolve) => {
           resolveGeneration = resolve
         }),
     )
     renderReadyView(data, {
-      actions: createActions(data, { match }),
+      actions: createActions(data, { startRoleMatching }),
       initialActiveTab: "matching-analysis",
     })
 
@@ -1403,8 +1322,8 @@ describe("RolesView", () => {
     await user.click(generate)
     expect(generate).toBeDisabled()
     await user.click(generate)
-    expect(match).toHaveBeenCalledTimes(1)
-    expect(match).toHaveBeenCalledWith(data.roles[0]!.id)
+    expect(startRoleMatching).toHaveBeenCalledTimes(1)
+    expect(startRoleMatching).toHaveBeenCalledWith(data.roles[0]!.id)
     resolveGeneration(data)
   })
 

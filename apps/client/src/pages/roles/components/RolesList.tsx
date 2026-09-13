@@ -1,5 +1,3 @@
-import type { MatchingAnalysisState } from "@/mocks/models/role"
-import type { RoleResources } from "../types"
 import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
@@ -16,7 +14,6 @@ export function RolesList({
   activeRoleId,
   onCategoryChange,
   roles,
-  matchingByRoleId,
   selectedRoleId,
   onSelectRole,
 }: {
@@ -25,7 +22,6 @@ export function RolesList({
   activeRoleId: string | null
   onCategoryChange: (category: RoleListCategory) => void
   roles: RoleResponse[]
-  matchingByRoleId: RoleResources["matchingByRoleId"]
   selectedRoleId: string | null
   onSelectRole: (roleId: string) => void
 }) {
@@ -82,7 +78,6 @@ export function RolesList({
                 isCurrent={role.id === activeRoleId}
                 onSelectRole={onSelectRole}
                 role={role}
-                analysis={matchingByRoleId[role.id]}
                 selected={selectedRoleId === role.id}
               />
             </div>
@@ -102,18 +97,16 @@ function RoleListItem({
   isCurrent,
   onSelectRole,
   role,
-  analysis,
   selected,
 }: {
   isCurrent: boolean
   onSelectRole: (roleId: string) => void
   role: RoleResponse
-  analysis: MatchingAnalysisState | undefined
   selected: boolean
 }) {
   const { t } = useTranslation()
   const isArchived = role.isArchived
-  const score = getRoleMatchScore(analysis)
+  const score = role.matching.result?.score ?? null
 
   return (
     <Button
@@ -183,10 +176,4 @@ function RoleMatchScoreRing({ archived, score }: { archived: boolean; score: num
       <span className="absolute font-heading text-[10px] font-semibold tabular-nums">{score}%</span>
     </span>
   )
-}
-
-function getRoleMatchScore(match: MatchingAnalysisState | undefined): number | null {
-  return match?.status === "current" || match?.status === "stale"
-    ? match.result.overallMatchScore
-    : null
 }

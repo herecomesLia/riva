@@ -194,44 +194,22 @@ export const roles = {
     },
   },
   matching: {
+    failureCodes: {
+      invalid_output: "分析结果格式有误，请重试。",
+      llm_unavailable: "AI 服务暂时不可用，请稍后重试。",
+      internal_error: "分析失败，请重试。",
+    },
     cardDescription: "结合当前求职档案与岗位 JD，查看能力匹配和面试准备重点。",
     actions: {
+      abort: "取消分析",
       generate: "生成匹配分析",
       regenerate: "重新生成分析",
       retry: "重试生成",
       resynchronize: "重新同步状态",
     },
-    prerequisites: {
-      profile: {
-        missing: {
-          title: "请先创建求职档案",
-          description: "匹配分析需要使用你的经历、技能和求职信息。",
-          action: "前往创建档案",
-        },
-        incomplete: {
-          title: "请补充求职档案",
-          description: "完善关键经历和技能后，才能生成可靠的匹配分析。",
-          action: "前往完善档案",
-        },
-      },
-      jd: {
-        missing: {
-          title: "请先添加岗位 JD",
-          description: "保存并解析 JD 后，才能分析岗位要求与档案的匹配情况。",
-        },
-        extracting: {
-          title: "正在等待 JD 解析",
-          description: "JD 解析完成后即可生成匹配分析。",
-        },
-        failed: {
-          title: "请重新提交岗位 JD",
-          description: "当前 JD 尚未得到结构化结果，请提交一份新的完整 JD。",
-        },
-      },
-    },
     synchronization: {
-      title: "暂时无法获取匹配分析结果",
-      description: "分析任务仍在生成中。可以重新同步，不会重复创建分析任务。",
+      title: "无法获取分析状态",
+      description: "暂时无法确认任务状态，请重新同步；这不会启动新的分析。",
     },
     stale: {
       title: "当前结果需要更新",
@@ -331,15 +309,13 @@ export const roles = {
     },
   },
   matchingAnalysisStatus: {
-    blocked: { label: "前置条件未满足" },
+    queued: { label: "排队中" },
+    running: { label: "分析中" },
+    aborting: { label: "取消中" },
     loading: { label: "加载中" },
     none: {
       label: "未生成",
       description: "当前岗位还没有匹配分析。",
-    },
-    generating: {
-      label: "生成中",
-      description: "正在结合求职档案与 JD 生成分析。",
     },
     current: {
       label: "当前有效",

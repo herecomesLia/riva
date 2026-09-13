@@ -12,7 +12,7 @@ import type {
   InterviewTrainingEntryPreparationResponse,
   TrainingEntryRoleAvailability,
 } from "@/models/training-entry"
-import { getRoles, getJdExtractionState } from "@/services/roles"
+import { listRoles, getJdExtractionState } from "@/services/roles"
 import { getProfile } from "@/services/profile"
 import { isCareerProfileComplete } from "@/lib/career-profile"
 import { hasJobDescription } from "@/lib/job-description"
@@ -56,7 +56,7 @@ export async function getInterviewPage(): Promise<InterviewData> {
 }
 
 async function getSetupResources() {
-  const [initialRoles, profile] = await Promise.all([getRoles(), getProfile()])
+  const [initialRoles, profile] = await Promise.all([listRoles(), getProfile()])
   const tasks = new Map(
     await Promise.all(
       initialRoles.roles
@@ -66,7 +66,7 @@ async function getSetupResources() {
   )
   // Read the saved JD after observing completion, as extraction can finish during these reads.
   const roles = [...tasks.values()].some((task) => task.status === "idle")
-    ? await getRoles()
+    ? await listRoles()
     : initialRoles
   const readyRoleIds = new Set(
     roles.roles

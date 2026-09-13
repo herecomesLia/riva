@@ -4,7 +4,7 @@ import type {
   RoleListResponse,
   RoleResponse,
 } from "@/api/generated/models"
-import type { MatchingAnalysisResult } from "@/mocks/models/role"
+import type { RoleMatchingResultResponse } from "@/api/generated/models"
 
 export const jdFailInput = "__RIVA_MOCK_JD_EXTRACTION_FAILURE__"
 
@@ -32,6 +32,7 @@ export const urlRoleFixture = {
 } satisfies CreateRoleRequest
 
 export const extractedJdFixture = {
+  updatedAt: "2026-07-14T09:00:00.000Z",
   responsibilities: [
     "Lead frontend architecture for merchant operations products.",
     "Partner with product and design teams to deliver accessible experiences.",
@@ -59,7 +60,7 @@ export const extractedJdFixture = {
 } satisfies JobDescriptionResponse
 
 export const matchResultFixture = {
-  overallMatchScore: 78,
+  score: 78,
   coreRequirements:
     "Lead complex React product delivery with strong engineering judgment and measurable impact.",
   resumeStrengths: [
@@ -78,9 +79,10 @@ export const matchResultFixture = {
     "Review accessibility principles and prepare to discuss how you would validate an accessible React experience.",
     "Prepare to explain frontend architecture trade-offs for large-scale SaaS products using your existing project experience.",
   ],
-} satisfies MatchingAnalysisResult
+} satisfies RoleMatchingResultResponse
 
 export const roleFixture = {
+  matching: { result: null, generatedAt: null, isStale: false },
   id: "11111111-1111-4111-8111-111111111111",
   title: "Senior Frontend Engineer",
   company: "ByteDance",
@@ -93,6 +95,7 @@ export const roleFixture = {
 } satisfies RoleResponse
 
 export const secondaryRoleFixture = {
+  matching: { result: null, generatedAt: null, isStale: false },
   id: "22222222-2222-4222-8222-222222222222",
   title: "Product Manager",
   company: "Meituan",
@@ -100,6 +103,7 @@ export const secondaryRoleFixture = {
   location: "Beijing",
   isArchived: false,
   jd: {
+    updatedAt: "2026-07-01T08:00:00Z",
     responsibilities: [],
     requirements: {
       education: [],

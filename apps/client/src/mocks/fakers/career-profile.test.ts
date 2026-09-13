@@ -16,6 +16,16 @@ describe("careerProfileFaker", () => {
     await expect(faker.get()).resolves.toEqual(careerProfileFixture)
   })
 
+  it("changes the content version only when profile content changes", async () => {
+    const faker = createCareerProfileFaker(careerProfileFixture)
+    const unchanged = await faker.update({ skills: careerProfileFixture.skills })
+    expect(unchanged.updatedAt).toBe(careerProfileFixture.updatedAt)
+    const changed = await faker.update({ skills: [...careerProfileFixture.skills, "Python"] })
+    expect(changed.updatedAt).not.toBe(unchanged.updatedAt)
+    const changedAgain = await faker.update({ skills: [...changed.skills, "Go"] })
+    expect(changedAgain.updatedAt).not.toBe(changed.updatedAt)
+  })
+
   it("persists the imported resume profile", async () => {
     const faker = createCareerProfileFaker(null)
 

@@ -7,14 +7,14 @@ import { interviewFaker } from "@/mocks/fakers/interview"
 import { interviewFixture } from "@/mocks/fixtures/interview"
 import { roleFixture } from "@/mocks/fixtures/role"
 import type { RoleListResponse } from "@/api/generated/models"
-import { getRoles, getJdExtractionState } from "@/services/roles"
+import { listRoles, getJdExtractionState } from "@/services/roles"
 import {
   getInterviewPage,
   getInterviewReview,
   prepareInterviewTrainingEntry,
 } from "@/services/interview"
 
-vi.mock("@/services/roles", () => ({ getRoles: vi.fn(), getJdExtractionState: vi.fn() }))
+vi.mock("@/services/roles", () => ({ listRoles: vi.fn(), getJdExtractionState: vi.fn() }))
 vi.mock("@/services/profile", () => ({ getProfile: vi.fn() }))
 
 const roles: RoleListResponse = {
@@ -34,7 +34,7 @@ beforeEach(() => {
   vi.restoreAllMocks()
   vi.mocked(getProfile).mockResolvedValue(careerProfileFixture)
   vi.mocked(getJdExtractionState).mockResolvedValue({ status: "idle", error: null })
-  vi.mocked(getRoles).mockResolvedValue(structuredClone(roles))
+  vi.mocked(listRoles).mockResolvedValue(structuredClone(roles))
   vi.spyOn(interviewFaker, "get").mockReturnValue(null)
 })
 
@@ -62,7 +62,7 @@ describe("Interview service", () => {
         durationMinutes: 30,
       },
     })
-    vi.mocked(getRoles).mockResolvedValue({ ...roles, activeRoleId: "missing" })
+    vi.mocked(listRoles).mockResolvedValue({ ...roles, activeRoleId: "missing" })
     expect((await getInterviewPage()).setup.defaultConfiguration.roleId).toBe("first")
     const session = {
       status: "opening" as const,
@@ -82,7 +82,7 @@ describe("Interview service", () => {
   ] as const)(
     "preserves empty and prerequisite availability",
     async (items, complete, status, reason) => {
-      vi.mocked(getRoles).mockResolvedValue({
+      vi.mocked(listRoles).mockResolvedValue({
         ...roles,
         roles: [...items],
       })
@@ -102,7 +102,7 @@ describe("Interview service", () => {
   ] as const)(
     "prepares history for %s without changing the session",
     async (roleId, complete, reason) => {
-      vi.mocked(getRoles).mockResolvedValue(roles)
+      vi.mocked(listRoles).mockResolvedValue(roles)
       vi.mocked(getProfile).mockResolvedValue(
         complete ? careerProfileFixture : { ...careerProfileFixture, skills: [] },
       )

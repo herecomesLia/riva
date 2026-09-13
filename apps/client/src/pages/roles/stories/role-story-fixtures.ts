@@ -1,5 +1,4 @@
 import type { RoleResources } from "../types"
-import { hasJobDescription } from "@/lib/job-description"
 import type {
   JobDescriptionResponse,
   RoleListResponse,
@@ -8,7 +7,7 @@ import type {
   TaskFailureResponse,
 } from "@/api/generated/models"
 import { jdFailReason, matchResultFixture, extractedJdFixture } from "@/mocks/fixtures/role"
-import type { MatchingAnalysisState } from "@/mocks/models/role"
+import type { RoleMatchingResponse } from "@/api/generated/models"
 
 export type RolesStoryScenario =
   | "noRoles"
@@ -21,8 +20,6 @@ export type RolesStoryScenario =
   | "roleWithJobDescriptionExtracting"
   | "roleWithJobDescriptionFailed"
   | "roleWithExtractedJobDescription"
-  | "profileMissing"
-  | "profileIncomplete"
   | "matchingAnalysisGenerating"
   | "matchingAnalysisFailed"
   | "matchingAnalysisStale"
@@ -30,6 +27,7 @@ export type RolesStoryScenario =
   | "archivedRoles"
 
 const emptyJd = {
+  updatedAt: "2026-07-01T00:00:00Z",
   responsibilities: [],
   requirements: {
     education: [],
@@ -66,13 +64,17 @@ function createRole(
     isArchived?: boolean
     jd?: JobDescriptionResponse
     jdTask?: TaskStatusResponse | TaskFailureResponse
-    analysis?: MatchingAnalysisState
+    matching?: RoleMatchingResponse
+    analysis?: TaskStatusResponse | TaskFailureResponse
   } = {},
 ) {
   const jdTask = options.jdTask ?? { status: "idle", error: null }
   const role: RoleResponse = {
     id,
     title,
+    matching: structuredClone(
+      options.matching ?? { result: null, generatedAt: null, isStale: false },
+    ),
     company: options.company ?? "ByteDance",
     recruitmentTrack: "experienced",
     location: options.location ?? "Shanghai",
@@ -81,15 +83,7 @@ function createRole(
     createdAt: "2026-07-01T09:00:00.000Z",
     updatedAt: "2026-07-14T09:00:00.000Z",
   }
-  const analysis: MatchingAnalysisState =
-    options.analysis ??
-    (jdTask.status === "failed"
-      ? { status: "blocked", reason: "jobDescriptionFailed" }
-      : jdTask.status !== "idle"
-        ? { status: "blocked", reason: "jobDescriptionExtracting" }
-        : !hasJobDescription(role.jd)
-          ? { status: "blocked", reason: "jobDescriptionMissing" }
-          : { status: "none" })
+  const analysis = options.analysis ?? { status: "idle" as const, error: null }
   return { role, jdTask, analysis }
 }
 
@@ -110,7 +104,6 @@ const scenarios: Record<
   {
     entries: ReturnType<typeof createRole>[]
     activeRoleId: string | null
-    blockedReason?: "profileMissing" | "profileIncomplete"
   }
 > = {
   noRoles: { entries: [], activeRoleId: null },
@@ -120,14 +113,26 @@ const scenarios: Record<
   },
   multipleRoles: {
     entries: [
-      frontendRole({ analysis: { status: "current", result: matchResultFixture } }),
+      frontendRole({
+        matching: {
+          result: matchResultFixture,
+          generatedAt: "2026-07-14T09:00:00Z",
+          isStale: false,
+        },
+      }),
       productRole({ jd: emptyJd }),
     ],
     activeRoleId: "role_frontend_bytedance",
   },
   multipleRolesReady: {
     entries: [
-      frontendRole({ analysis: { status: "current", result: matchResultFixture } }),
+      frontendRole({
+        matching: {
+          result: matchResultFixture,
+          generatedAt: "2026-07-14T09:00:00Z",
+          isStale: false,
+        },
+      }),
       productRole(),
     ],
     activeRoleId: "role_frontend_bytedance",
@@ -161,35 +166,54 @@ const scenarios: Record<
     entries: [frontendRole()],
     activeRoleId: "role_frontend_bytedance",
   },
-  profileMissing: {
-    entries: [frontendRole()],
-    activeRoleId: "role_frontend_bytedance",
-    blockedReason: "profileMissing",
-  },
-  profileIncomplete: {
-    entries: [frontendRole()],
-    activeRoleId: "role_frontend_bytedance",
-    blockedReason: "profileIncomplete",
-  },
   matchingAnalysisGenerating: {
-    entries: [frontendRole({ analysis: { status: "generating" } })],
+    entries: [frontendRole({ analysis: { status: "running", error: null } })],
     activeRoleId: "role_frontend_bytedance",
   },
   matchingAnalysisFailed: {
-    entries: [frontendRole({ analysis: { status: "failed", reason: failedMatchReason } })],
+    entries: [
+      frontendRole({
+        analysis: {
+          status: "failed",
+          error: { code: "invalid_output", message: failedMatchReason },
+        },
+      }),
+    ],
     activeRoleId: "role_frontend_bytedance",
   },
   matchingAnalysisStale: {
-    entries: [frontendRole({ analysis: { status: "stale", result: matchResultFixture } })],
+    entries: [
+      frontendRole({
+        matching: {
+          result: matchResultFixture,
+          generatedAt: "2026-07-14T09:00:00Z",
+          isStale: true,
+        },
+      }),
+    ],
     activeRoleId: "role_frontend_bytedance",
   },
   matchingAnalysisCurrent: {
-    entries: [frontendRole({ analysis: { status: "current", result: matchResultFixture } })],
+    entries: [
+      frontendRole({
+        matching: {
+          result: matchResultFixture,
+          generatedAt: "2026-07-14T09:00:00Z",
+          isStale: false,
+        },
+      }),
+    ],
     activeRoleId: "role_frontend_bytedance",
   },
   archivedRoles: {
     entries: [
-      frontendRole({ analysis: { status: "current", result: matchResultFixture } }),
+      frontendRole({
+        matching: {
+          result: matchResultFixture,
+          generatedAt: "2026-07-14T09:00:00Z",
+          isStale: false,
+        },
+      }),
       createRole("role_frontend_meituan", "Frontend Engineer", {
         company: "Meituan",
         isArchived: true,
@@ -200,16 +224,13 @@ const scenarios: Record<
 }
 
 export function createRoleStoryResponse(scenario: RolesStoryScenario): RoleStoryData {
-  const { entries, activeRoleId, blockedReason } = structuredClone(scenarios[scenario])
+  const { entries, activeRoleId } = structuredClone(scenarios[scenario])
   return {
     roles: entries.map(({ role }) => role),
     activeRoleId,
     jdTasksByRoleId: Object.fromEntries(entries.map(({ role, jdTask }) => [role.id, jdTask])),
-    matchingByRoleId: Object.fromEntries(
-      entries.map(({ role, analysis }) => [
-        role.id,
-        blockedReason ? { status: "blocked", reason: blockedReason } : analysis,
-      ]),
+    matchingStatesByRoleId: Object.fromEntries(
+      entries.map(({ role, analysis }) => [role.id, analysis]),
     ),
   }
 }
@@ -248,7 +269,7 @@ export function createManyRolesResponse() {
   )
   for (const role of response.roles) {
     response.jdTasksByRoleId[role.id] ??= { status: "idle", error: null }
-    response.matchingByRoleId[role.id] ??= { status: "blocked", reason: "jobDescriptionMissing" }
+    response.matchingStatesByRoleId[role.id] ??= { status: "idle", error: null }
   }
   return response
 }
@@ -265,14 +286,13 @@ export function createLongJobDescriptionResponse() {
 
 export function createLongMatchingAnalysisResponse() {
   const response = createRoleStoryResponse("matchingAnalysisCurrent")
-  const match = response.matchingByRoleId[response.roles[0]!.id]!
-  if (match.status !== "current") throw new Error("Expected a current match fixture.")
-  match.result.interviewPreparationSuggestions.push(
+  const match = response.roles[0]!.matching
+  match.result!.interviewPreparationSuggestions.push(
     "Prepare a concise architecture narrative that connects user impact, system constraints, delivery milestones, and measurable reliability improvements.",
     "Rehearse trade-off discussions for performance budgets, observability coverage, and incremental platform migration.",
     "Select two cross-functional projects that demonstrate technical leadership without relying on formal authority.",
   )
-  match.result.resumeOptimizationSuggestions.push(
+  match.result!.resumeOptimizationSuggestions.push(
     "Expand the existing project descriptions with documented accessibility audit findings, the improvements you implemented, and the validation results.",
     "Clarify the scale of products you worked on with verified usage metrics and your personal architecture responsibilities.",
   )
@@ -282,13 +302,6 @@ export function createLongMatchingAnalysisResponse() {
 export function createStaleWhileExtractingResponse() {
   const response = createRoleStoryResponse("matchingAnalysisStale")
   const id = response.roles[0]!.id
-  const analysis = response.matchingByRoleId[id]!
-  if (analysis.status !== "stale") throw new Error("Expected a stale result.")
   response.jdTasksByRoleId[id] = { status: "running", error: null }
-  response.matchingByRoleId[id] = {
-    status: "blocked",
-    reason: "jobDescriptionExtracting",
-    result: analysis.result,
-  }
   return response
 }

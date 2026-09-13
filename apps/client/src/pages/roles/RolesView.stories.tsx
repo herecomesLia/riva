@@ -35,7 +35,7 @@ export const NoRoles = meta.story({
   args: {
     content: { status: "ready", data: createRoleStoryResponse("noRoles") },
     jdTasksByRoleId: createRoleStoryResponse("noRoles").jdTasksByRoleId,
-    matchingByRoleId: createRoleStoryResponse("noRoles").matchingByRoleId,
+    matchingStatesByRoleId: createRoleStoryResponse("noRoles").matchingStatesByRoleId,
     variant: "default",
   },
 })
@@ -47,7 +47,8 @@ export const SingleRole = meta.story({
       data: createRoleStoryResponse("singleRoleWithoutJobDescription"),
     },
     jdTasksByRoleId: createRoleStoryResponse("singleRoleWithoutJobDescription").jdTasksByRoleId,
-    matchingByRoleId: createRoleStoryResponse("singleRoleWithoutJobDescription").matchingByRoleId,
+    matchingStatesByRoleId: createRoleStoryResponse("singleRoleWithoutJobDescription")
+      .matchingStatesByRoleId,
     variant: "default",
   },
 })
@@ -56,7 +57,7 @@ export const MultipleRoles = meta.story({
   args: {
     content: { status: "ready", data: createRoleStoryResponse("multipleRoles") },
     jdTasksByRoleId: createRoleStoryResponse("multipleRoles").jdTasksByRoleId,
-    matchingByRoleId: createRoleStoryResponse("multipleRoles").matchingByRoleId,
+    matchingStatesByRoleId: createRoleStoryResponse("multipleRoles").matchingStatesByRoleId,
     variant: "default",
   },
 })
@@ -65,7 +66,7 @@ export const NoCurrentRole = meta.story({
   args: {
     content: { status: "ready", data: createRoleStoryResponse("rolesWithoutCurrent") },
     jdTasksByRoleId: createRoleStoryResponse("rolesWithoutCurrent").jdTasksByRoleId,
-    matchingByRoleId: createRoleStoryResponse("rolesWithoutCurrent").matchingByRoleId,
+    matchingStatesByRoleId: createRoleStoryResponse("rolesWithoutCurrent").matchingStatesByRoleId,
     variant: "default",
   },
 })
@@ -77,7 +78,7 @@ export const ArchivedRoleSelected = meta.story({
   args: {
     content: { status: "ready", data: archivedRoles },
     jdTasksByRoleId: archivedRoles.jdTasksByRoleId,
-    matchingByRoleId: archivedRoles.matchingByRoleId,
+    matchingStatesByRoleId: archivedRoles.matchingStatesByRoleId,
     initialSelectedRoleId: archivedRole.id,
     variant: "default",
   },
@@ -95,7 +96,7 @@ export const SelectedRoleDifferentFromCurrent = meta.story({
   args: {
     content: { status: "ready", data: selectedDifferent },
     jdTasksByRoleId: selectedDifferent.jdTasksByRoleId,
-    matchingByRoleId: selectedDifferent.matchingByRoleId,
+    matchingStatesByRoleId: selectedDifferent.matchingStatesByRoleId,
     initialSelectedRoleId: selectedRole.id,
     variant: "default",
   },
@@ -123,7 +124,7 @@ export const ManyRoles = meta.story({
   args: {
     content: { status: "ready", data: createManyRolesResponse() },
     jdTasksByRoleId: createManyRolesResponse().jdTasksByRoleId,
-    matchingByRoleId: createManyRolesResponse().matchingByRoleId,
+    matchingStatesByRoleId: createManyRolesResponse().matchingStatesByRoleId,
     variant: "default",
   },
 })
@@ -132,7 +133,7 @@ export const MobileLayout = meta.story({
   args: {
     content: { status: "ready", data: createRoleStoryResponse("multipleRoles") },
     jdTasksByRoleId: createRoleStoryResponse("multipleRoles").jdTasksByRoleId,
-    matchingByRoleId: createRoleStoryResponse("multipleRoles").matchingByRoleId,
+    matchingStatesByRoleId: createRoleStoryResponse("multipleRoles").matchingStatesByRoleId,
     variant: "default",
   },
   globals: { viewport: { isRotated: false, value: "mobile1" } },
@@ -153,7 +154,7 @@ export const LongJobDescriptionPage = meta.story({
   args: {
     content: { status: "ready", data: createLongJobDescriptionResponse() },
     jdTasksByRoleId: createLongJobDescriptionResponse().jdTasksByRoleId,
-    matchingByRoleId: createLongJobDescriptionResponse().matchingByRoleId,
+    matchingStatesByRoleId: createLongJobDescriptionResponse().matchingStatesByRoleId,
     variant: "default",
   },
   play: async ({ userEvent }) => {
@@ -167,7 +168,7 @@ export const LongMatchingAnalysisPage = meta.story({
   args: {
     content: { status: "ready", data: createLongMatchingAnalysisResponse() },
     jdTasksByRoleId: createLongMatchingAnalysisResponse().jdTasksByRoleId,
-    matchingByRoleId: createLongMatchingAnalysisResponse().matchingByRoleId,
+    matchingStatesByRoleId: createLongMatchingAnalysisResponse().matchingStatesByRoleId,
     variant: "default",
   },
   play: async ({ userEvent }) => {

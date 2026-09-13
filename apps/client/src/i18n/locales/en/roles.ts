@@ -207,46 +207,24 @@ export const roles = {
     },
   },
   matching: {
+    failureCodes: {
+      invalid_output: "The analysis output was invalid. Please try again.",
+      llm_unavailable: "The AI service is unavailable. Please try again later.",
+      internal_error: "The analysis failed. Please try again.",
+    },
     cardDescription:
       "Compare the current job profile with this JD and focus your interview preparation.",
     actions: {
+      abort: "Cancel analysis",
       generate: "Generate match analysis",
       regenerate: "Regenerate analysis",
       retry: "Retry generation",
       resynchronize: "Synchronize status",
     },
-    prerequisites: {
-      profile: {
-        missing: {
-          title: "Create your job profile first",
-          description: "Match analysis uses your experience, skills, and job-search context.",
-          action: "Create profile",
-        },
-        incomplete: {
-          title: "Complete your job profile",
-          description: "Add the key experience and skills needed for a reliable match analysis.",
-          action: "Complete profile",
-        },
-      },
-      jd: {
-        missing: {
-          title: "Add the job description first",
-          description: "Submit and extract the JD before comparing it with your profile.",
-        },
-        extracting: {
-          title: "Waiting for JD extraction",
-          description: "Match analysis will be available after JD extraction completes.",
-        },
-        failed: {
-          title: "Submit the job description again",
-          description: "Submit a complete new JD before starting match analysis.",
-        },
-      },
-    },
     synchronization: {
-      title: "Unable to retrieve the match-analysis result",
+      title: "Unable to retrieve analysis status",
       description:
-        "The analysis task is still generating. Synchronizing again will not create another task.",
+        "The task status could not be confirmed. Try synchronizing again; this will not start a new analysis.",
     },
     stale: {
       title: "This result needs an update",
@@ -347,15 +325,13 @@ export const roles = {
     },
   },
   matchingAnalysisStatus: {
-    blocked: { label: "Prerequisites required" },
+    queued: { label: "Queued" },
+    running: { label: "Analyzing" },
+    aborting: { label: "Cancelling" },
     loading: { label: "Loading" },
     none: {
       label: "Not generated",
       description: "This role does not have a match analysis yet.",
-    },
-    generating: {
-      label: "Generating",
-      description: "Combining your job profile and JD into a match analysis.",
     },
     current: {
       label: "Current",

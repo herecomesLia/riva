@@ -15,7 +15,7 @@ function argsFor(scenario: Parameters<typeof createRoleStoryResponse>[0]) {
     isCurrent: role.id === response.activeRoleId,
     role,
     jdTask: response.jdTasksByRoleId[role.id],
-    analysis: response.matchingByRoleId[role.id],
+    matchingState: response.matchingStatesByRoleId[role.id],
   }
 }
 
@@ -42,7 +42,7 @@ export const ArchivedRole = meta.story({
   args: {
     isCurrent: false,
     jdTask: { status: "idle", error: null },
-    analysis: { status: "none" },
+    matchingState: { status: "idle", error: null },
     role: archivedResponse.roles.find((role) => role.isArchived)!,
   },
 })

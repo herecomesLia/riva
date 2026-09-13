@@ -1,41 +1,43 @@
-import { Link } from "@tanstack/react-router"
 import {
-  ArrowRightIcon,
   CircleCheckIcon,
   ClipboardCheckIcon,
   FileCheckIcon,
   FileWarningIcon,
   LightbulbIcon,
-  RefreshCwIcon,
-  SparklesIcon,
   type LucideIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-
+import type {
+  RoleMatchingResponse,
+  RoleMatchingResultResponse,
+  TaskStatusResponse,
+  TaskFailureResponse,
+} from "@/api/generated/models"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
-import type { MatchingAnalysisResult, MatchingAnalysisState } from "@/mocks/models/role"
 
 export function MatchingAnalysisCard({
-  onGenerate,
-  onRetrySynchronization,
+  matching,
+  matchingState,
+  isMatchingStateError,
+  onStartMatching,
+  onAbortMatching,
+  onRetryMatchingState,
   pending,
-  analysis,
-  synchronizationError,
 }: {
-  onGenerate?: () => void
-  onRetrySynchronization?: () => void
+  matching: RoleMatchingResponse
+  matchingState: TaskStatusResponse | TaskFailureResponse | undefined
+  isMatchingStateError: boolean
+  onStartMatching?: () => void
+  onAbortMatching?: () => void
+  onRetryMatchingState?: () => void
   pending?: boolean
-  analysis: MatchingAnalysisState | undefined
-  synchronizationError: boolean
 }) {
   const { t } = useTranslation()
-  const status = analysis?.status ?? "loading"
-  const result = analysis && "result" in analysis ? analysis.result : null
-
+  const status = matchingState?.status
+  const active = status === "queued" || status === "running" || status === "aborting"
   return (
     <Card
       className="bg-card shadow-none ring-border"
@@ -54,215 +56,102 @@ export function MatchingAnalysisCard({
               {t("roles.matching.cardDescription")}
             </CardDescription>
           </div>
-          <div className="flex items-end justify-between gap-4 sm:justify-end">
-            {result && (
-              <div className="flex items-end gap-2 whitespace-nowrap">
-                <span className="font-heading text-4xl leading-none font-bold text-primary">
-                  {result.overallMatchScore}%
-                </span>
-                <span className="text-sm leading-none text-muted-foreground">
-                  {t("roles.matching.result.overallMatch")}
-                </span>
-              </div>
-            )}
-            {status !== "current" && (
-              <Badge variant={status === "failed" ? "destructive" : "outline"}>
-                {t(`roles.matchingAnalysisStatus.${status}.label`)}
-              </Badge>
-            )}
-          </div>
+          {matching.result && (
+            <div className="flex items-end gap-2 whitespace-nowrap">
+              <span className="font-heading text-4xl leading-none font-bold text-primary">
+                {matching.result.score}%
+              </span>
+              <span className="text-sm leading-none text-muted-foreground">
+                {t("roles.matching.result.overallMatch")}
+              </span>
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        {synchronizationError ? (
-          <AnalysisGenerating
-            onRetrySynchronization={onRetrySynchronization}
-            pending={pending}
-            synchronizationError
-          />
-        ) : !analysis ? (
-          <Spinner />
-        ) : analysis.status === "blocked" ? (
-          <>
-            {analysis.result && (
-              <Alert>
-                <AlertTitle>{t("roles.matching.stale.title")}</AlertTitle>
-                <AlertDescription>{t("roles.matching.stale.description")}</AlertDescription>
-              </Alert>
-            )}
-            <MatchingPrerequisite reason={analysis.reason} />
-            {analysis.result && <MatchingAnalysisResultView result={analysis.result} />}
-          </>
-        ) : analysis.status === "stale" ? (
-          <>
-            <Alert>
-              <AlertTitle>{t("roles.matching.stale.title")}</AlertTitle>
-              <AlertDescription>{t("roles.matching.stale.description")}</AlertDescription>
-            </Alert>
-            {onGenerate && (
-              <div className="flex justify-end">
-                <Button disabled={pending} onClick={onGenerate} size="sm">
-                  {pending ? (
-                    <Spinner data-icon="inline-start" />
-                  ) : (
-                    <RefreshCwIcon data-icon="inline-start" />
-                  )}
-                  {t("roles.matching.actions.regenerate")}
+        {matching.result && matching.isStale && (
+          <Alert>
+            <AlertTitle>{t("roles.matching.stale.title")}</AlertTitle>
+            <AlertDescription>{t("roles.matching.stale.description")}</AlertDescription>
+          </Alert>
+        )}
+        {isMatchingStateError ? (
+          <Alert variant="destructive">
+            <AlertTitle>{t("roles.matching.synchronization.title")}</AlertTitle>
+            <AlertDescription className="flex flex-col items-start gap-3">
+              <span>{t("roles.matching.synchronization.description")}</span>
+              {onRetryMatchingState && (
+                <Button
+                  disabled={pending}
+                  onClick={onRetryMatchingState}
+                  size="sm"
+                  variant="outline"
+                >
+                  {t("roles.matching.actions.resynchronize")}
                 </Button>
+              )}
+            </AlertDescription>
+          </Alert>
+        ) : !matchingState ? (
+          <Spinner />
+        ) : (
+          <>
+            {active && (
+              <div className="flex items-center gap-3" aria-live="polite">
+                <Spinner />
+                <span>{t(`roles.matchingAnalysisStatus.${matchingState.status}.label`)}</span>
+                {onAbortMatching && (
+                  <Button
+                    disabled={pending || status === "aborting"}
+                    onClick={onAbortMatching}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {t("roles.matching.actions.abort")}
+                  </Button>
+                )}
               </div>
             )}
-            <MatchingAnalysisResultView result={analysis.result} />
+            {matchingState.status === "failed" && (
+              <Alert variant="destructive">
+                <AlertTitle>{t("roles.matching.failed.title")}</AlertTitle>
+                <AlertDescription>
+                  {t(`roles.matching.failureCodes.${matchingState.error.code}`)}
+                </AlertDescription>
+              </Alert>
+            )}
+            {!active && (
+              <>
+                {!matching.result && status === "idle" && (
+                  <p className="text-sm text-muted-foreground">
+                    {t("roles.matchingAnalysisStatus.none.description")}
+                  </p>
+                )}
+                {onStartMatching && (
+                  <div>
+                    <Button disabled={pending} onClick={onStartMatching} size="sm">
+                      {pending && <Spinner data-icon="inline-start" />}
+                      {t(
+                        status === "failed"
+                          ? "roles.matching.actions.retry"
+                          : matching.result
+                            ? "roles.matching.actions.regenerate"
+                            : "roles.matching.actions.generate",
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
           </>
-        ) : analysis.status === "none" ? (
-          <AnalysisEmpty onGenerate={onGenerate} pending={pending} />
-        ) : analysis.status === "generating" ? (
-          <AnalysisGenerating
-            onRetrySynchronization={onRetrySynchronization}
-            pending={pending}
-            synchronizationError={false}
-          />
-        ) : analysis.status === "failed" ? (
-          <AnalysisFailed failureReason={analysis.reason} onRetry={onGenerate} pending={pending} />
-        ) : (
-          <MatchingAnalysisResultView result={analysis.result} />
         )}
+        {matching.result && <MatchingAnalysisResultView result={matching.result} />}
       </CardContent>
     </Card>
   )
 }
 
-function ProfilePrerequisite({ exists }: { exists: boolean }) {
-  const { t } = useTranslation()
-  const key = exists ? "incomplete" : "missing"
-  return (
-    <Alert>
-      <AlertTitle>{t(`roles.matching.prerequisites.profile.${key}.title`)}</AlertTitle>
-      <AlertDescription className="flex flex-col items-start gap-3">
-        <span>{t(`roles.matching.prerequisites.profile.${key}.description`)}</span>
-        <Button nativeButton={false} render={<Link to="/profile" />} size="sm" variant="outline">
-          {t(`roles.matching.prerequisites.profile.${key}.action`)}
-          <ArrowRightIcon data-icon="inline-end" />
-        </Button>
-      </AlertDescription>
-    </Alert>
-  )
-}
-
-function MatchingPrerequisite({
-  reason,
-}: {
-  reason: Extract<MatchingAnalysisState, { status: "blocked" }>["reason"]
-}) {
-  if (reason === "profileMissing" || reason === "profileIncomplete") {
-    return <ProfilePrerequisite exists={reason === "profileIncomplete"} />
-  }
-  const status =
-    reason === "jobDescriptionMissing"
-      ? "missing"
-      : reason === "jobDescriptionFailed"
-        ? "failed"
-        : "extracting"
-  return <JobDescriptionPrerequisite status={status} />
-}
-
-function JobDescriptionPrerequisite({ status }: { status: "missing" | "failed" | "extracting" }) {
-  const { t } = useTranslation()
-  return (
-    <Alert>
-      <AlertTitle>{t(`roles.matching.prerequisites.jd.${status}.title`)}</AlertTitle>
-      <AlertDescription className="flex flex-col items-start gap-3">
-        <span>{t(`roles.matching.prerequisites.jd.${status}.description`)}</span>
-      </AlertDescription>
-    </Alert>
-  )
-}
-
-function AnalysisEmpty({ onGenerate, pending }: { onGenerate?: () => void; pending?: boolean }) {
-  const { t } = useTranslation()
-  return (
-    <div className="flex flex-col items-start gap-3">
-      <p className="text-sm leading-6 text-muted-foreground">
-        {t("roles.matchingAnalysisStatus.none.description")}
-      </p>
-      {onGenerate && (
-        <Button disabled={pending} onClick={onGenerate} size="sm">
-          <SparklesIcon data-icon="inline-start" />
-          {t("roles.matching.actions.generate")}
-        </Button>
-      )}
-    </div>
-  )
-}
-
-function AnalysisGenerating({
-  onRetrySynchronization,
-  pending,
-  synchronizationError,
-}: {
-  onRetrySynchronization?: () => void
-  pending?: boolean
-  synchronizationError: boolean
-}) {
-  const { t } = useTranslation()
-  if (synchronizationError) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>{t("roles.matching.synchronization.title")}</AlertTitle>
-        <AlertDescription className="flex flex-col items-start gap-3">
-          <span>{t("roles.matching.synchronization.description")}</span>
-          {onRetrySynchronization && (
-            <Button disabled={pending} onClick={onRetrySynchronization} size="sm" variant="outline">
-              <RefreshCwIcon data-icon="inline-start" />
-              {t("roles.matching.actions.resynchronize")}
-            </Button>
-          )}
-        </AlertDescription>
-      </Alert>
-    )
-  }
-  return (
-    <div className="flex items-center gap-3" aria-live="polite">
-      <Spinner />
-      <p className="text-sm text-muted-foreground">
-        {t("roles.matchingAnalysisStatus.generating.description")}
-      </p>
-    </div>
-  )
-}
-
-function AnalysisFailed({
-  failureReason,
-  onRetry,
-  pending,
-}: {
-  failureReason: string
-  onRetry?: () => void
-  pending?: boolean
-}) {
-  const { t } = useTranslation()
-  return (
-    <div className="flex flex-col gap-3">
-      <Alert variant="destructive">
-        <AlertTitle>{t("roles.matching.failed.title")}</AlertTitle>
-        <AlertDescription>{failureReason}</AlertDescription>
-      </Alert>
-      {onRetry && (
-        <div>
-          <Button disabled={pending} onClick={onRetry} size="sm">
-            {pending ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <RefreshCwIcon data-icon="inline-start" />
-            )}
-            {t("roles.matching.actions.retry")}
-          </Button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function MatchingAnalysisResultView({ result }: { result: MatchingAnalysisResult }) {
+function MatchingAnalysisResultView({ result }: { result: RoleMatchingResultResponse }) {
   const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-4" data-testid="matching-analysis-result">

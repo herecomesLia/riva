@@ -1,8 +1,5 @@
 import { ApiError } from "@/api/error"
 import { getCareerProfileApi } from "@/api/generated/endpoints/career-profile/career-profile"
-import { getRolesApi } from "@/api/generated/endpoints/roles/roles"
-import { hasJobDescription } from "@/lib/job-description"
-import { isCareerProfileComplete } from "@/lib/career-profile"
 import type {
   CreateRoleRequest,
   HardSkillsRequest,
@@ -19,11 +16,7 @@ import type {
   UpdateJobDescriptionRequest,
   UpdateRoleRequest,
 } from "@/api/generated/models"
-import type {
-  MatchingAnalysisResult,
-  MatchingAnalysisState,
-  RecognizeRoleInput,
-} from "@/mocks/models/role"
+import type { RecognizeRoleInput } from "@/mocks/models/role"
 import {
   jdFailInput,
   jdFailReason,
@@ -37,6 +30,7 @@ import {
 import { createMockApiError } from "@/mocks/utils"
 
 const emptyJd = {
+  updatedAt: "2026-07-01T00:00:00Z",
   responsibilities: [],
   requirements: {
     education: [],
@@ -65,7 +59,6 @@ const JD_PROCESSING_DURATION_MS = 2000
 const JD_ABORT_DURATION_MS = 500
 
 const careerProfileApi = getCareerProfileApi()
-const rolesApi = getRolesApi()
 
 type JdExtractionMock = {
   startedAt: number
@@ -73,29 +66,15 @@ type JdExtractionMock = {
   abortStartedAt?: number
 }
 
-type MatchRecord =
-  | {
-      status: "running"
-      startedAt: number
-      result: MatchingAnalysisResult
-    }
-  | {
-      status: "success"
-      result: MatchingAnalysisResult
-    }
-  | {
-      status: "stale"
-      result: MatchingAnalysisResult
-    }
-
-function toMatchState(match: MatchRecord | undefined): MatchingAnalysisState {
-  if (!match) return { status: "none" }
-  if (match.status === "running") return { status: "generating" }
-  return {
-    status: match.status === "success" ? "current" : "stale",
-    result: structuredClone(match.result),
-  }
+type MatchRecord = {
+  startedAt: number
+  profileUpdatedAt: string | null
+  jdUpdatedAt: string
+  abortStartedAt?: number
 }
+const MATCH_QUEUE_DURATION_MS = 500
+const MATCH_PROCESSING_DURATION_MS = 2000
+const MATCH_ABORT_DURATION_MS = 500
 
 function normalizeRequirements(input: JobRequirementsRequest): JobRequirementsResponse {
   return {
@@ -124,6 +103,7 @@ export function createRoleFaker(initialState: RoleListResponse) {
   let state = structuredClone(initialState)
   const jdExtractions = new Map<string, JdExtractionMock>()
   const matches = new Map<string, MatchRecord>()
+  const snapshots = new Map<string, { profileUpdatedAt: string | null; jdUpdatedAt: string }>()
   let roleSeq = 0
   let timeSeq = 0
 
@@ -153,6 +133,19 @@ export function createRoleFaker(initialState: RoleListResponse) {
     return structuredClone(storedRole)
   }
 
+  function applyJd(role: RoleResponse, jd: JobDescriptionResponse) {
+    const { updatedAt: _oldTime, ...oldContent } = role.jd
+    const { updatedAt: _newTime, ...newContent } = jd
+    if (JSON.stringify(oldContent) === JSON.stringify(newContent)) return structuredClone(role)
+    const updatedAt = nextTime()
+    return replaceRole({
+      ...role,
+      jd: { ...jd, updatedAt },
+      updatedAt,
+      matching: { ...role.matching, isStale: role.matching.result !== null },
+    })
+  }
+
   function getExtractionState(roleId: string): TaskStatusResponse | TaskFailureResponse {
     const role = requireRole(roleId)
     const extraction = jdExtractions.get(roleId)
@@ -172,64 +165,57 @@ export function createRoleFaker(initialState: RoleListResponse) {
     if (extraction.outcome === "failed") {
       return { status: "failed", error: { code: "invalid_output", message: jdFailReason } }
     }
-    replaceRole({ ...role, jd: extractedJdFixture, updatedAt: nextTime() })
+    applyJd(role, extractedJdFixture)
     jdExtractions.delete(roleId)
     return { status: "idle", error: null }
   }
 
-  async function staleMatch(roleId: string) {
-    const match = matches.get(roleId)
-    if (match?.status === "running") {
-      matches.delete(roleId)
-      return
-    }
-    if (match?.status !== "success") return
-    matches.set(roleId, { status: "stale", result: structuredClone(match.result) })
+  async function getProfileUpdatedAt() {
+    return careerProfileApi
+      .getCareerProfile()
+      .then((profile) => profile.updatedAt)
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && error.code === "resource.not_found") return null
+        throw error
+      })
   }
 
   async function clear(roleId: string) {
     jdExtractions.delete(roleId)
     matches.delete(roleId)
+    snapshots.delete(roleId)
   }
 
-  // Provisional matching API: prerequisites are aggregated here, not by the Role UI.
-  async function getMatch(roleId: string): Promise<MatchingAnalysisState> {
-    const task = await rolesApi.getJdExtractionState(roleId)
-    const [roles, profile] = await Promise.all([
-      rolesApi.listRoles(),
-      careerProfileApi.getCareerProfile().catch((error: unknown) => {
-        if (error instanceof ApiError && error.code === "resource.not_found") return null
-        throw error
-      }),
-    ])
-    const role = roles.roles.find((item) => item.id === roleId)
-    if (!role) throw createMockApiError("resource.not_found", "Target role was not found.")
-    const reason = !profile
-      ? "profileMissing"
-      : !isCareerProfileComplete(profile)
-        ? "profileIncomplete"
-        : task.status === "failed"
-          ? "jobDescriptionFailed"
-          : task.status !== "idle"
-            ? "jobDescriptionExtracting"
-            : !hasJobDescription(role.jd)
-              ? "jobDescriptionMissing"
-              : null
-    let record = matches.get(roleId)
-    if (reason) {
+  function getMatchingState(roleId: string): TaskStatusResponse | TaskFailureResponse {
+    const role = requireRole(roleId)
+    const task = matches.get(roleId)
+    if (!task) return { status: "idle", error: null }
+    if (task.abortStartedAt !== undefined) {
+      if (Date.now() - task.abortStartedAt < MATCH_ABORT_DURATION_MS)
+        return { status: "aborting", error: null }
+      matches.delete(roleId)
+      return { status: "idle", error: null }
+    }
+    const elapsed = Date.now() - task.startedAt
+    if (elapsed < MATCH_QUEUE_DURATION_MS) return { status: "queued", error: null }
+    if (elapsed < MATCH_QUEUE_DURATION_MS + MATCH_PROCESSING_DURATION_MS)
+      return { status: "running", error: null }
+    if (task.profileUpdatedAt === null)
       return {
-        status: "blocked",
-        reason,
-        ...(record && record.status !== "running"
-          ? { result: structuredClone(record.result) }
-          : {}),
+        status: "failed",
+        error: { code: "internal_error", message: "Career profile is missing." },
       }
-    }
-    if (record?.status === "running" && Date.now() - record.startedAt >= 1000) {
-      record = { status: "success", result: record.result }
-      matches.set(roleId, record)
-    }
-    return toMatchState(record)
+    snapshots.set(roleId, task)
+    replaceRole({
+      ...role,
+      matching: {
+        result: structuredClone(matchResultFixture),
+        generatedAt: nextTime(),
+        isStale: task.jdUpdatedAt !== role.jd.updatedAt,
+      },
+    })
+    matches.delete(roleId)
+    return { status: "idle", error: null }
   }
 
   async function create(input: CreateRoleRequest): Promise<RoleResponse> {
@@ -241,7 +227,8 @@ export function createRoleFaker(initialState: RoleListResponse) {
       recruitmentTrack: input.recruitmentTrack ?? null,
       location: input.location ?? null,
       isArchived: false,
-      jd: structuredClone(emptyJd),
+      jd: { ...structuredClone(emptyJd), updatedAt: createdAt },
+      matching: { result: null, generatedAt: null, isStale: false },
       createdAt,
       updatedAt: createdAt,
     }
@@ -252,7 +239,16 @@ export function createRoleFaker(initialState: RoleListResponse) {
   }
 
   return {
-    async list(): Promise<RoleListResponse> {
+    async listRoles(): Promise<RoleListResponse> {
+      const profileUpdatedAt = await getProfileUpdatedAt()
+      for (const role of state.roles) {
+        const snapshot = snapshots.get(role.id)
+        if (role.matching.result && snapshot) {
+          role.matching.isStale =
+            snapshot.profileUpdatedAt !== profileUpdatedAt ||
+            snapshot.jdUpdatedAt !== role.jd.updatedAt
+        }
+      }
       return {
         roles: structuredClone(state.roles).sort(
           (left, right) =>
@@ -309,21 +305,30 @@ export function createRoleFaker(initialState: RoleListResponse) {
       jdExtractions.get(roleId)!.abortStartedAt = Date.now()
     },
 
-    async match(roleId: string): Promise<MatchingAnalysisState> {
-      const analysis = await getMatch(roleId)
-      if (analysis.status === "blocked" || analysis.status === "generating") return analysis
-      const task = {
-        status: "running",
+    async startRoleMatching(roleId: string): Promise<void> {
+      if (getExtractionState(roleId).status !== "idle")
+        throw createMockApiError("resource.conflict", "JD extraction must be idle.")
+      const role = requireRole(roleId)
+      const task: MatchRecord = {
         startedAt: Date.now(),
-        result: structuredClone(matchResultFixture),
-      } satisfies MatchRecord
+        profileUpdatedAt: null,
+        jdUpdatedAt: role.jd.updatedAt,
+      }
       matches.set(roleId, task)
-      return { status: "generating" }
+      task.profileUpdatedAt = await getProfileUpdatedAt()
     },
 
-    getMatch,
+    async getRoleMatchingState(roleId: string): Promise<TaskStatusResponse | TaskFailureResponse> {
+      return getMatchingState(roleId)
+    },
 
-    staleMatch,
+    async abortRoleMatching(roleId: string): Promise<void> {
+      const { status } = getMatchingState(roleId)
+      if (status === "aborting") return
+      if (status !== "queued" && status !== "running")
+        throw createMockApiError("resource.conflict", "No active matching task.")
+      matches.get(roleId)!.abortStartedAt = Date.now()
+    },
 
     async update(roleId: string, input: UpdateRoleRequest): Promise<RoleResponse> {
       const role = requireRole(roleId)
@@ -383,28 +388,22 @@ export function createRoleFaker(initialState: RoleListResponse) {
         )
       }
       const role = requireRole(roleId)
-      const updatedRole = replaceRole({
-        ...role,
-        jd: {
-          ...role.jd,
-          ...(input.responsibilities !== undefined
-            ? { responsibilities: input.responsibilities }
-            : {}),
-          ...(input.requirements !== undefined
-            ? { requirements: normalizeRequirements(input.requirements) }
-            : {}),
-          ...(input.hardSkills !== undefined
-            ? { hardSkills: normalizeHardSkills(input.hardSkills) }
-            : {}),
-          ...(input.softSkills !== undefined ? { softSkills: input.softSkills } : {}),
-          ...(input.preferredQualifications !== undefined
-            ? { preferredQualifications: input.preferredQualifications }
-            : {}),
-          ...(input.businessDomains !== undefined
-            ? { businessDomains: input.businessDomains }
-            : {}),
-        },
-        updatedAt: nextTime(),
+      const updatedRole = applyJd(role, {
+        ...role.jd,
+        ...(input.responsibilities !== undefined
+          ? { responsibilities: input.responsibilities }
+          : {}),
+        ...(input.requirements !== undefined
+          ? { requirements: normalizeRequirements(input.requirements) }
+          : {}),
+        ...(input.hardSkills !== undefined
+          ? { hardSkills: normalizeHardSkills(input.hardSkills) }
+          : {}),
+        ...(input.softSkills !== undefined ? { softSkills: input.softSkills } : {}),
+        ...(input.preferredQualifications !== undefined
+          ? { preferredQualifications: input.preferredQualifications }
+          : {}),
+        ...(input.businessDomains !== undefined ? { businessDomains: input.businessDomains } : {}),
       })
       jdExtractions.delete(roleId)
       return updatedRole

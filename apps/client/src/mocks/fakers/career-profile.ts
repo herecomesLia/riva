@@ -17,7 +17,6 @@ import type { ResumeImportInput } from "@/mocks/models/profile"
 import { createMockApiError } from "@/mocks/utils"
 
 const createdAt = "2025-01-15T08:00:00Z"
-const updatedAt = "2025-02-01T08:00:00Z"
 
 type CareerProfileSections = Pick<
   CareerProfileResponse,
@@ -117,10 +116,18 @@ export function createCareerProfileFaker(initialProfile: CareerProfileResponse |
           skills: input.skills ?? profile.skills,
         }),
         createdAt: profile.createdAt,
-        updatedAt,
+        updatedAt: profile.updatedAt,
       }
 
       validateSkills(nextProfile)
+      if (
+        JSON.stringify(normalizeSections(nextProfile)) !==
+        JSON.stringify(normalizeSections(profile))
+      ) {
+        nextProfile.updatedAt = new Date(
+          Math.max(Date.now(), Date.parse(profile.updatedAt) + 1),
+        ).toISOString()
+      }
       profile = nextProfile
       return structuredClone(profile)
     },

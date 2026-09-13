@@ -21,7 +21,7 @@ function DetailsHarness({ initialTab = "overview" }: { initialTab?: RoleTab }) {
       onTabChange={setActiveTab}
       role={response.roles[0]!}
       jdTask={response.jdTasksByRoleId[response.roles[0]!.id]}
-      analysis={response.matchingByRoleId[response.roles[0]!.id]}
+      matchingState={response.matchingStatesByRoleId[response.roles[0]!.id]}
     />
   )
 }
@@ -37,7 +37,7 @@ function ArchivedDetailsHarness() {
       onTabChange={setActiveTab}
       role={archivedRole}
       jdTask={response.jdTasksByRoleId[archivedRole.id]}
-      analysis={response.matchingByRoleId[archivedRole.id]}
+      matchingState={response.matchingStatesByRoleId[archivedRole.id]}
     />
   )
 }

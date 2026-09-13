@@ -7,7 +7,7 @@ import type {
   TrainingEntryRoleAvailability,
 } from "@/models/training-entry"
 import type { RoleListResponse } from "@/api/generated/models"
-import { getRoles } from "@/services/roles"
+import { listRoles } from "@/services/roles"
 
 function setupContext(roles: RoleListResponse["roles"]): PracticeSetupContext {
   const supportedQuestionTypes: QuestionType[] = [
@@ -32,7 +32,7 @@ function setupContext(roles: RoleListResponse["roles"]): PracticeSetupContext {
 }
 
 export async function getPracticePage(): Promise<PracticeData> {
-  const [roles, session] = await Promise.all([getRoles(), practiceFaker.get()])
+  const [roles, session] = await Promise.all([listRoles(), practiceFaker.get()])
   const context = setupContext(roles.roles)
   if (session.status === "setup") {
     const available = (id: string | null) => context.roles.some((role) => role.id === id)
@@ -48,7 +48,7 @@ export async function getPracticePage(): Promise<PracticeData> {
 export async function preparePracticeTrainingEntry(
   input: PracticeTrainingEntryParameters,
 ): Promise<PracticeTrainingEntryPreparationResponse> {
-  const [roles, session] = await Promise.all([getRoles(), practiceFaker.get()])
+  const [roles, session] = await Promise.all([listRoles(), practiceFaker.get()])
   const context = setupContext(roles.roles)
   const role = roles.roles.find((role) => role.id === input.roleId)
   const availability: TrainingEntryRoleAvailability = !role

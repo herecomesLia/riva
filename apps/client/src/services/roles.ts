@@ -9,7 +9,7 @@ import type {
   RoleListResponse,
 } from "@/api/generated/models"
 import { roleFaker } from "@/mocks/fakers/role"
-import type { MatchingAnalysisState, RecognizeRoleInput } from "@/mocks/models/role"
+import type { RecognizeRoleInput } from "@/mocks/models/role"
 
 const rolesApi = rolesEndpoints.getRolesApi()
 
@@ -24,7 +24,7 @@ export function abortJdExtraction(roleId: string): Promise<void> {
   return rolesApi.abortJdExtraction(roleId)
 }
 
-export function getRoles(): Promise<RoleListResponse> {
+export function listRoles(): Promise<RoleListResponse> {
   return rolesApi.listRoles()
 }
 
@@ -54,17 +54,14 @@ export function restoreRole(roleId: string): Promise<RoleResponse> {
 
 export async function deleteRole(roleId: string): Promise<void> {
   await rolesApi.deleteRole(roleId)
-  await roleFaker.clear(roleId)
 }
 
-export async function extractJd(roleId: string, text: string): Promise<void> {
+export async function extractJdFromText(roleId: string, text: string): Promise<void> {
   await rolesApi.extractJdFromText(roleId, { text })
-  await roleFaker.staleMatch(roleId)
 }
 
 export async function retryJdExtraction(roleId: string): Promise<void> {
   await rolesApi.retryJdExtraction(roleId)
-  await roleFaker.staleMatch(roleId)
 }
 
 export async function updateJd(
@@ -72,14 +69,20 @@ export async function updateJd(
   input: UpdateJobDescriptionRequest,
 ): Promise<RoleResponse> {
   const role = await rolesApi.updateJd(roleId, input)
-  await roleFaker.staleMatch(roleId)
   return role
 }
 
-export function match(roleId: string): Promise<MatchingAnalysisState> {
-  return roleFaker.match(roleId)
+export function startRoleMatching(roleId: string): Promise<void> {
+  return rolesApi.startRoleMatching(roleId)
 }
 
-export function getMatchingAnalysis(roleId: string): Promise<MatchingAnalysisState> {
-  return roleFaker.getMatch(roleId)
+export function getRoleMatchingState(
+  roleId: string,
+  signal?: AbortSignal,
+): Promise<TaskStatusResponse | TaskFailureResponse> {
+  return rolesApi.getRoleMatchingState(roleId, { signal })
+}
+
+export function abortRoleMatching(roleId: string): Promise<void> {
+  return rolesApi.abortRoleMatching(roleId)
 }

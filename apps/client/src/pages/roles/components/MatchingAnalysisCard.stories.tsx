@@ -22,28 +22,21 @@ const meta = preview.meta({
 function argsFor(scenario: Parameters<typeof createRoleStoryResponse>[0]) {
   const response = createRoleStoryResponse(scenario)
   return {
-    analysis: response.matchingByRoleId[response.roles[0]!.id],
-    synchronizationError: false,
+    matching: response.roles[0]!.matching,
+    matchingState: response.matchingStatesByRoleId[response.roles[0]!.id],
+    isMatchingStateError: false,
   }
 }
 
-export const ProfileMissing = meta.story({ args: argsFor("profileMissing") })
-export const ProfileIncomplete = meta.story({ args: argsFor("profileIncomplete") })
-export const JobDescriptionMissing = meta.story({
-  args: argsFor("singleRoleWithoutJobDescription"),
-})
-export const JobDescriptionExtracting = meta.story({
-  args: argsFor("roleWithJobDescriptionExtracting"),
-})
 export const None = meta.story({
-  args: { ...argsFor("roleWithExtractedJobDescription"), onGenerate: fn() },
+  args: { ...argsFor("roleWithExtractedJobDescription"), onStartMatching: fn() },
 })
 export const Generating = meta.story({ args: argsFor("matchingAnalysisGenerating") })
 export const SynchronizationError = meta.story({
   args: {
     ...argsFor("matchingAnalysisGenerating"),
-    onRetrySynchronization: fn(),
-    synchronizationError: true,
+    onRetryMatchingState: fn(),
+    isMatchingStateError: true,
   },
 })
 
@@ -51,15 +44,16 @@ function SynchronizationRetryHarness() {
   const initial = createRoleStoryResponse("matchingAnalysisGenerating")
   const completed = createRoleStoryResponse("matchingAnalysisCurrent")
   const [response, setResponse] = useState(initial)
-  const [synchronizationError, setSynchronizationError] = useState(true)
+  const [isMatchingStateError, setSynchronizationError] = useState(true)
   return (
     <MatchingAnalysisCard
-      onRetrySynchronization={() => {
+      onRetryMatchingState={() => {
         setSynchronizationError(false)
         setResponse(completed)
       }}
-      analysis={response.matchingByRoleId[response.roles[0]!.id]}
-      synchronizationError={synchronizationError}
+      matching={response.roles[0]!.matching}
+      matchingState={response.matchingStatesByRoleId[response.roles[0]!.id]}
+      isMatchingStateError={isMatchingStateError}
     />
   )
 }
@@ -72,10 +66,10 @@ export const SynchronizationRetry = meta.story({
   },
 })
 export const Failed = meta.story({
-  args: { ...argsFor("matchingAnalysisFailed"), onGenerate: fn() },
+  args: { ...argsFor("matchingAnalysisFailed"), onStartMatching: fn() },
 })
 export const Stale = meta.story({
-  args: { ...argsFor("matchingAnalysisStale"), onGenerate: fn() },
+  args: { ...argsFor("matchingAnalysisStale"), onStartMatching: fn() },
 })
 export const Current = meta.story({ args: argsFor("matchingAnalysisCurrent") })
 
@@ -83,8 +77,9 @@ const staleWhileExtracting = createStaleWhileExtractingResponse()
 
 export const StaleWhileJobDescriptionExtracting = meta.story({
   args: {
-    analysis: staleWhileExtracting.matchingByRoleId[staleWhileExtracting.roles[0]!.id],
-    synchronizationError: false,
+    matching: staleWhileExtracting.roles[0]!.matching,
+    matchingState: staleWhileExtracting.matchingStatesByRoleId[staleWhileExtracting.roles[0]!.id],
+    isMatchingStateError: false,
   },
 })
 
@@ -92,8 +87,9 @@ const longMatchingAnalysis = createLongMatchingAnalysisResponse()
 
 export const LongMatchingAnalysis = meta.story({
   args: {
-    analysis: longMatchingAnalysis.matchingByRoleId[longMatchingAnalysis.roles[0]!.id],
-    synchronizationError: false,
+    matching: longMatchingAnalysis.roles[0]!.matching,
+    matchingState: longMatchingAnalysis.matchingStatesByRoleId[longMatchingAnalysis.roles[0]!.id],
+    isMatchingStateError: false,
   },
 })
 
@@ -108,9 +104,10 @@ function AnalysisFlowHarness({
 
   return (
     <MatchingAnalysisCard
-      onGenerate={() => setResponse(completed)}
-      analysis={response.matchingByRoleId[role.id]}
-      synchronizationError={false}
+      onStartMatching={() => setResponse(completed)}
+      matching={response.roles[0]!.matching}
+      matchingState={response.matchingStatesByRoleId[role.id]}
+      isMatchingStateError={false}
     />
   )
 }
@@ -138,5 +135,27 @@ export const RetryFailed = meta.story({
   play: async ({ userEvent }) => {
     await userEvent.click(screen.getByRole("button", { name: /重试生成|retry generation/i }))
     await expect(screen.getByTestId("matching-analysis-result")).toBeVisible()
+  },
+})
+
+export const OldResultRunning = meta.story({
+  args: {
+    ...argsFor("matchingAnalysisStale"),
+    matchingState: { status: "running", error: null },
+    onAbortMatching: fn(),
+  },
+})
+export const OldResultFailed = meta.story({
+  args: {
+    ...argsFor("matchingAnalysisStale"),
+    matchingState: { status: "failed", error: { code: "llm_unavailable", message: "Unavailable" } },
+    onStartMatching: fn(),
+  },
+})
+export const OldResultAborting = meta.story({
+  args: {
+    ...argsFor("matchingAnalysisStale"),
+    matchingState: { status: "aborting", error: null },
+    onAbortMatching: fn(),
   },
 })

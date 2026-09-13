@@ -27,7 +27,7 @@ vi.mock("@/api/generated/endpoints/career-profile/career-profile", () => ({
 
 function createFaker(initial: Parameters<typeof createRoleFaker>[0]) {
   const faker = createRoleFaker(initial)
-  vi.mocked(rolesApi.listRoles).mockImplementation(faker.list)
+  vi.mocked(rolesApi.listRoles).mockImplementation(faker.listRoles)
   vi.mocked(rolesApi.getJdExtractionState).mockImplementation(faker.getJdExtractionState)
   vi.mocked(careerProfileApi.getCareerProfile).mockResolvedValue(careerProfileFixture)
   return faker
@@ -39,19 +39,19 @@ describe("roleFaker", () => {
     const faker = createFaker({ roles: [], activeRoleId: null })
 
     const created = await faker.create({ title: "Staff Platform Engineer" })
-    let state = await faker.list()
+    let state = await faker.listRoles()
     expect(state.roles[0]).toEqual(created)
     expect(state.activeRoleId).toBeNull()
 
     await faker.setActive({ roleId: created.id })
     await expect(faker.archive(created.id)).resolves.toMatchObject({ isArchived: true })
-    expect((await faker.list()).activeRoleId).toBeNull()
+    expect((await faker.listRoles()).activeRoleId).toBeNull()
 
     await expect(faker.restore(created.id)).resolves.toMatchObject({ isArchived: false })
     await faker.setActive({ roleId: created.id })
     await faker.delete(created.id)
 
-    state = await faker.list()
+    state = await faker.listRoles()
     expect(state.roles).not.toContainEqual(expect.objectContaining({ id: created.id }))
     expect(state.activeRoleId).toBeNull()
   })
@@ -64,7 +64,7 @@ describe("roleFaker", () => {
       code: "resource.conflict",
     })
 
-    const state = await faker.list()
+    const state = await faker.listRoles()
     expect(state.activeRoleId).toBeNull()
     expect(state.roles.find(({ id }) => id === roleFixture.id)?.isArchived).toBe(true)
   })
@@ -104,7 +104,7 @@ describe("roleFaker", () => {
     const faker = createFaker(roleListFixture)
     const role = await faker.recognizeRole({ sourceType: "text", text: "Job posting" })
     expect(role).toMatchObject({ ...textRoleFixture, jd: extractedJdFixture })
-    expect((await faker.list()).roles).toContainEqual(role)
+    expect((await faker.listRoles()).roles).toContainEqual(role)
   })
 
   it("advances extraction by elapsed time and preserves JD when aborted", async () => {
@@ -135,14 +135,16 @@ describe("roleFaker", () => {
       status: "idle",
       error: null,
     })
-    expect((await faker.list()).roles[0]?.jd).toEqual(role.jd)
+    expect((await faker.listRoles()).roles[0]?.jd).toEqual(role.jd)
     await faker.extractJd(role.id, { text: "Replacement JD" })
     now.mockReturnValue(3500)
     await expect(faker.getJdExtractionState(role.id)).resolves.toEqual({
       status: "idle",
       error: null,
     })
-    expect((await faker.list()).roles[0]?.jd).toEqual(extractedJdFixture)
+    const extracted = (await faker.listRoles()).roles[0]!
+    expect(extracted.jd).toEqual({ ...extractedJdFixture, updatedAt: extracted.updatedAt })
+    expect(extracted.jd.updatedAt).not.toBe(role.jd.updatedAt)
     await expect(faker.retryJdExtraction(role.id)).rejects.toMatchObject({
       code: "resource.conflict",
     })
@@ -156,7 +158,7 @@ describe("roleFaker", () => {
     const failed = { status: "failed", error: { code: "invalid_output", message: jdFailReason } }
     await expect(faker.getJdExtractionState(roleFixture.id)).resolves.toEqual(failed)
     await expect(faker.getJdExtractionState(roleFixture.id)).resolves.toEqual(failed)
-    expect((await faker.list()).roles.find(({ id }) => id === roleFixture.id)?.jd).toEqual(
+    expect((await faker.listRoles()).roles.find(({ id }) => id === roleFixture.id)?.jd).toEqual(
       roleFixture.jd,
     )
     await expect(faker.abortJdExtraction(roleFixture.id)).rejects.toMatchObject({
@@ -181,78 +183,53 @@ describe("roleFaker", () => {
     })
   })
 
-  it("advances a match from running to an idempotent fixed success", async () => {
+  it("persists matching results and derives freshness from actual JD and Profile changes", async () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(0)
     const faker = createFaker(roleListFixture)
-
-    await expect(faker.getMatch(roleFixture.id)).resolves.toEqual({ status: "none" })
-    await expect(faker.match(roleFixture.id)).resolves.toEqual({
-      status: "generating",
-    })
-
-    await expect(faker.getMatch(roleFixture.id)).resolves.toEqual({ status: "generating" })
+    await faker.startRoleMatching(roleFixture.id)
+    expect((await faker.getRoleMatchingState(roleFixture.id)).status).toBe("queued")
     now.mockReturnValue(1000)
-    const success = await faker.getMatch(roleFixture.id)
-    expect(success).toEqual({ status: "current", result: matchResultFixture })
-    await expect(faker.getMatch(roleFixture.id)).resolves.toEqual(success)
+    expect((await faker.getRoleMatchingState(roleFixture.id)).status).toBe("running")
+    now.mockReturnValue(3000)
+    expect((await faker.getRoleMatchingState(roleFixture.id)).status).toBe("idle")
+    const matching = (await faker.listRoles()).roles.find((r) => r.id === roleFixture.id)!.matching
+    expect(matching).toMatchObject({ result: matchResultFixture, isStale: false })
+    await faker.updateJd(roleFixture.id, { softSkills: roleFixture.jd.softSkills })
+    expect(
+      (await faker.listRoles()).roles.find((r) => r.id === roleFixture.id)!.matching.isStale,
+    ).toBe(false)
+    careerProfileApi.getCareerProfile.mockResolvedValue({
+      ...careerProfileFixture,
+      updatedAt: "2026-08-02T00:00:00Z",
+    })
+    expect(
+      (await faker.listRoles()).roles.find((r) => r.id === roleFixture.id)!.matching.isStale,
+    ).toBe(true)
+    careerProfileApi.getCareerProfile.mockResolvedValue(careerProfileFixture)
+    await faker.updateJd(roleFixture.id, { softSkills: ["Changed"] })
+    expect(
+      (await faker.listRoles()).roles.find((r) => r.id === roleFixture.id)!.matching.isStale,
+    ).toBe(true)
   })
 
-  it("clears workflow state without deleting the formal role", async () => {
-    const faker = createFaker({ roles: [], activeRoleId: null })
-    const role = await faker.create({ title: "Staff Platform Engineer" })
-    await faker.extractJd(role.id, { text: "JD text" })
-    await faker.match(role.id)
-
-    await faker.clear(role.id)
-
-    await expect(faker.getJdExtractionState(role.id)).resolves.toEqual({
-      status: "idle",
-      error: null,
-    })
-    await expect(faker.getMatch(role.id)).resolves.toEqual({
-      status: "blocked",
-      reason: "jobDescriptionMissing",
-    })
-    expect((await faker.list()).roles).toContainEqual(role)
-  })
-
-  it("keeps a successful match stale across JD changes until regeneration", async () => {
+  it("preserves the last success on cancellation and supersedes older tasks", async () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(0)
     const faker = createFaker(roleListFixture)
-    await faker.match(roleFixture.id)
-    now.mockReturnValue(1000)
-    await faker.getMatch(roleFixture.id)
-
-    await faker.updateJd(roleFixture.id, { softSkills: ["Stakeholder management"] })
-    await faker.staleMatch(roleFixture.id)
-    await expect(faker.getMatch(roleFixture.id)).resolves.toEqual({
-      status: "stale",
-      result: matchResultFixture,
-    })
-
-    await expect(faker.match(roleFixture.id)).resolves.toEqual({
-      status: "generating",
-    })
-    await expect(faker.getMatch(roleFixture.id)).resolves.toEqual({
-      status: "generating",
-    })
-    now.mockReturnValue(2000)
-    await expect(faker.getMatch(roleFixture.id)).resolves.toEqual({
-      status: "current",
-      result: matchResultFixture,
-    })
-
-    await faker.extractJd(roleFixture.id, { text: "Replacement JD" })
-    await faker.staleMatch(roleFixture.id)
-    await expect(faker.getMatch(roleFixture.id)).resolves.toEqual({
-      status: "blocked",
-      reason: "jobDescriptionExtracting",
-      result: matchResultFixture,
-    })
-
-    await faker.delete(roleFixture.id)
-    await expect(faker.getMatch(roleFixture.id)).rejects.toMatchObject({
-      code: "resource.not_found",
-    })
+    await faker.startRoleMatching(roleFixture.id)
+    now.mockReturnValue(3000)
+    await faker.getRoleMatchingState(roleFixture.id)
+    const saved = (await faker.listRoles()).roles.find((r) => r.id === roleFixture.id)!.matching
+    await faker.startRoleMatching(roleFixture.id)
+    now.mockReturnValue(5000)
+    await faker.startRoleMatching(roleFixture.id)
+    now.mockReturnValue(6000)
+    expect((await faker.getRoleMatchingState(roleFixture.id)).status).toBe("running")
+    await faker.abortRoleMatching(roleFixture.id)
+    expect((await faker.getRoleMatchingState(roleFixture.id)).status).toBe("aborting")
+    now.mockReturnValue(7000)
+    expect((await faker.getRoleMatchingState(roleFixture.id)).status).toBe("idle")
+    expect((await faker.listRoles()).roles.find((r) => r.id === roleFixture.id)!.matching).toEqual(
+      saved,
+    )
   })
 })

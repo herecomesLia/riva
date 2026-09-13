@@ -10,15 +10,22 @@ export function RoleProgressSummary({
   isCurrent,
   role,
   jdTask,
-  analysis,
+  matchingState,
 }: {
   isCurrent: boolean
   jdTask: RoleResources["jdTasksByRoleId"][string]
-  analysis: RoleResources["matchingByRoleId"][string]
+  matchingState: RoleResources["matchingStatesByRoleId"][string]
   role: RoleResponse
 }) {
   const { i18n, t } = useTranslation()
-  const matchingStatus = analysis?.status ?? "loading"
+  const matchingStatus =
+    matchingState && matchingState.status !== "idle"
+      ? matchingState.status
+      : role.matching.result
+        ? role.matching.isStale
+          ? "stale"
+          : "current"
+        : "none"
   const roleStatus = role.isArchived ? "archived" : "active"
   const updatedAt = new Intl.DateTimeFormat(i18n.language, {
     dateStyle: "medium",

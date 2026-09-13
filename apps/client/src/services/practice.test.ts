@@ -3,10 +3,10 @@ import { practiceFaker } from "@/mocks/fakers/practice"
 import { practiceFixture } from "@/mocks/fixtures/practice"
 import { roleFixture } from "@/mocks/fixtures/role"
 import type { RoleListResponse } from "@/api/generated/models"
-import { getRoles } from "@/services/roles"
+import { listRoles } from "@/services/roles"
 import { getPracticePage, preparePracticeTrainingEntry } from "@/services/practice"
 
-vi.mock("@/services/roles", () => ({ getRoles: vi.fn() }))
+vi.mock("@/services/roles", () => ({ listRoles: vi.fn() }))
 
 const roles: RoleListResponse = {
   roles: ["first", "active", "archived"].map((id) => ({
@@ -19,7 +19,7 @@ const roles: RoleListResponse = {
 
 beforeEach(() => {
   vi.restoreAllMocks()
-  vi.mocked(getRoles).mockResolvedValue(structuredClone(roles))
+  vi.mocked(listRoles).mockResolvedValue(structuredClone(roles))
   vi.spyOn(practiceFaker, "get").mockResolvedValue({
     status: "setup",
     selection: structuredClone(practiceFixture.selection),
@@ -60,11 +60,11 @@ describe("Practice service", () => {
       status: "setup",
       selection: { ...practiceFixture.selection, roleId: "deleted" },
     })
-    vi.mocked(getRoles).mockResolvedValue({ ...roles, activeRoleId: "archived" })
+    vi.mocked(listRoles).mockResolvedValue({ ...roles, activeRoleId: "archived" })
     expect((await getPracticePage()).session).toMatchObject({
       selection: { roleId: "first" },
     })
-    vi.mocked(getRoles).mockResolvedValue({ ...roles, roles: [] })
+    vi.mocked(listRoles).mockResolvedValue({ ...roles, roles: [] })
     expect((await getPracticePage()).session).toMatchObject({ selection: { roleId: null } })
 
     const session = {

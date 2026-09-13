@@ -24,8 +24,9 @@ export type RoleDetailsActions = {
   retryJdSynchronization: () => void
   retryJdExtraction: () => void
   abortJdExtraction: () => void
-  generateMatch: () => void
-  retryMatchSynchronization: () => void
+  startMatching: () => void
+  abortMatching: () => void
+  retryMatchingState: () => void
 }
 
 export function RoleDetails({
@@ -35,7 +36,7 @@ export function RoleDetails({
   onTabChange,
   pending,
   jdTask,
-  analysis,
+  matchingState,
   role,
   jdSynchronizationError = false,
   matchSynchronizationError = false,
@@ -48,7 +49,7 @@ export function RoleDetails({
   onTabChange: (tab: RoleTab) => void
   pending?: boolean
   jdTask: RoleResources["jdTasksByRoleId"][string]
-  analysis: RoleResources["matchingByRoleId"][string]
+  matchingState: RoleResources["matchingStatesByRoleId"][string]
   role: RoleResponse
 }) {
   const { t } = useTranslation()
@@ -123,11 +124,13 @@ export function RoleDetails({
           <TabsContent value="matching-analysis">
             {activeTab === "matching-analysis" && (
               <MatchingAnalysisCard
-                onGenerate={actions?.generateMatch}
-                onRetrySynchronization={actions?.retryMatchSynchronization}
+                onStartMatching={actions?.startMatching}
+                onAbortMatching={actions?.abortMatching}
+                onRetryMatchingState={actions?.retryMatchingState}
                 pending={pending}
-                analysis={analysis}
-                synchronizationError={matchSynchronizationError}
+                matching={role.matching}
+                matchingState={matchingState}
+                isMatchingStateError={matchSynchronizationError}
               />
             )}
           </TabsContent>

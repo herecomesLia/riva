@@ -25,7 +25,6 @@ export const SavedRoles = meta.story({
     onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: singleRoleResponse.roles,
-    matchingByRoleId: singleRoleResponse.matchingByRoleId,
     selectedRoleId: singleRoleResponse.activeRoleId,
   },
 })
@@ -37,7 +36,6 @@ export const MixedRoles = meta.story({
     onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: multipleRolesResponse.roles,
-    matchingByRoleId: multipleRolesResponse.matchingByRoleId,
     selectedRoleId: currentRole.id,
   },
 })
@@ -51,7 +49,6 @@ export const SelectedRoleDifferentFromCurrent = meta.story({
     onCategoryChange: fn(),
     onSelectRole,
     roles: multipleRolesResponse.roles,
-    matchingByRoleId: multipleRolesResponse.matchingByRoleId,
     selectedRoleId: selectedRole.id,
   },
   play: async ({ userEvent }) => {
@@ -78,7 +75,6 @@ export const ArchivedRoles = meta.story({
     onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: archivedRolesResponse.roles,
-    matchingByRoleId: archivedRolesResponse.matchingByRoleId,
     selectedRoleId: archivedRole.id,
   },
 })
@@ -90,7 +86,6 @@ export const ScrollableRolesList = meta.story({
     onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: createManyRolesResponse().roles,
-    matchingByRoleId: createManyRolesResponse().matchingByRoleId,
     selectedRoleId: currentRole.id,
   },
 })
@@ -107,7 +102,6 @@ export const RolesWithAndWithoutMatchScore = meta.story({
     onCategoryChange: fn(),
     onSelectRole: fn(),
     roles: [scoreResponse.roles[0]!, roleWithoutScore],
-    matchingByRoleId: scoreResponse.matchingByRoleId,
     selectedRoleId: scoreResponse.roles[0]!.id,
   },
 })

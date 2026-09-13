@@ -1,4 +1,7 @@
 import {
+  getStartRoleMatchingMockHandler,
+  getGetRoleMatchingStateMockHandler,
+  getAbortRoleMatchingMockHandler,
   getArchiveRoleMockHandler,
   getCreateRoleMockHandler,
   getDeleteRoleMockHandler,
@@ -28,7 +31,16 @@ const roleFaker = asMswFaker(baseFaker, {
 })
 
 export const roleHandlers = [
-  getListRolesMockHandler(() => roleFaker.list()),
+  getStartRoleMatchingMockHandler(({ params }) =>
+    roleFaker.startRoleMatching(params.roleId as string),
+  ),
+  getGetRoleMatchingStateMockHandler(({ params }) =>
+    roleFaker.getRoleMatchingState(params.roleId as string),
+  ),
+  getAbortRoleMatchingMockHandler(({ params }) =>
+    roleFaker.abortRoleMatching(params.roleId as string),
+  ),
+  getListRolesMockHandler(() => roleFaker.listRoles()),
   getCreateRoleMockHandler(async ({ request }) => {
     const input = (await request.json()) as CreateRoleRequest
     return roleFaker.create(input)

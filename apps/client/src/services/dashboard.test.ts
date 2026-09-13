@@ -6,31 +6,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { dashboardFixture } from "@/mocks/fixtures/dashboard"
 import { matchResultFixture, roleFixture } from "@/mocks/fixtures/role"
 import type { RoleResponse } from "@/api/generated/models"
-import { getRoles, getMatchingAnalysis, getJdExtractionState } from "@/services/roles"
+import { listRoles, getJdExtractionState } from "@/services/roles"
 import { getDashboardData } from "./dashboard"
 
 vi.mock("@/services/roles", () => ({
-  getRoles: vi.fn(),
-  getMatchingAnalysis: vi.fn(),
+  listRoles: vi.fn(),
   getJdExtractionState: vi.fn(),
 }))
 vi.mock("@/services/profile", () => ({ getProfile: vi.fn() }))
 beforeEach(() => {
   vi.mocked(getProfile).mockResolvedValue(careerProfileFixture)
   vi.mocked(getJdExtractionState).mockResolvedValue({ status: "idle", error: null })
-  vi.mocked(getMatchingAnalysis).mockResolvedValue({
-    status: "current",
-    result: matchResultFixture,
-  })
 })
 
 const role = {
   ...structuredClone(roleFixture),
+  matching: { result: matchResultFixture, generatedAt: "2026-07-14T00:00:00Z", isStale: false },
 } satisfies RoleResponse
 
 describe("getDashboardData", () => {
   it("projects the active role and uses fixed training data", async () => {
-    vi.mocked(getRoles).mockResolvedValue({
+    vi.mocked(listRoles).mockResolvedValue({
       roles: [role],
       activeRoleId: role.id,
     })
@@ -49,13 +45,13 @@ describe("getDashboardData", () => {
       },
       metrics: {
         ...dashboardFixture.metrics,
-        roleFit: { currentValue: matchResultFixture.overallMatchScore, previousValue: null },
+        roleFit: { currentValue: matchResultFixture.score, previousValue: null },
       },
     })
   })
 
   it("keeps training data when no role is active", async () => {
-    vi.mocked(getRoles).mockResolvedValue({
+    vi.mocked(listRoles).mockResolvedValue({
       roles: [role],
       activeRoleId: null,
     })
@@ -66,11 +62,8 @@ describe("getDashboardData", () => {
     const incomplete: RoleResponse = structuredClone(role)
     incomplete.jd = createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!.jd
     vi.mocked(getProfile).mockResolvedValue({ ...careerProfileFixture, skills: [] })
-    vi.mocked(getMatchingAnalysis).mockResolvedValue({
-      status: "stale",
-      result: matchResultFixture,
-    })
-    vi.mocked(getRoles).mockResolvedValue({
+    incomplete.matching.isStale = true
+    vi.mocked(listRoles).mockResolvedValue({
       roles: [incomplete],
       activeRoleId: incomplete.id,
     })
