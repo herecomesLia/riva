@@ -39,6 +39,12 @@ async def test_role_http_lifecycle_covers_all_endpoints(
         location="Remote",
     )
     second = await _create_role(client, "Platform Engineer")
+    assert first["matching"] == {
+        "result": None,
+        "isStale": False,
+        "generatedAt": None,
+    }
+    assert first["jd"]["updatedAt"]
 
     update_response = await client.patch(
         f"/api/roles/{first['id']}",
@@ -300,3 +306,201 @@ async def test_jd_extraction_hides_other_users_roles(
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "resource.not_found"
+
+
+async def test_matching_http_lifecycle_and_saved_result(client, database):
+    from riva.models.career_profile import CareerProfile
+    from riva.models.role import RoleMatchingResult
+
+    await register_user(client)
+    role = await _create_role(client, "Engineer")
+    path = f"/api/roles/{role['id']}/matching"
+    assert (await client.get(path)).json() == {"status": "idle", "error": None}
+    assert (
+        await client.post(f"{path}/abort", headers=ORIGIN_HEADERS)
+    ).status_code == 409
+    async with database.sessionmaker() as session:
+        stored = await session.get(Role, UUID(role["id"]))
+        session.add(CareerProfile(user_id=stored.user_id, skills=["Python"]))
+        stored.matching.result = RoleMatchingResult(
+            score=75,
+            core_requirements="APIs",
+            resume_strengths=["Python"],
+            resume_gaps=[],
+            resume_optimization_suggestions=[],
+            interview_preparation_suggestions=[],
+        )
+        stored.matching.generated_at = stored.created_at
+        stored.matching.profile_updated_at = stored.created_at
+        stored.matching.jd_updated_at = stored.jd.updated_at
+        await session.commit()
+    response = await client.post(path, headers=ORIGIN_HEADERS)
+    assert response.status_code == 202
+    assert response.content == b""
+    assert (await client.get(path)).json()["status"] == "queued"
+    response = await client.post(path, headers=ORIGIN_HEADERS)
+    assert response.status_code == 202
+    response = await client.post(f"{path}/abort", headers=ORIGIN_HEADERS)
+    assert response.status_code == 202
+    assert response.content == b""
+    assert (await client.get(path)).json()["status"] == "idle"
+    assert (
+        await client.post(f"{path}/abort", headers=ORIGIN_HEADERS)
+    ).status_code == 409
+    saved = (await client.get("/api/roles")).json()["roles"][0]["matching"]
+    assert set(saved) == {"result", "generatedAt", "isStale"}
+    assert saved["result"] == {
+        "score": 75,
+        "coreRequirements": "APIs",
+        "resumeStrengths": ["Python"],
+        "resumeGaps": [],
+        "resumeOptimizationSuggestions": [],
+        "interviewPreparationSuggestions": [],
+    }
+    assert saved["generatedAt"]
+    assert saved["isStale"] is True
+
+
+@pytest.mark.parametrize(
+    ("method", "suffix"), [("POST", ""), ("GET", ""), ("POST", "/abort")]
+)
+async def test_matching_hides_other_users_roles(client, method, suffix):
+    await register_user(client)
+    role = await _create_role(client, "Private")
+    await register_user(client, username="OtherUser")
+    response = await client.request(
+        method, f"/api/roles/{role['id']}/matching{suffix}", headers=ORIGIN_HEADERS
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "resource.not_found"
+
+
+@pytest.mark.parametrize(
+    ("code", "message"),
+    [
+        (TaskErrorCode.INVALID_OUTPUT, "Unable to complete the task."),
+        (TaskErrorCode.INTERNAL_ERROR, "Unable to complete the task."),
+        (TaskErrorCode.LLM_UNAVAILABLE, "LLM service is temporarily unavailable."),
+    ],
+)
+async def test_matching_failure_public_state(client, database, code, message):
+    from riva.models.career_profile import CareerProfile
+
+    await register_user(client)
+    role = await _create_role(client, "Engineer")
+    async with database.sessionmaker() as session:
+        stored = await session.get(Role, UUID(role["id"]))
+        session.add(CareerProfile(user_id=stored.user_id))
+        await session.commit()
+    path = f"/api/roles/{role['id']}/matching"
+    assert (await client.post(path, headers=ORIGIN_HEADERS)).status_code == 202
+    async with database.sessionmaker() as session:
+        stored = await session.get(Role, UUID(role["id"]))
+        stored.matching.error_code = code
+        await session.execute(text("SET LOCAL search_path TO procrastinate, public"))
+        await session.execute(
+            text("UPDATE procrastinate_jobs SET status = 'failed' WHERE id = :id"),
+            {"id": stored.matching.job_id},
+        )
+        await session.commit()
+    response = await client.get(path)
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "failed",
+        "error": {"code": code.value, "message": message},
+    }
+
+
+@pytest.mark.parametrize(
+    ("change", "expected"),
+    [
+        ("no-result", False),
+        ("unchanged", False),
+        ("profile", True),
+        ("jd", True),
+        ("missing-profile", True),
+    ],
+)
+async def test_matching_freshness_uses_current_inputs(
+    client, database, change, expected
+):
+    from datetime import timedelta
+
+    from riva.models.career_profile import CareerProfile
+    from riva.models.role import RoleMatchingResult
+
+    await register_user(client)
+    role = await _create_role(client, "Engineer")
+    async with database.sessionmaker() as session:
+        stored = await session.get(Role, UUID(role["id"]))
+        profile = CareerProfile(user_id=stored.user_id, skills=["Python"])
+        session.add(profile)
+        await session.flush()
+        stored.matching.result = RoleMatchingResult(
+            score=75,
+            core_requirements="APIs",
+            resume_strengths=["Python"],
+            resume_gaps=[],
+            resume_optimization_suggestions=[],
+            interview_preparation_suggestions=[],
+        )
+        stored.matching.profile_updated_at = profile.updated_at
+        stored.matching.jd_updated_at = stored.jd.updated_at
+        stored.matching.generated_at = stored.created_at
+        if change == "no-result":
+            stored.matching.result = None
+            await session.delete(profile)
+        elif change == "profile":
+            profile.updated_at += timedelta(seconds=1)
+        elif change == "jd":
+            stored.jd.updated_at += timedelta(seconds=1)
+        elif change == "missing-profile":
+            await session.delete(profile)
+        await session.commit()
+    response = await client.get("/api/roles")
+    assert response.status_code == 200
+    matching = response.json()["roles"][0]["matching"]
+    assert matching["isStale"] is expected
+    assert set(matching) == {"result", "generatedAt", "isStale"}
+    # Role mutation responses must use the same assembly path as the list.
+    response = await client.patch(
+        f"/api/roles/{role['id']}",
+        headers=ORIGIN_HEADERS,
+        json={"title": "Renamed"},
+    )
+    assert response.status_code == 200
+    assert response.json()["matching"] == matching
+
+
+async def test_jd_update_response_immediately_marks_saved_matching_stale(
+    client, database
+):
+    from riva.models.career_profile import CareerProfile
+    from riva.models.role import RoleMatchingResult
+
+    await register_user(client)
+    role = await _create_role(client, "Engineer")
+    async with database.sessionmaker() as session:
+        stored = await session.get(Role, UUID(role["id"]))
+        profile = CareerProfile(user_id=stored.user_id)
+        session.add(profile)
+        await session.flush()
+        stored.matching.result = RoleMatchingResult(
+            score=75,
+            core_requirements="APIs",
+            resume_strengths=[],
+            resume_gaps=[],
+            resume_optimization_suggestions=[],
+            interview_preparation_suggestions=[],
+        )
+        stored.matching.profile_updated_at = profile.updated_at
+        stored.matching.jd_updated_at = stored.jd.updated_at
+        await session.commit()
+    response = await client.patch(
+        f"/api/roles/{role['id']}/jd",
+        headers=ORIGIN_HEADERS,
+        json={"responsibilities": ["New requirement"]},
+    )
+    assert response.status_code == 200
+    assert response.json()["matching"]["isStale"] is True
+    assert response.json()["matching"]["result"]["score"] == 75

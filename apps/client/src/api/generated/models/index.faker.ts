@@ -31,6 +31,8 @@ import type {
   RecruitmentTrack,
   RegisterCredentials,
   RoleListResponse,
+  RoleMatchingResponse,
+  RoleMatchingResultResponse,
   RoleResponse,
   ServiceHealthStatus,
   SetActiveRoleRequest,
@@ -480,6 +482,7 @@ export const getJobDescriptionResponseMock = (
     { length: faker.number.int({ min: 1, max: 10 }) },
     (_, i) => i + 1,
   ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+  updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
 })
 
@@ -541,6 +544,41 @@ export const getRegisterCredentialsMock = (
   ...overrideResponse,
 })
 
+export const getRoleMatchingResultResponseMock = (
+  overrideResponse: Partial<RoleMatchingResultResponse> = {},
+): RoleMatchingResultResponse => ({
+  coreRequirements: faker.string.alpha({ length: { min: 1, max: 20 } }),
+  resumeStrengths: Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+  resumeGaps: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+    () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+  ),
+  resumeOptimizationSuggestions: Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+  interviewPreparationSuggestions: Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => faker.string.alpha({ length: { min: 1, max: 20 } })),
+  score: faker.number.float({ fractionDigits: 2 }),
+  ...overrideResponse,
+})
+
+export const getRoleMatchingResponseMock = (
+  overrideResponse: Partial<RoleMatchingResponse> = {},
+): RoleMatchingResponse => ({
+  result: faker.helpers.arrayElement([{ ...getRoleMatchingResultResponseMock() }, null]),
+  generatedAt: faker.helpers.arrayElement([
+    faker.date.past().toISOString().slice(0, 19) + "Z",
+    null,
+  ]),
+  isStale: faker.datatype.boolean(),
+  ...overrideResponse,
+})
+
 export const getRoleResponseMock = (
   overrideResponse: Partial<RoleResponse> = {},
 ): RoleResponse => ({
@@ -554,6 +592,7 @@ export const getRoleResponseMock = (
   ]),
   isArchived: faker.datatype.boolean(),
   jd: { ...getJobDescriptionResponseMock() },
+  matching: { ...getRoleMatchingResponseMock() },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,

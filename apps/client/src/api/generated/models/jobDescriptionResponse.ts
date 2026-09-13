@@ -32,4 +32,6 @@ export interface JobDescriptionResponse {
    * @items.minLength 1
    */
   businessDomains: string[]
+  /** JD content version timestamp; task state changes do not update it. */
+  updatedAt: string
 }

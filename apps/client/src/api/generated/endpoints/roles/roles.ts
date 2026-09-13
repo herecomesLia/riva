@@ -163,6 +163,30 @@ export const getRolesApi = () => {
       options,
     )
   }
+  /**
+   * @summary Start Role Matching
+   */
+  const startRoleMatching = (roleId: string, options?: SecondParameter<typeof request<void>>) => {
+    return request<void>({ url: `/api/roles/${roleId}/matching`, method: "POST" }, options)
+  }
+  /**
+   * @summary Get Role Matching State
+   */
+  const getRoleMatchingState = (
+    roleId: string,
+    options?: SecondParameter<typeof request<TaskStatusResponse | TaskFailureResponse>>,
+  ) => {
+    return request<TaskStatusResponse | TaskFailureResponse>(
+      { url: `/api/roles/${roleId}/matching`, method: "GET" },
+      options,
+    )
+  }
+  /**
+   * @summary Abort Role Matching
+   */
+  const abortRoleMatching = (roleId: string, options?: SecondParameter<typeof request<void>>) => {
+    return request<void>({ url: `/api/roles/${roleId}/matching/abort`, method: "POST" }, options)
+  }
   return {
     listRoles,
     createRole,
@@ -176,6 +200,9 @@ export const getRolesApi = () => {
     getJdExtractionState,
     retryJdExtraction,
     abortJdExtraction,
+    startRoleMatching,
+    getRoleMatchingState,
+    abortRoleMatching,
   }
 }
 export type ListRolesResult = NonNullable<
@@ -213,4 +240,13 @@ export type RetryJdExtractionResult = NonNullable<
 >
 export type AbortJdExtractionResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getRolesApi>["abortJdExtraction"]>>
+>
+export type StartRoleMatchingResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["startRoleMatching"]>>
+>
+export type GetRoleMatchingStateResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["getRoleMatchingState"]>>
+>
+export type AbortRoleMatchingResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getRolesApi>["abortRoleMatching"]>>
 >

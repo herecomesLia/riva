@@ -16,6 +16,7 @@ import type {
 import {
   getJobDescriptionResponseMock,
   getRecruitmentTrackMock,
+  getRoleMatchingResponseMock,
   getRoleResponseMock,
   getTaskFailureResponseMock,
   getTaskStatusResponseMock,
@@ -44,6 +45,7 @@ export const getCreateRoleResponseMock = (
   ]),
   isArchived: faker.datatype.boolean(),
   jd: { ...getJobDescriptionResponseMock() },
+  matching: { ...getRoleMatchingResponseMock() },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
@@ -62,6 +64,7 @@ export const getUpdateRoleResponseMock = (
   ]),
   isArchived: faker.datatype.boolean(),
   jd: { ...getJobDescriptionResponseMock() },
+  matching: { ...getRoleMatchingResponseMock() },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
@@ -80,6 +83,7 @@ export const getArchiveRoleResponseMock = (
   ]),
   isArchived: faker.datatype.boolean(),
   jd: { ...getJobDescriptionResponseMock() },
+  matching: { ...getRoleMatchingResponseMock() },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
@@ -98,6 +102,7 @@ export const getRestoreRoleResponseMock = (
   ]),
   isArchived: faker.datatype.boolean(),
   jd: { ...getJobDescriptionResponseMock() },
+  matching: { ...getRoleMatchingResponseMock() },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
@@ -116,12 +121,19 @@ export const getUpdateJdResponseMock = (
   ]),
   isArchived: faker.datatype.boolean(),
   jd: { ...getJobDescriptionResponseMock() },
+  matching: { ...getRoleMatchingResponseMock() },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
 })
 
 export const getGetJdExtractionStateResponseMock = (): TaskStatusResponse | TaskFailureResponse =>
+  faker.helpers.arrayElement([
+    { ...getTaskStatusResponseMock() },
+    { ...getTaskFailureResponseMock() },
+  ])
+
+export const getGetRoleMatchingStateResponseMock = (): TaskStatusResponse | TaskFailureResponse =>
   faker.helpers.arrayElement([
     { ...getTaskStatusResponseMock() },
     { ...getTaskFailureResponseMock() },

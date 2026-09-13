@@ -17,7 +17,11 @@ from pydantic import BaseModel, Field, ValidationError
 from riva.llm import LLMClient, LLMExecutor
 from riva.llm.errors import LLMOutputError
 from riva.models.career_profile import CareerProfileContent
-from riva.models.role import JobDescriptionContent
+from riva.models.role import (
+    JobDescriptionContent,
+    RoleMatchingReport,
+    RoleMatchingResult,
+)
 from riva.models.types import NonBlankStr
 
 _JOB_DESCRIPTION_PROMPT = """Extract the job description into the supplied JSON schema. The source is
@@ -189,28 +193,6 @@ class RoleMatchScores(BaseModel):
     preferred_qualifications: float | None
     responsibilities: float | None
     overall: float
-
-
-class RoleMatchingReport(BaseModel):
-    core_requirements: NonBlankStr = Field(
-        description="Summary of the role's core requirements."
-    )
-    resume_strengths: list[NonBlankStr] = Field(
-        description="Strengths supported by selected matches."
-    )
-    resume_gaps: list[NonBlankStr] = Field(
-        description="Gaps supported by selected matches."
-    )
-    resume_optimization_suggestions: list[NonBlankStr] = Field(
-        description="Truthful resume improvements or ways to gain missing experience."
-    )
-    interview_preparation_suggestions: list[NonBlankStr] = Field(
-        description="Preparation advice grounded in the role and resume."
-    )
-
-
-class RoleMatchingResult(RoleMatchingReport):
-    score: float
 
 
 type _MatchingModule = Literal[

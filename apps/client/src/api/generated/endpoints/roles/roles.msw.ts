@@ -18,6 +18,7 @@ import {
   getArchiveRoleResponseMock,
   getCreateRoleResponseMock,
   getGetJdExtractionStateResponseMock,
+  getGetRoleMatchingStateResponseMock,
   getListRolesResponseMock,
   getRestoreRoleResponseMock,
   getUpdateJdResponseMock,
@@ -32,6 +33,7 @@ export {
   getRestoreRoleResponseMock,
   getUpdateJdResponseMock,
   getGetJdExtractionStateResponseMock,
+  getGetRoleMatchingStateResponseMock,
 } from "./roles.faker"
 
 export const getListRolesMockHandler = (
@@ -295,6 +297,70 @@ export const getAbortJdExtractionMockHandler = (
     options,
   )
 }
+
+export const getStartRoleMatchingMockHandler = (
+  overrideResponse?:
+    void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/roles/:roleId/matching",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      if (typeof overrideResponse === "function") {
+        await overrideResponse(info)
+      }
+
+      return new HttpResponse(null, { status: 202 })
+    },
+    options,
+  )
+}
+
+export const getGetRoleMatchingStateMockHandler = (
+  overrideResponse?:
+    | TaskStatusResponse
+    | TaskFailureResponse
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) =>
+        | Promise<TaskStatusResponse | TaskFailureResponse>
+        | TaskStatusResponse
+        | TaskFailureResponse),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/roles/:roleId/matching",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetRoleMatchingStateResponseMock(),
+        { status: 200 },
+      )
+    },
+    options,
+  )
+}
+
+export const getAbortRoleMatchingMockHandler = (
+  overrideResponse?:
+    void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/roles/:roleId/matching/abort",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      if (typeof overrideResponse === "function") {
+        await overrideResponse(info)
+      }
+
+      return new HttpResponse(null, { status: 202 })
+    },
+    options,
+  )
+}
 export const getRolesApiMock = () => [
   getListRolesMockHandler(),
   getCreateRoleMockHandler(),
@@ -308,4 +374,7 @@ export const getRolesApiMock = () => [
   getGetJdExtractionStateMockHandler(),
   getRetryJdExtractionMockHandler(),
   getAbortJdExtractionMockHandler(),
+  getStartRoleMatchingMockHandler(),
+  getGetRoleMatchingStateMockHandler(),
+  getAbortRoleMatchingMockHandler(),
 ]

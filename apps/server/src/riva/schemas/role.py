@@ -9,6 +9,7 @@ from riva.models.role import (
     JobDescriptionContent,
     JobRequirements,
     RecruitmentTrack,
+    RoleMatchingResult,
 )
 from riva.models.types import NonBlankStr
 from riva.schemas.base import (
@@ -35,12 +36,25 @@ class HardSkillsResponse(HardSkills, ResponseModel):
 
 
 class JobDescriptionResponse(JobDescriptionContent, ResponseModel):
+    updated_at: datetime = Field(
+        description="JD content version timestamp; task state changes do not update it."
+    )
     requirements: JobRequirementsResponse = Field(
         description="Mandatory eligibility conditions; excludes preferred qualifications."
     )
     hard_skills: HardSkillsResponse = Field(
         description="Required technical skills, retaining proficiency and conditions; excludes preferred-only skills."
     )
+
+
+class RoleMatchingResultResponse(RoleMatchingResult, ResponseModel):
+    pass
+
+
+class RoleMatchingResponse(ResponseModel):
+    result: RoleMatchingResultResponse | None
+    generated_at: datetime | None
+    is_stale: bool
 
 
 class RoleResponse(ResponseModel):
@@ -55,6 +69,7 @@ class RoleResponse(ResponseModel):
         description="Whether the saved role is archived. An archived role cannot be the current target role."
     )
     jd: JobDescriptionResponse
+    matching: RoleMatchingResponse
     created_at: datetime
     updated_at: datetime
 

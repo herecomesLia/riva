@@ -106,6 +106,10 @@ class JobDescriptionContent(BaseModel):
 class JobDescription(Base):
     __tablename__ = "job_descriptions"
 
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+
     role_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("roles.id", ondelete="CASCADE"),
@@ -152,6 +156,51 @@ class JobDescription(Base):
     )
 
 
+class RoleMatchingReport(BaseModel):
+    core_requirements: NonBlankStr = Field(
+        description="Summary of the role's core requirements."
+    )
+    resume_strengths: list[NonBlankStr] = Field(
+        description="Strengths supported by selected matches."
+    )
+    resume_gaps: list[NonBlankStr] = Field(
+        description="Gaps supported by selected matches."
+    )
+    resume_optimization_suggestions: list[NonBlankStr] = Field(
+        description="Truthful resume improvements or ways to gain missing experience."
+    )
+    interview_preparation_suggestions: list[NonBlankStr] = Field(
+        description="Preparation advice grounded in the role and resume."
+    )
+
+
+class RoleMatchingResult(RoleMatchingReport):
+    score: float
+
+
+class RoleMatching(Base):
+    __tablename__ = "role_matchings"
+
+    role_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
+    )
+    job_id: Mapped[int | None] = mapped_column(BigInteger)
+    error_code: Mapped[TaskErrorCode | None] = mapped_column(
+        Enum(
+            TaskErrorCode,
+            values_callable=lambda enum: [member.value for member in enum],
+            native_enum=False,
+            validate_strings=True,
+        )
+    )
+    result: Mapped[RoleMatchingResult | None] = mapped_column(
+        PydanticJSONB(RoleMatchingResult)
+    )
+    profile_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    jd_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Role(Base):
     __tablename__ = "roles"
 
@@ -195,4 +244,7 @@ class Role(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
         uselist=False,
+    )
+    matching: Mapped[RoleMatching] = relationship(
+        cascade="all, delete-orphan", lazy="selectin", uselist=False
     )

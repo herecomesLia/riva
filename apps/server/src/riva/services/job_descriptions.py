@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from riva.models.role import (
     HardSkills,
     JobDescription,
+    JobDescriptionContent,
     JobRequirements,
     Role,
 )
@@ -42,6 +43,9 @@ class JobDescriptionService:
             self.session, jd.extraction_job_id
         ) in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.ABORTING}:
             raise ConflictError("Abort the active extraction before updating the JD.")
+        previous_content = {
+            field: getattr(jd, field) for field in JobDescriptionContent.model_fields
+        }
         if responsibilities is not UNSET:
             jd.responsibilities = responsibilities
         if requirements is not UNSET:
@@ -54,6 +58,10 @@ class JobDescriptionService:
             jd.preferred_qualifications = preferred_qualifications
         if business_domains is not UNSET:
             jd.business_domains = business_domains
+        if any(
+            getattr(jd, field) != value for field, value in previous_content.items()
+        ):
+            jd.updated_at = utc_now()
         jd.extraction_job_id = None
         jd.extraction_error_code = None
         role.updated_at = utc_now()

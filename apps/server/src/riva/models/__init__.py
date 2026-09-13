@@ -7,6 +7,9 @@ from riva.models.role import (
     JobRequirements,
     RecruitmentTrack,
     Role,
+    RoleMatching,
+    RoleMatchingReport,
+    RoleMatchingResult,
 )
 from riva.models.user import User
 
@@ -20,5 +23,8 @@ __all__ = [
     "JobRequirements",
     "RecruitmentTrack",
     "Role",
+    "RoleMatching",
+    "RoleMatchingReport",
+    "RoleMatchingResult",
     "User",
 ]

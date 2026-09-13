@@ -6,6 +6,7 @@
  */
 import type { JobDescriptionResponse } from "./jobDescriptionResponse"
 import type { RecruitmentTrack } from "./recruitmentTrack"
+import type { RoleMatchingResponse } from "./roleMatchingResponse"
 
 export interface RoleResponse {
   id: string
@@ -17,6 +18,7 @@ export interface RoleResponse {
   /** Whether the saved role is archived. An archived role cannot be the current target role. */
   isArchived: boolean
   jd: JobDescriptionResponse
+  matching: RoleMatchingResponse
   createdAt: string
   updatedAt: string
 }
