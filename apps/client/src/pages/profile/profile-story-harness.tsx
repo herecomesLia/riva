@@ -1,7 +1,7 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { fn } from "storybook/test"
 
-import type { CareerProfileResponse } from "@/api/generated/models"
+import type { CareerProfileResponse, TaskStatusResponse } from "@/api/generated/models"
 import {
   careerProfileFixture,
   resumeImportedCareerProfileFixture,
@@ -17,18 +17,40 @@ export function ProfileStoryHarness({
   const [profile, setProfile] = useState<CareerProfileResponse | null>(() =>
     initialProfile ? structuredClone(initialProfile) : null,
   )
+  const [extractionState, setExtractionState] = useState<TaskStatusResponse>({
+    status: "idle",
+    error: null,
+  })
+  useEffect(() => {
+    if (extractionState.status === "idle") return
+    const timer = setTimeout(() => {
+      if (extractionState.status === "queued") {
+        setExtractionState({ status: "running", error: null })
+      } else {
+        if (extractionState.status === "running")
+          setProfile(structuredClone(resumeImportedCareerProfileFixture))
+        setExtractionState({ status: "idle", error: null })
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [extractionState])
   const actions: ProfileViewActions = {
-    createProfile: fn(async () => {
+    createCareerProfile: fn(async () => {
       const next = structuredClone(careerProfileFixture)
       setProfile(next)
       return next
     }),
-    importResume: fn(async () => {
-      const next = structuredClone(resumeImportedCareerProfileFixture)
-      setProfile(next)
-      return next
+    extractCareerProfileFromText: fn(async () => {
+      setExtractionState({ status: "queued", error: null })
     }),
-    updateProfile: fn(async (input) => {
+    retryCareerProfileExtraction: fn(async () => {
+      setExtractionState({ status: "queued", error: null })
+    }),
+    abortCareerProfileExtraction: fn(async () => {
+      setExtractionState({ status: "aborting", error: null })
+    }),
+    retryCareerProfileExtractionState: fn(async () => undefined),
+    updateCareerProfile: fn(async (input) => {
       if (!profile) throw new Error("A profile is required for update.")
       const next = { ...profile, ...structuredClone(input) }
       setProfile(next)
@@ -37,6 +59,12 @@ export function ProfileStoryHarness({
   }
 
   return (
-    <ProfileView actions={actions} content={{ status: "ready", data: profile }} variant="default" />
+    <ProfileView
+      actions={actions}
+      profile={profile}
+      extractionState={extractionState}
+      extractionStateError={false}
+      variant="default"
+    />
   )
 }

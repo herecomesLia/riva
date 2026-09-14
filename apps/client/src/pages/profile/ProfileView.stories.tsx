@@ -2,7 +2,10 @@ import preview from "#storybook/preview"
 import { expect, fn, screen, waitFor, within } from "storybook/test"
 
 import { withRouter } from "#storybook/decorators/with-router"
-import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
+import {
+  careerProfileFixture,
+  resumeImportedCareerProfileFixture,
+} from "@/mocks/fixtures/career-profile"
 
 import { ProfileView } from "./ProfileView"
 import { ProfileStoryHarness } from "./profile-story-harness"
@@ -15,7 +18,7 @@ const meta = preview.meta({
 })
 
 export const Loading = meta.story({
-  args: { content: { status: "loading" }, variant: "default" },
+  args: { variant: "loading" },
 })
 
 const onRetry = fn()
@@ -31,12 +34,42 @@ export const NoProfile = meta.story({
   render: () => <ProfileStoryHarness initialProfile={null} />,
   play: async ({ canvas, userEvent }) => {
     await userEvent.type(canvas.getByLabelText(/简历文本|resume text/i), "Frontend resume")
-    await userEvent.click(canvas.getByRole("button", { name: /上传并识别|upload and recognize/i }))
+    await userEvent.click(canvas.getByRole("button", { name: /解析简历|parse resume/i }))
     await waitFor(() => expect(canvas.getByTestId("profile-section-education")).toBeInTheDocument())
   },
 })
 
 export const Ready = meta.story({ render: () => <ProfileStoryHarness /> })
+
+const extractionArgs = {
+  variant: "default" as const,
+  profile: careerProfileFixture,
+  extractionStateError: false,
+  actions: {
+    createCareerProfile: fn(async () => structuredClone(careerProfileFixture)),
+    updateCareerProfile: fn(async () => structuredClone(careerProfileFixture)),
+    extractCareerProfileFromText: fn(async () => undefined),
+    retryCareerProfileExtraction: fn(async () => undefined),
+    abortCareerProfileExtraction: fn(async () => undefined),
+    retryCareerProfileExtractionState: fn(async () => undefined),
+  },
+}
+
+export const Reextracting = meta.story({
+  args: { ...extractionArgs, extractionState: { status: "running", error: null } },
+})
+export const ExtractionFailed = meta.story({
+  args: {
+    ...extractionArgs,
+    extractionState: {
+      status: "failed",
+      error: { code: "invalid_output", message: "Unable to complete the task." },
+    },
+  },
+})
+export const Aborting = meta.story({
+  args: { ...extractionArgs, extractionState: { status: "aborting", error: null } },
+})
 export const Partial = meta.story({
   render: () => (
     <ProfileStoryHarness
@@ -62,15 +95,17 @@ export const EditableProfile = meta.story({
   },
 })
 
-export const ResumeImport = meta.story({
+export const CareerProfileExtraction = meta.story({
   render: () => <ProfileStoryHarness />,
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole("button", { name: /更新简历|update resume/i }))
     const dialog = await screen.findByRole("dialog")
     await userEvent.type(within(dialog).getByLabelText(/简历文本|resume text/i), "Updated resume")
-    await userEvent.click(
-      within(dialog).getByRole("button", { name: /上传并识别|upload and recognize/i }),
+    await userEvent.click(within(dialog).getByRole("button", { name: /解析简历|parse resume/i }))
+    await waitFor(() =>
+      expect(
+        canvas.getByText(resumeImportedCareerProfileFixture.projects[0]!.name),
+      ).toBeInTheDocument(),
     )
-    await waitFor(() => expect(canvas.getByTestId("profile-import-success")).toBeInTheDocument())
   },
 })

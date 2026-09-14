@@ -1,52 +1,93 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 import type { CareerProfileResponse } from "@/api/generated/models"
-import { createProfile, getProfile, importResume, updateProfile } from "@/services/profile"
+import { rolesQueryKey } from "@/pages/roles/queries"
+import {
+  createCareerProfile,
+  updateCareerProfile,
+  extractCareerProfileFromText,
+  retryCareerProfileExtraction,
+  abortCareerProfileExtraction,
+} from "@/services/profile"
 
 import { ProfileView, type ProfileViewActions } from "./ProfileView"
-
-const profileQueryKey = ["profile"] as const
+import {
+  careerProfileQueryKey,
+  careerProfileExtractionStateQueryKey,
+  useCareerProfileQueries,
+} from "./hooks/useCareerProfileQueries"
 
 export function ProfilePage() {
   const queryClient = useQueryClient()
-  const profileQuery = useQuery({
-    queryFn: getProfile,
-    queryKey: profileQueryKey,
-    retry: false,
+  const { careerProfileQuery, careerProfileExtractionStateQuery } = useCareerProfileQueries()
+
+  async function storeCareerProfile(profile: CareerProfileResponse) {
+    queryClient.setQueryData(careerProfileQueryKey, profile)
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: rolesQueryKey, exact: true }),
+      queryClient.invalidateQueries({ queryKey: careerProfileExtractionStateQueryKey }),
+    ])
+  }
+
+  const createCareerProfileMutation = useMutation({
+    mutationFn: createCareerProfile,
+    onSuccess: storeCareerProfile,
+  })
+  const updateCareerProfileMutation = useMutation({
+    mutationFn: updateCareerProfile,
+    onSuccess: storeCareerProfile,
+  })
+  const extractCareerProfileFromTextMutation = useMutation({
+    mutationFn: extractCareerProfileFromText,
+  })
+  const retryCareerProfileExtractionMutation = useMutation({
+    mutationFn: retryCareerProfileExtraction,
+  })
+  const abortCareerProfileExtractionMutation = useMutation({
+    mutationFn: abortCareerProfileExtraction,
   })
 
-  function storeProfile(profile: CareerProfileResponse) {
-    queryClient.setQueryData(profileQueryKey, profile)
-    return profile
+  async function runExtractionCommand(command: () => Promise<void>) {
+    await queryClient.cancelQueries({ queryKey: careerProfileExtractionStateQueryKey })
+    try {
+      await command()
+    } finally {
+      await queryClient.invalidateQueries({ queryKey: careerProfileExtractionStateQueryKey })
+    }
   }
-
-  const createMutation = useMutation({ mutationFn: createProfile, onSuccess: storeProfile })
-  const updateMutation = useMutation({ mutationFn: updateProfile, onSuccess: storeProfile })
-  const importMutation = useMutation({ mutationFn: importResume, onSuccess: storeProfile })
 
   const actions: ProfileViewActions = {
-    createProfile: () => createMutation.mutateAsync(),
-    importResume: (input) => importMutation.mutateAsync(input),
-    updateProfile: (input) => updateMutation.mutateAsync(input),
+    createCareerProfile: (input) => createCareerProfileMutation.mutateAsync(input),
+    updateCareerProfile: (input) => updateCareerProfileMutation.mutateAsync(input),
+    extractCareerProfileFromText: (input) =>
+      runExtractionCommand(() => extractCareerProfileFromTextMutation.mutateAsync(input)),
+    retryCareerProfileExtraction: () =>
+      runExtractionCommand(() => retryCareerProfileExtractionMutation.mutateAsync()),
+    abortCareerProfileExtraction: () =>
+      runExtractionCommand(() => abortCareerProfileExtractionMutation.mutateAsync()),
+    retryCareerProfileExtractionState: () =>
+      queryClient.refetchQueries(
+        { queryKey: careerProfileExtractionStateQueryKey },
+        { throwOnError: true },
+      ),
   }
 
-  if (profileQuery.data !== undefined) {
+  if (careerProfileQuery.data !== undefined) {
     return (
       <ProfileView
-        actions={actions}
-        content={{ status: "ready", data: profileQuery.data }}
         variant="default"
+        profile={careerProfileQuery.data}
+        extractionState={careerProfileExtractionStateQuery.data}
+        extractionStateError={
+          careerProfileExtractionStateQuery.isError || careerProfileQuery.isError
+        }
+        actions={actions}
       />
     )
   }
-
-  if (profileQuery.isFetching) {
-    return <ProfileView content={{ status: "loading" }} variant="default" />
+  if (careerProfileQuery.isFetching) return <ProfileView variant="loading" />
+  if (careerProfileQuery.isError) {
+    return <ProfileView variant="error" onRetry={() => void careerProfileQuery.refetch()} />
   }
-
-  if (profileQuery.isError) {
-    return <ProfileView onRetry={() => void profileQuery.refetch()} variant="error" />
-  }
-
-  return <ProfileView content={{ status: "loading" }} variant="default" />
+  return <ProfileView variant="loading" />
 }

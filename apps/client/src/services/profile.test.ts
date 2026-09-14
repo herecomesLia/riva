@@ -1,22 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ApiError, TransportError } from "@/api/error"
-import { careerProfileFaker } from "@/mocks/fakers/career-profile"
 import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
-import { createProfile, getProfile, importResume, updateProfile } from "@/services/profile"
+import {
+  createCareerProfile,
+  getCareerProfile,
+  extractCareerProfileFromText,
+  updateCareerProfile,
+} from "@/services/profile"
 
 const careerProfileApi = vi.hoisted(() => ({
   createCareerProfile: vi.fn(),
   getCareerProfile: vi.fn(),
   updateCareerProfile: vi.fn(),
+  extractCareerProfileFromText: vi.fn(),
 }))
 
 vi.mock("@/api/generated/endpoints/career-profile/career-profile", () => ({
   getCareerProfileApi: () => careerProfileApi,
-}))
-
-vi.mock("@/mocks/fakers/career-profile", () => ({
-  careerProfileFaker: { importResume: vi.fn() },
 }))
 
 describe("profile service", () => {
@@ -24,7 +25,7 @@ describe("profile service", () => {
     vi.mocked(careerProfileApi.createCareerProfile).mockReset()
     vi.mocked(careerProfileApi.getCareerProfile).mockReset()
     vi.mocked(careerProfileApi.updateCareerProfile).mockReset()
-    vi.mocked(careerProfileFaker.importResume).mockReset()
+    careerProfileApi.extractCareerProfileFromText.mockReset()
   })
 
   it("maps only resource.not_found to null", async () => {
@@ -33,30 +34,30 @@ describe("profile service", () => {
         error: { code: "resource.not_found", message: "Career profile was not found.", issues: [] },
       }),
     )
-    await expect(getProfile()).resolves.toBeNull()
+    await expect(getCareerProfile()).resolves.toBeNull()
 
     const transportError = new TransportError("network", "Network unavailable")
     vi.mocked(careerProfileApi.getCareerProfile).mockRejectedValueOnce(transportError)
-    await expect(getProfile()).rejects.toBe(transportError)
+    await expect(getCareerProfile()).rejects.toBe(transportError)
   })
 
   it("passes create and update through the generated operations", async () => {
     vi.mocked(careerProfileApi.createCareerProfile).mockResolvedValue(careerProfileFixture)
     vi.mocked(careerProfileApi.updateCareerProfile).mockResolvedValue(careerProfileFixture)
 
-    await expect(createProfile()).resolves.toBe(careerProfileFixture)
+    await expect(createCareerProfile({})).resolves.toBe(careerProfileFixture)
     expect(careerProfileApi.createCareerProfile).toHaveBeenCalledWith({})
 
     const input = { skills: ["TypeScript"] }
-    await expect(updateProfile(input)).resolves.toBe(careerProfileFixture)
+    await expect(updateCareerProfile(input)).resolves.toBe(careerProfileFixture)
     expect(careerProfileApi.updateCareerProfile).toHaveBeenCalledWith(input)
   })
 
-  it("uses the raw faker for the API-less resume import", async () => {
-    vi.mocked(careerProfileFaker.importResume).mockResolvedValue(careerProfileFixture)
+  it("submits extraction through the generated operation without returning a profile", async () => {
+    careerProfileApi.extractCareerProfileFromText.mockResolvedValue(undefined)
     const input = { text: "resume" }
 
-    await expect(importResume(input)).resolves.toBe(careerProfileFixture)
-    expect(careerProfileFaker.importResume).toHaveBeenCalledWith(input)
+    await expect(extractCareerProfileFromText(input)).resolves.toBeUndefined()
+    expect(careerProfileApi.extractCareerProfileFromText).toHaveBeenCalledWith(input)
   })
 })

@@ -7,7 +7,7 @@ import { SkillsCard } from "./SkillsCard"
 import { WorkExperienceCard } from "./WorkExperienceCard"
 
 type ProfileSectionsProps = {
-  onStartEditing: (section: EditableProfileSection) => void
+  onStartEditing?: (section: EditableProfileSection) => void
   profile: CareerProfileResponse
 }
 
@@ -18,15 +18,21 @@ export function ProfileSections({ onStartEditing, profile }: ProfileSectionsProp
         className="grid items-stretch gap-6 @3xl/app:grid-cols-[minmax(0,3fr)_minmax(18rem,2fr)]"
         data-testid="profile-summary-sections"
       >
-        <EducationCard education={profile.education} onEdit={() => onStartEditing("education")} />
-        <SkillsCard onEdit={() => onStartEditing("skills")} skills={profile.skills} />
+        <EducationCard
+          education={profile.education}
+          onEdit={onStartEditing ? () => onStartEditing("education") : undefined}
+        />
+        <SkillsCard
+          onEdit={onStartEditing ? () => onStartEditing("skills") : undefined}
+          skills={profile.skills}
+        />
       </section>
       <WorkExperienceCard
         experiences={profile.workExperiences}
-        onEdit={() => onStartEditing("workExperience")}
+        onEdit={onStartEditing ? () => onStartEditing("workExperience") : undefined}
       />
       <ProjectExperienceCard
-        onEdit={() => onStartEditing("projectExperience")}
+        onEdit={onStartEditing ? () => onStartEditing("projectExperience") : undefined}
         projects={profile.projects}
       />
     </div>

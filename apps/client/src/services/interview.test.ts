@@ -1,4 +1,4 @@
-import { getProfile } from "@/services/profile"
+import { getCareerProfile } from "@/services/profile"
 import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 import { createRoleStoryResponse } from "@/pages/roles/stories/role-story-fixtures"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -15,7 +15,7 @@ import {
 } from "@/services/interview"
 
 vi.mock("@/services/roles", () => ({ listRoles: vi.fn(), getJdExtractionState: vi.fn() }))
-vi.mock("@/services/profile", () => ({ getProfile: vi.fn() }))
+vi.mock("@/services/profile", () => ({ getCareerProfile: vi.fn() }))
 
 const roles: RoleListResponse = {
   roles: ["first", "active", "missing", "archived"].map((id) => ({
@@ -32,7 +32,7 @@ const roles: RoleListResponse = {
 
 beforeEach(() => {
   vi.restoreAllMocks()
-  vi.mocked(getProfile).mockResolvedValue(careerProfileFixture)
+  vi.mocked(getCareerProfile).mockResolvedValue(careerProfileFixture)
   vi.mocked(getJdExtractionState).mockResolvedValue({ status: "idle", error: null })
   vi.mocked(listRoles).mockResolvedValue(structuredClone(roles))
   vi.spyOn(interviewFaker, "get").mockReturnValue(null)
@@ -86,7 +86,7 @@ describe("Interview service", () => {
         ...roles,
         roles: [...items],
       })
-      vi.mocked(getProfile).mockResolvedValue(complete ? careerProfileFixture : null)
+      vi.mocked(getCareerProfile).mockResolvedValue(complete ? careerProfileFixture : null)
       const page = await getInterviewPage()
       expect(page.setup.availability).toEqual({ status, ...(reason ? { reason } : {}) })
       if (page.setup.roles.length === 0) expect(page.setup.defaultConfiguration.roleId).toBeNull()
@@ -103,7 +103,7 @@ describe("Interview service", () => {
     "prepares history for %s without changing the session",
     async (roleId, complete, reason) => {
       vi.mocked(listRoles).mockResolvedValue(roles)
-      vi.mocked(getProfile).mockResolvedValue(
+      vi.mocked(getCareerProfile).mockResolvedValue(
         complete ? careerProfileFixture : { ...careerProfileFixture, skills: [] },
       )
       vi.mocked(interviewFaker.get).mockRestore()

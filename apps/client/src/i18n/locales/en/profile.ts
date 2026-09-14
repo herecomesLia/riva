@@ -4,60 +4,35 @@ export const profile = {
   updatedAt: "Last updated {{value}}",
   completeness: "Profile completeness",
   completenessShort: "Completeness",
-  processingStatus: {
-    uploaded: "Uploaded, waiting to be recognized",
-    recognizing: "Recognizing",
-    succeeded: "Recognition complete",
-    failed: "Recognition failed",
-  },
   actions: {
     edit: "Edit",
     openProject: "View project",
-    uploadResume: "Upload resume",
+    uploadResume: "Import resume",
     updateResume: "Update resume",
     retryRecognition: "Recognize again",
+    abortExtraction: "Stop parsing",
     manualEntry: "Enter manually",
   },
-  resume: {
-    title: "Current resume",
-    description:
-      "Your resume initializes the profile; you can maintain the profile independently afterwards.",
-    typeAndSize: "{{type}} · {{size}}",
-    uploadedAt: "Uploaded {{value}}",
-  },
   import: {
-    title: "Upload a resume to create your profile",
+    file: "Resume file (PDF / DOC / DOCX / TXT)",
+    noFileSelected: "Choose a resume file",
+    fileNotSupported:
+      "File recognition is not available yet. Only the text pasted below will be parsed; the selected file will not be uploaded.",
+    title: "Import a resume to create your profile",
     updateTitle: "New resume recognition result",
     description:
-      "Upload a file or paste resume text. Recognition updates your current profile directly.",
-    updateDescription:
-      "A new resume is recognized and automatically merged into your current profile.",
-    file: "Resume file",
-    text: "Or paste resume text",
-    noFileSelected: "No file selected",
+      "Paste resume text. Parsing creates a profile or replaces the entire existing profile.",
+    updateDescription: "Parsing the new resume replaces your entire current profile.",
+    text: "Resume text",
     textPlaceholder: "Paste your resume content here",
-    required: "Select a resume file or paste resume text.",
-    submit: "Upload and recognize",
-    submitting: "Uploading...",
-    processing: "Recognizing the new resume…",
-    failed: "Resume recognition failed. Try again.",
-    newItems: "New items recognized",
-    changedItems: "Items that may change",
-    missingItems: "Existing items that may be missing",
-    manualChangesProtected: "Manual edits and additions in your current profile were preserved.",
-    success: "Resume recognition complete",
-    successDescription:
-      "Your profile has been updated. Review the extracted information for accuracy.",
-    updateSuccess: "Your job profile was updated from the new resume",
-    updateSummary:
-      "{{newItems}} added, {{changedItems}} updated, and {{missingItems}} existing items retained.",
+    required: "Paste resume text.",
+    submit: "Parse resume",
+    submitting: "Submitting...",
   },
   lifecycle: {
-    uploading: {
-      title: "Your resume is uploading",
-      description:
-        "Once it finishes uploading, we will recognize it and update your structured profile.",
-    },
+    checking: "Checking resume parsing status…",
+    aborting: "Stopping resume parsing…",
+    stateConflict: "The profile state has changed. Refresh its parsing status and try again.",
     recognizing: {
       title: "Recognizing your resume",
       description: "Riva is extracting experience and skills from your resume.",
@@ -76,8 +51,7 @@ export const profile = {
   },
   empty: {
     title: "You do not have a job profile yet",
-    description:
-      "After you upload a resume, Riva extracts initial information and creates a structured profile you can maintain over time.",
+    description: "Paste resume text to create a structured profile you can maintain over time.",
   },
   sections: {
     education: "Education",

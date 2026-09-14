@@ -1,4 +1,4 @@
-import { getProfile } from "@/services/profile"
+import { getCareerProfile } from "@/services/profile"
 import { careerProfileFixture } from "@/mocks/fixtures/career-profile"
 import { createRoleStoryResponse } from "@/pages/roles/stories/role-story-fixtures"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -13,9 +13,9 @@ vi.mock("@/services/roles", () => ({
   listRoles: vi.fn(),
   getJdExtractionState: vi.fn(),
 }))
-vi.mock("@/services/profile", () => ({ getProfile: vi.fn() }))
+vi.mock("@/services/profile", () => ({ getCareerProfile: vi.fn() }))
 beforeEach(() => {
-  vi.mocked(getProfile).mockResolvedValue(careerProfileFixture)
+  vi.mocked(getCareerProfile).mockResolvedValue(careerProfileFixture)
   vi.mocked(getJdExtractionState).mockResolvedValue({ status: "idle", error: null })
 })
 
@@ -61,7 +61,7 @@ describe("getDashboardData", () => {
   it("projects incomplete prerequisites without exposing a stale score", async () => {
     const incomplete: RoleResponse = structuredClone(role)
     incomplete.jd = createRoleStoryResponse("singleRoleWithoutJobDescription").roles[0]!.jd
-    vi.mocked(getProfile).mockResolvedValue({ ...careerProfileFixture, skills: [] })
+    vi.mocked(getCareerProfile).mockResolvedValue({ ...careerProfileFixture, skills: [] })
     incomplete.matching.isStale = true
     vi.mocked(listRoles).mockResolvedValue({
       roles: [incomplete],

@@ -1,17 +1,17 @@
 import preview from "#storybook/preview"
 import { fn } from "storybook/test"
 
-import { ProfileResumeDialog } from "./ProfileResumeDialog"
+import { CareerProfileExtractionDialog } from "./CareerProfileExtractionDialog"
 
 const meta = preview.meta({
-  component: ProfileResumeDialog,
-  title: "Profile/ProfileResumeDialog",
+  component: CareerProfileExtractionDialog,
+  title: "Profile/CareerProfileExtractionDialog",
 })
 
 export const ExistingProfile = meta.story({
   args: {
     hasProfile: true,
-    importError: null,
+    actionError: null,
     isSubmitting: false,
     onOpenChange: fn(),
     onSubmit: fn(async () => undefined),
@@ -19,10 +19,10 @@ export const ExistingProfile = meta.story({
   },
 })
 
-export const ImportError = meta.story({
+export const SubmissionError = meta.story({
   args: {
     hasProfile: false,
-    importError: "Resume import failed.",
+    actionError: "Unable to submit extraction.",
     isSubmitting: false,
     onOpenChange: fn(),
     onSubmit: fn(async () => undefined),

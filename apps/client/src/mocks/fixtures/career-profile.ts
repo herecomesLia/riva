@@ -1,5 +1,8 @@
 import type { CareerProfileResponse } from "@/api/generated/models"
 
+// Paste this text to exercise failed extraction and retry in mock mode.
+export const careerProfileFailInput = "mock:career-profile-failure"
+
 export const careerProfileFixture = {
   education: [
     {

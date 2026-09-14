@@ -11,9 +11,11 @@ import { ProfileHeaderIntro } from "./ProfileHeaderIntro"
 export function ProfileHeader({
   onOpenResume,
   profile,
+  disabled = false,
 }: {
   onOpenResume: () => void
   profile: CareerProfileResponse
+  disabled?: boolean
 }) {
   const { i18n, t } = useTranslation()
 
@@ -32,6 +34,7 @@ export function ProfileHeader({
       </div>
 
       <Button
+        disabled={disabled}
         className="h-auto min-h-10 max-w-full justify-self-end whitespace-normal py-2 text-center"
         onClick={onOpenResume}
         size="lg"

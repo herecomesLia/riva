@@ -1,5 +1,8 @@
 import type {
   CareerProfileResponse,
+  CareerProfileTextExtractionRequest,
+  TaskStatusResponse,
+  TaskFailureResponse,
   CreateCareerProfileRequest,
   EducationEntryRequest,
   EducationEntryResponse,
@@ -11,9 +14,9 @@ import type {
 } from "@/api/generated/models"
 import {
   careerProfileFixture,
+  careerProfileFailInput,
   resumeImportedCareerProfileFixture,
 } from "@/mocks/fixtures/career-profile"
-import type { ResumeImportInput } from "@/mocks/models/profile"
 import { createMockApiError } from "@/mocks/utils"
 
 const createdAt = "2025-01-15T08:00:00Z"
@@ -77,9 +80,59 @@ function validateSkills(profile: CareerProfileResponse) {
 
 export function createCareerProfileFaker(initialProfile: CareerProfileResponse | null) {
   let profile = initialProfile ? structuredClone(initialProfile) : null
+  let extraction: {
+    startedAt: number
+    outcome: "success" | "failed"
+    abortStartedAt?: number
+  } | null = null
+
+  // Reads advance the mock background job by elapsed time, as in the JD faker.
+  function getExtractionState(): TaskStatusResponse | TaskFailureResponse {
+    if (!extraction) return { status: "idle", error: null }
+    if (extraction.abortStartedAt !== undefined) {
+      if (Date.now() - extraction.abortStartedAt < 500) return { status: "aborting", error: null }
+      extraction = null
+      return { status: "idle", error: null }
+    }
+    const elapsed = Date.now() - extraction.startedAt
+    if (elapsed < 500) return { status: "queued", error: null }
+    if (elapsed < 2500) return { status: "running", error: null }
+    if (extraction.outcome === "failed") {
+      return {
+        status: "failed",
+        error: { code: "invalid_output", message: "Unable to complete the task." },
+      }
+    }
+    const imported = structuredClone(resumeImportedCareerProfileFixture)
+    const unchanged =
+      profile &&
+      JSON.stringify(normalizeSections(profile)) === JSON.stringify(normalizeSections(imported))
+    profile = {
+      ...imported,
+      createdAt: profile?.createdAt ?? imported.createdAt,
+      updatedAt: unchanged
+        ? profile!.updatedAt
+        : new Date(
+            Math.max(Date.now(), Date.parse(profile?.updatedAt ?? imported.updatedAt) + 1),
+          ).toISOString(),
+    }
+    extraction = null
+    return { status: "idle", error: null }
+  }
+
+  function requireManualWrite() {
+    const { status } = getExtractionState()
+    if (status === "queued" || status === "running" || status === "aborting") {
+      throw createMockApiError(
+        "resource.conflict",
+        "Abort the active extraction before editing the career profile.",
+      )
+    }
+  }
 
   return {
-    async get(): Promise<CareerProfileResponse> {
+    async getCareerProfile(): Promise<CareerProfileResponse> {
+      getExtractionState()
       if (!profile) {
         throw createMockApiError("resource.not_found", "Career profile was not found.")
       }
@@ -87,7 +140,8 @@ export function createCareerProfileFaker(initialProfile: CareerProfileResponse |
       return structuredClone(profile)
     },
 
-    async create(input: CreateCareerProfileRequest): Promise<CareerProfileResponse> {
+    async createCareerProfile(input: CreateCareerProfileRequest): Promise<CareerProfileResponse> {
+      requireManualWrite()
       if (profile) {
         throw createMockApiError("resource.conflict", "Career profile already exists.")
       }
@@ -100,10 +154,12 @@ export function createCareerProfileFaker(initialProfile: CareerProfileResponse |
 
       validateSkills(nextProfile)
       profile = nextProfile
+      extraction = null
       return structuredClone(profile)
     },
 
-    async update(input: UpdateCareerProfileRequest): Promise<CareerProfileResponse> {
+    async updateCareerProfile(input: UpdateCareerProfileRequest): Promise<CareerProfileResponse> {
+      requireManualWrite()
       if (!profile) {
         throw createMockApiError("resource.not_found", "Career profile was not found.")
       }
@@ -129,23 +185,40 @@ export function createCareerProfileFaker(initialProfile: CareerProfileResponse |
         ).toISOString()
       }
       profile = nextProfile
+      extraction = null
       return structuredClone(profile)
     },
 
-    async importResume(input: ResumeImportInput): Promise<CareerProfileResponse> {
-      if (!input.file && !input.text?.trim()) {
-        throw new Error("A resume file or pasted resume text is required.")
+    async extractCareerProfileFromText(input: CareerProfileTextExtractionRequest): Promise<void> {
+      if (!input.text.trim()) {
+        throw createMockApiError("request.validation_failed", "Resume text is required.")
       }
-
-      const imported = structuredClone(resumeImportedCareerProfileFixture)
-      const nextProfile: CareerProfileResponse = {
-        ...imported,
-        createdAt: profile?.createdAt ?? imported.createdAt,
+      getExtractionState()
+      extraction = {
+        startedAt: Date.now(),
+        outcome: input.text.trim() === careerProfileFailInput ? "failed" : "success",
       }
-
-      validateSkills(nextProfile)
-      profile = nextProfile
-      return structuredClone(profile)
+    },
+    async getCareerProfileExtractionState(): Promise<TaskStatusResponse | TaskFailureResponse> {
+      return getExtractionState()
+    },
+    async retryCareerProfileExtraction(): Promise<void> {
+      if (getExtractionState().status !== "failed")
+        throw createMockApiError(
+          "resource.conflict",
+          "Only a failed career profile extraction can be retried.",
+        )
+      extraction = { startedAt: Date.now(), outcome: "success" }
+    },
+    async abortCareerProfileExtraction(): Promise<void> {
+      const { status } = getExtractionState()
+      if (status === "aborting") return
+      if (status !== "queued" && status !== "running")
+        throw createMockApiError(
+          "resource.conflict",
+          "Only an active career profile extraction can be aborted.",
+        )
+      extraction!.abortStartedAt = Date.now()
     },
   }
 }

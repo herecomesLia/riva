@@ -3,7 +3,7 @@ import { ProfileSkillBadge } from "./ProfileSkillBadge"
 import { EmptySection } from "./profile-section-shared"
 
 export type SkillsCardProps = {
-  onEdit: () => void
+  onEdit?: () => void
   skills: string[]
 }
 

@@ -10,7 +10,7 @@ import { formatMonth } from "./profile-formatters"
 
 export type EducationCardProps = {
   education: EducationEntryResponse[]
-  onEdit: () => void
+  onEdit?: () => void
 }
 
 export function EducationCard({ education, onEdit }: EducationCardProps) {

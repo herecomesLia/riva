@@ -8,27 +8,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import type { ResumeImportInput } from "@/mocks/models/profile"
+import type { CareerProfileTextExtractionRequest } from "@/api/generated/models"
 
-import { ResumeImportForm } from "./ProfileImportPanels"
+import { CareerProfileExtractionForm } from "./CareerProfileExtractionForm"
 
-type ProfileResumeDialogProps = {
+type CareerProfileExtractionDialogProps = {
   hasProfile: boolean
-  importError: string | null
+  actionError: string | null
   isSubmitting: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (input: ResumeImportInput) => Promise<void>
+  onSubmit: (input: CareerProfileTextExtractionRequest) => Promise<void>
   open: boolean
 }
 
-export function ProfileResumeDialog({
+export function CareerProfileExtractionDialog({
   hasProfile,
-  importError,
+  actionError,
   isSubmitting,
   onOpenChange,
   onSubmit,
   open,
-}: ProfileResumeDialogProps) {
+}: CareerProfileExtractionDialogProps) {
   const { t } = useTranslation()
 
   return (
@@ -41,15 +41,15 @@ export function ProfileResumeDialog({
           <DialogDescription>{t("profile.import.description")}</DialogDescription>
         </DialogHeader>
         <div className="flex min-w-0 flex-col gap-4">
-          <ResumeImportForm
+          <CareerProfileExtractionForm
             embedded
             isSubmitting={isSubmitting}
             onSubmit={onSubmit}
             title={t("profile.import.title")}
           />
-          {importError && (
+          {actionError && (
             <Alert variant="destructive">
-              <AlertDescription>{importError}</AlertDescription>
+              <AlertDescription>{actionError}</AlertDescription>
             </Alert>
           )}
         </div>

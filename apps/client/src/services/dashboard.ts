@@ -3,7 +3,7 @@ import type { DashboardResponse } from "@/models/dashboard"
 import type { RoleResponse } from "@/api/generated/models"
 import { hasJobDescription } from "@/lib/job-description"
 import { isCareerProfileComplete } from "@/lib/career-profile"
-import { getProfile } from "@/services/profile"
+import { getCareerProfile } from "@/services/profile"
 import { listRoles, getJdExtractionState } from "@/services/roles"
 
 function toCurrentRole(
@@ -31,7 +31,7 @@ function toRoleFit(role: RoleResponse | null): DashboardResponse["metrics"]["rol
 }
 
 export async function getDashboardData(): Promise<DashboardResponse> {
-  const [roles, profile] = await Promise.all([listRoles(), getProfile()])
+  const [roles, profile] = await Promise.all([listRoles(), getCareerProfile()])
   let currentRole = roles.activeRoleId
     ? (roles.roles.find(({ id }) => id === roles.activeRoleId) ?? null)
     : null

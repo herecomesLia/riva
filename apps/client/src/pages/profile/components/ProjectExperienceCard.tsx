@@ -18,7 +18,7 @@ import { ProfileSkillBadge } from "./ProfileSkillBadge"
 import { DateRange, DetailList, EmptySection } from "./profile-section-shared"
 
 export type ProjectExperienceCardProps = {
-  onEdit: () => void
+  onEdit?: () => void
   projects: ProjectEntryResponse[]
 }
 

@@ -4,8 +4,15 @@ import { useCallback, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
-import type { CareerProfileResponse, UpdateCareerProfileRequest } from "@/api/generated/models"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import type {
+  CareerProfileResponse,
+  CareerProfileTextExtractionRequest,
+  CreateCareerProfileRequest,
+  UpdateCareerProfileRequest,
+  TaskStatusResponse,
+  TaskFailureResponse,
+} from "@/api/generated/models"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,16 +24,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import type { ResumeImportInput } from "@/mocks/models/profile"
+import { ApiError } from "@/api/error"
 
 import { ProfileHeader } from "./components/ProfileHeader"
-import { ResumeImportForm } from "./components/ProfileImportPanels"
+import { CareerProfileExtractionForm } from "./components/CareerProfileExtractionForm"
+import { CareerProfileExtractionStatus } from "./components/CareerProfileExtractionStatus"
 import {
   ProfileEmptyState,
   ProfileErrorState,
   ProfileLoadingState,
 } from "./components/ProfilePageStates"
-import { ProfileResumeDialog } from "./components/ProfileResumeDialog"
+import { CareerProfileExtractionDialog } from "./components/CareerProfileExtractionDialog"
 import {
   ProfileSectionEditDialog,
   type EditableProfileSection,
@@ -34,166 +42,178 @@ import {
 import { ProfileSections } from "./components/ProfileSections"
 
 export type ProfileViewActions = {
-  createProfile: () => Promise<CareerProfileResponse>
-  importResume: (input: ResumeImportInput) => Promise<CareerProfileResponse>
-  updateProfile: (input: UpdateCareerProfileRequest) => Promise<CareerProfileResponse>
+  createCareerProfile: (input: CreateCareerProfileRequest) => Promise<CareerProfileResponse>
+  updateCareerProfile: (input: UpdateCareerProfileRequest) => Promise<CareerProfileResponse>
+  extractCareerProfileFromText: (input: CareerProfileTextExtractionRequest) => Promise<void>
+  retryCareerProfileExtraction: () => Promise<void>
+  abortCareerProfileExtraction: () => Promise<void>
+  retryCareerProfileExtractionState: () => Promise<void>
 }
 
 export type ProfileViewProps =
   | { variant: "error"; onRetry: () => void }
-  | { variant: "default"; content: { status: "loading" } }
+  | { variant: "loading" }
   | {
       variant: "default"
-      content: { status: "ready"; data: CareerProfileResponse | null }
+      profile: CareerProfileResponse | null
+      extractionState: TaskStatusResponse | TaskFailureResponse | undefined
+      extractionStateError: boolean
       actions: ProfileViewActions
     }
 
 export function ProfileView(props: ProfileViewProps) {
-  if (props.variant === "error") {
+  if (props.variant === "error")
     return <ProfileErrorState isRetrying={false} onRetry={props.onRetry} />
-  }
-
-  if (!("actions" in props)) {
-    return <ProfileLoadingState />
-  }
-
-  return <ProfileReadyView actions={props.actions} profile={props.content.data} />
+  if (props.variant === "loading") return <ProfileLoadingState />
+  return <ProfileReadyView {...props} />
 }
 
 function ProfileReadyView({
   actions,
   profile,
-}: {
-  actions: ProfileViewActions
-  profile: CareerProfileResponse | null
-}) {
+  extractionState,
+  extractionStateError,
+}: Extract<ProfileViewProps, { variant: "default" }>) {
   const { t } = useTranslation()
   const [editingSection, setEditingSection] = useState<EditableProfileSection | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false)
-  const [isImportSubmitting, setIsImportSubmitting] = useState(false)
-  const [isCreating, setIsCreating] = useState(false)
-  const [importError, setImportError] = useState<string | null>(null)
-  const [createError, setCreateError] = useState<string | null>(null)
-  const [showImportFeedback, setShowImportFeedback] = useState(false)
-  const [isResumeDialogOpen, setIsResumeDialogOpen] = useState(false)
+  const [pendingAction, setPendingAction] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [isExtractionDialogOpen, setIsExtractionDialogOpen] = useState(false)
   const blocker = useBlocker({
     disabled: !isDirty,
     enableBeforeUnload: isDirty,
     shouldBlockFn: () => isDirty,
     withResolver: true,
   })
-
-  const handleDirtyChange = useCallback((nextIsDirty: boolean) => {
-    setIsDirty(nextIsDirty)
-  }, [])
+  const handleDirtyChange = useCallback((nextIsDirty: boolean) => setIsDirty(nextIsDirty), [])
+  const canEdit =
+    !pendingAction &&
+    !extractionStateError &&
+    (extractionState?.status === "idle" || extractionState?.status === "failed")
 
   function closeEditor() {
     setEditingSection(null)
     setIsDirty(false)
   }
-
   function requestCloseEditor() {
-    if (isDirty) {
-      setIsDiscardDialogOpen(true)
-      return
-    }
-    closeEditor()
+    if (isDirty) setIsDiscardDialogOpen(true)
+    else closeEditor()
   }
-
-  async function runImport(input: ResumeImportInput) {
-    setIsImportSubmitting(true)
-    setImportError(null)
-    setShowImportFeedback(false)
+  async function runAction(action: () => Promise<unknown>) {
+    if (pendingAction) return false
+    setPendingAction(true)
+    setActionError(null)
     try {
-      await actions.importResume(input)
-      setShowImportFeedback(true)
-      setIsResumeDialogOpen(false)
-    } catch {
-      setImportError(t("profile.import.failed"))
+      await action()
+      return true
+    } catch (error) {
+      setActionError(
+        t(
+          error instanceof ApiError && error.code === "resource.conflict"
+            ? "profile.lifecycle.stateConflict"
+            : "profile.lifecycle.actionFailed",
+        ),
+      )
+      return false
     } finally {
-      setIsImportSubmitting(false)
+      setPendingAction(false)
     }
   }
-
-  async function createManually() {
-    setIsCreating(true)
-    setCreateError(null)
-    try {
-      await actions.createProfile()
-    } catch {
-      setCreateError(t("profile.lifecycle.actionFailed"))
-    } finally {
-      setIsCreating(false)
+  async function extract(input: CareerProfileTextExtractionRequest) {
+    if (await runAction(() => actions.extractCareerProfileFromText(input))) {
+      setIsExtractionDialogOpen(false)
     }
-  }
-
-  if (!profile) {
-    return (
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <ProfileEmptyState />
-        <ResumeImportForm
-          isSubmitting={isImportSubmitting}
-          onSubmit={runImport}
-          title={t("profile.import.title")}
-        />
-        <Button disabled={isCreating} onClick={() => void createManually()} variant="outline">
-          {t("profile.actions.manualEntry")}
-        </Button>
-        {importError && <ImportError message={importError} />}
-        {createError && <ImportError message={createError} />}
-      </div>
-    )
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-      <ProfileHeader onOpenResume={() => setIsResumeDialogOpen(true)} profile={profile} />
-      <ProfileResumeDialog
-        hasProfile
-        importError={importError}
-        isSubmitting={isImportSubmitting}
-        onOpenChange={(open) => {
-          if (!open && isImportSubmitting) return
-          setImportError(null)
-          setIsResumeDialogOpen(open)
-        }}
-        onSubmit={runImport}
-        open={isResumeDialogOpen}
-      />
-
-      {showImportFeedback && (
-        <Alert data-testid="profile-import-success">
-          <AlertTitle>{t("profile.import.success")}</AlertTitle>
-          <AlertDescription>{t("profile.import.successDescription")}</AlertDescription>
-        </Alert>
+    <div
+      className={
+        profile
+          ? "mx-auto flex w-full max-w-7xl flex-col gap-6"
+          : "mx-auto flex w-full max-w-3xl flex-col gap-6"
+      }
+    >
+      {profile ? (
+        <ProfileHeader
+          disabled={!canEdit}
+          onOpenResume={() => setIsExtractionDialogOpen(true)}
+          profile={profile}
+        />
+      ) : (
+        <ProfileEmptyState />
       )}
-
-      <ProfileSections
-        onStartEditing={(section) => {
-          setIsDirty(false)
-          setEditingSection(section)
-        }}
-        profile={profile}
+      <CareerProfileExtractionStatus
+        state={extractionState}
+        synchronizationError={extractionStateError}
+        pending={pendingAction}
+        onRetry={() => void runAction(actions.retryCareerProfileExtraction)}
+        onAbort={() => void runAction(actions.abortCareerProfileExtraction)}
+        onReimport={() => setIsExtractionDialogOpen(true)}
+        onResynchronize={() => void runAction(actions.retryCareerProfileExtractionState)}
       />
-      <ProfileSectionEditDialog
-        onDirtyChange={handleDirtyChange}
+      {actionError && <ActionError message={actionError} />}
+      {!profile && extractionState?.status === "idle" && !extractionStateError && (
+        <CareerProfileExtractionForm
+          isSubmitting={pendingAction}
+          onSubmit={extract}
+          title={t("profile.import.title")}
+        />
+      )}
+      {!profile && canEdit && (
+        <Button
+          disabled={pendingAction}
+          onClick={() => void runAction(() => actions.createCareerProfile({}))}
+          variant="outline"
+        >
+          {t("profile.actions.manualEntry")}
+        </Button>
+      )}
+      <CareerProfileExtractionDialog
+        hasProfile={profile !== null}
+        actionError={actionError}
+        isSubmitting={pendingAction}
         onOpenChange={(open) => {
-          if (!open) requestCloseEditor()
+          if (!open && pendingAction) return
+          setActionError(null)
+          setIsExtractionDialogOpen(open)
         }}
-        onSave={async (input) => {
-          await actions.updateProfile(input)
-          closeEditor()
-          toast.success(t("profile.editor.saveSuccess"), {
-            duration: 2500,
-            id: "profile-save-success",
-          })
-        }}
-        open={editingSection !== null}
-        profile={profile}
-        section={editingSection}
+        onSubmit={extract}
+        open={isExtractionDialogOpen}
       />
-
+      {profile && (
+        <>
+          <ProfileSections
+            onStartEditing={
+              canEdit
+                ? (section) => {
+                    setIsDirty(false)
+                    setEditingSection(section)
+                  }
+                : undefined
+            }
+            profile={profile}
+          />
+          <ProfileSectionEditDialog
+            onDirtyChange={handleDirtyChange}
+            onOpenChange={(open) => {
+              if (!open) requestCloseEditor()
+            }}
+            onSave={async (input) => {
+              await actions.updateCareerProfile(input)
+              closeEditor()
+              toast.success(t("profile.editor.saveSuccess"), {
+                duration: 2500,
+                id: "profile-save-success",
+              })
+            }}
+            open={editingSection !== null}
+            profile={profile}
+            section={editingSection}
+          />
+        </>
+      )}
       <AlertDialog open={isDiscardDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -241,7 +261,7 @@ function ProfileReadyView({
   )
 }
 
-function ImportError({ message }: { message: string }) {
+function ActionError({ message }: { message: string }) {
   return (
     <Alert variant="destructive">
       <CircleAlertIcon />

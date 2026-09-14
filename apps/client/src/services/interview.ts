@@ -13,7 +13,7 @@ import type {
   TrainingEntryRoleAvailability,
 } from "@/models/training-entry"
 import { listRoles, getJdExtractionState } from "@/services/roles"
-import { getProfile } from "@/services/profile"
+import { getCareerProfile } from "@/services/profile"
 import { isCareerProfileComplete } from "@/lib/career-profile"
 import { hasJobDescription } from "@/lib/job-description"
 
@@ -56,7 +56,7 @@ export async function getInterviewPage(): Promise<InterviewData> {
 }
 
 async function getSetupResources() {
-  const [initialRoles, profile] = await Promise.all([listRoles(), getProfile()])
+  const [initialRoles, profile] = await Promise.all([listRoles(), getCareerProfile()])
   const tasks = new Map(
     await Promise.all(
       initialRoles.roles

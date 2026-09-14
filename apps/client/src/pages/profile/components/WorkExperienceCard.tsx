@@ -18,7 +18,7 @@ import { DateRange, DetailList, EmptySection } from "./profile-section-shared"
 
 export type WorkExperienceCardProps = {
   experiences: WorkExperienceEntryResponse[]
-  onEdit: () => void
+  onEdit?: () => void
 }
 
 export function WorkExperienceCard({ experiences, onEdit }: WorkExperienceCardProps) {

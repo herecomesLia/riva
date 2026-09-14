@@ -12,11 +12,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import type { ResumeImportInput } from "@/mocks/models/profile"
+import type { CareerProfileTextExtractionRequest } from "@/api/generated/models"
 
-export function ResumeImportForm({
+export function CareerProfileExtractionForm({
   embedded = false,
   isSubmitting,
   onSubmit,
@@ -24,18 +25,18 @@ export function ResumeImportForm({
 }: {
   embedded?: boolean
   isSubmitting: boolean
-  onSubmit: (input: ResumeImportInput) => Promise<void>
+  onSubmit: (input: CareerProfileTextExtractionRequest) => Promise<void>
   title: string
 }) {
   const { t } = useTranslation()
-  const [file, setFile] = useState<File | undefined>()
+  const [fileName, setFileName] = useState<string>()
   const [text, setText] = useState("")
   const [errorVisible, setErrorVisible] = useState(false)
 
   const fields = (
     <>
-      <div className="flex min-w-0 flex-col gap-2">
-        <p className="text-sm font-medium">{t("profile.import.file")}</p>
+      <Field>
+        <FieldLabel htmlFor="profile-resume-file">{t("profile.import.file")}</FieldLabel>
         <label
           className="flex w-full min-w-0 max-w-full min-h-10 cursor-pointer items-center gap-3 rounded-md border bg-background px-3 text-sm transition-colors hover:bg-accent/50 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
           htmlFor="profile-resume-file"
@@ -43,25 +44,27 @@ export function ResumeImportForm({
           <Input
             accept=".pdf,.doc,.docx,.txt"
             aria-label={t("profile.import.file")}
+            aria-describedby="profile-resume-file-description"
             className="sr-only"
+            disabled={isSubmitting}
             id="profile-resume-file"
-            onChange={(event) => {
-              setFile(event.target.files?.[0])
-              setErrorVisible(false)
-            }}
+            onChange={(event) => setFileName(event.target.files?.[0]?.name)}
             type="file"
           />
           <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
           <span className="min-w-0 truncate text-muted-foreground">
-            {file?.name ?? t("profile.import.noFileSelected")}
+            {fileName ?? t("profile.import.noFileSelected")}
           </span>
         </label>
-      </div>
-      <div className="flex min-w-0 flex-col gap-2">
-        <label className="text-sm font-medium" htmlFor="profile-resume-text">
-          {t("profile.import.text")}
-        </label>
+        <FieldDescription id="profile-resume-file-description">
+          {t("profile.import.fileNotSupported")}
+        </FieldDescription>
+      </Field>
+      <Field data-invalid={errorVisible}>
+        <FieldLabel htmlFor="profile-resume-text">{t("profile.import.text")}</FieldLabel>
         <Textarea
+          disabled={isSubmitting}
+          aria-invalid={errorVisible}
           className="min-w-0 max-w-full"
           id="profile-resume-text"
           onChange={(event) => {
@@ -71,7 +74,7 @@ export function ResumeImportForm({
           placeholder={t("profile.import.textPlaceholder")}
           value={text}
         />
-      </div>
+      </Field>
       {errorVisible && (
         <Alert variant="destructive">
           <AlertCircleIcon />
@@ -85,12 +88,12 @@ export function ResumeImportForm({
     <Button
       disabled={isSubmitting}
       onClick={() => {
-        if (!file && !text.trim()) {
+        if (!text.trim()) {
           setErrorVisible(true)
           return
         }
 
-        void onSubmit({ file, text })
+        void onSubmit({ text })
       }}
     >
       {isSubmitting ? (
@@ -104,7 +107,7 @@ export function ResumeImportForm({
 
   if (embedded) {
     return (
-      <div className="flex flex-col gap-5" data-testid="profile-resume-import-form">
+      <div className="flex flex-col gap-5" data-testid="career-profile-extraction-form">
         {fields}
         <div>{submit}</div>
       </div>
@@ -112,7 +115,7 @@ export function ResumeImportForm({
   }
 
   return (
-    <Card data-testid="profile-resume-import-form">
+    <Card data-testid="career-profile-extraction-form">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{t("profile.import.description")}</CardDescription>
