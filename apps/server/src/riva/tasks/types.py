@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from enum import StrEnum
 
 
@@ -24,9 +23,3 @@ class TaskStatus(StrEnum):
     RUNNING = "running"
     FAILED = "failed"
     ABORTING = "aborting"
-
-
-@dataclass(frozen=True, slots=True)
-class TaskState:
-    status: TaskStatus
-    error_code: TaskErrorCode | None = None

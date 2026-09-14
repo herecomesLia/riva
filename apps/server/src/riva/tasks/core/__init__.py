@@ -3,7 +3,7 @@ from riva.tasks.core.dispatch import (
     cancel_job,
     defer_job,
     get_job_status,
-    get_task_state,
+    get_task_status,
     retry_job,
 )
 from riva.tasks.core.schema import reset_task_schema, setup_task_schema
@@ -14,7 +14,7 @@ __all__ = [
     "cancel_job",
     "defer_job",
     "get_job_status",
-    "get_task_state",
+    "get_task_status",
     "reset_task_schema",
     "retry_job",
     "run_worker",

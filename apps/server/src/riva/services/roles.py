@@ -15,15 +15,16 @@ from riva.models.role import (
 )
 from riva.models.user import User
 from riva.services.errors import ConflictError, NotFoundError
-from riva.services.types import UNSET
+from riva.services.types import UNSET, TaskState
 from riva.tasks import (
     JobStatus,
     Task,
-    TaskState,
+    TaskErrorCode,
+    TaskStatus,
     cancel_job,
     defer_job,
     get_job_status,
-    get_task_state,
+    get_task_status,
 )
 
 
@@ -175,7 +176,13 @@ class RoleService:
     async def get_matching_analysis_state(self, user: User, role_id: UUID) -> TaskState:
         role = await self.get(user, role_id)
         analysis = await self._lock_matching_analysis(role, shared=True)
-        return await get_task_state(self.session, analysis.job_id, analysis.error_code)
+        status = await get_task_status(self.session, analysis.job_id)
+        return TaskState(
+            status,
+            (analysis.error_code or TaskErrorCode.INTERNAL_ERROR)
+            if status is TaskStatus.FAILED
+            else None,
+        )
 
     async def abort_matching_analysis(self, user: User, role_id: UUID) -> None:
         role = await self.get(user, role_id)

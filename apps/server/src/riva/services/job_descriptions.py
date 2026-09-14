@@ -8,15 +8,16 @@ from riva.models.role import (
     Role,
 )
 from riva.services.errors import ConflictError, NotFoundError
-from riva.services.types import UNSET
+from riva.services.types import UNSET, TaskState
 from riva.tasks import (
     JobStatus,
     Task,
-    TaskState,
+    TaskErrorCode,
+    TaskStatus,
     cancel_job,
     defer_job,
     get_job_status,
-    get_task_state,
+    get_task_status,
     retry_job,
 )
 from riva.utils import utc_now
@@ -84,8 +85,12 @@ class JobDescriptionService:
     async def get_extraction_state(self, role: Role) -> TaskState:
         # Keep the current job and its error stable while reading the job status.
         extraction = await self._lock_extraction(role, shared=True)
-        return await get_task_state(
-            self.session, extraction.job_id, extraction.error_code
+        status = await get_task_status(self.session, extraction.job_id)
+        return TaskState(
+            status,
+            (extraction.error_code or TaskErrorCode.INTERNAL_ERROR)
+            if status is TaskStatus.FAILED
+            else None,
         )
 
     async def retry_extraction(self, role: Role) -> None:
