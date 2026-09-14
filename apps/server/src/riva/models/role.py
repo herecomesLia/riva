@@ -3,14 +3,14 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
-from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, String, text
+from sqlalchemy import DateTime, Enum, ForeignKey, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.sqltypes import Uuid
 
 from riva.db.base import Base
 from riva.db.types import PydanticJSONB
+from riva.models.mixins import TaskStateMixin
 from riva.models.types import NonBlankStr
-from riva.tasks.types import TaskErrorCode
 from riva.utils import utc_now
 
 
@@ -147,20 +147,11 @@ class JobDescription(Base):
     )
 
 
-class JobDescriptionExtraction(Base):
+class JobDescriptionExtraction(TaskStateMixin, Base):
     __tablename__ = "job_description_extractions"
 
     role_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
-    )
-    job_id: Mapped[int | None] = mapped_column(BigInteger)
-    error_code: Mapped[TaskErrorCode | None] = mapped_column(
-        Enum(
-            TaskErrorCode,
-            values_callable=lambda enum: [member.value for member in enum],
-            native_enum=False,
-            validate_strings=True,
-        )
     )
 
 
@@ -186,20 +177,11 @@ class RoleMatchingResult(RoleMatchingReport):
     score: float
 
 
-class RoleMatchingAnalysis(Base):
+class RoleMatchingAnalysis(TaskStateMixin, Base):
     __tablename__ = "role_matching_analyses"
 
     role_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
-    )
-    job_id: Mapped[int | None] = mapped_column(BigInteger)
-    error_code: Mapped[TaskErrorCode | None] = mapped_column(
-        Enum(
-            TaskErrorCode,
-            values_callable=lambda enum: [member.value for member in enum],
-            native_enum=False,
-            validate_strings=True,
-        )
     )
 
 
