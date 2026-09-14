@@ -11,11 +11,18 @@ from riva.core.config import (
     SameSitePolicy,
     SessionSettings,
     Settings,
+    TaskSettings,
     load_settings,
 )
 
 DATABASE_URL = "postgresql+psycopg://test:test@invalid/test"
 SESSION_DIGEST_KEY = "valid-session-digest-key"
+
+
+def test_stall_timeout_covers_shutdown_and_heartbeat_margin() -> None:
+    with pytest.raises(ValidationError, match="heartbeat margin"):
+        TaskSettings(shutdown_timeout_seconds=40, stall_timeout_seconds=69)
+    TaskSettings(shutdown_timeout_seconds=40, stall_timeout_seconds=70)
 
 
 @pytest.fixture(autouse=True)
@@ -253,6 +260,10 @@ def test_write_environ_writes_all_settings(
         tasks={
             "concurrency": 8,
             "shutdown_timeout_seconds": 12.5,
+            "queue_timeout_seconds": 180,
+            "stall_timeout_seconds": 65,
+            "recovery_timeout_seconds": 75,
+            "max_recovery_attempts": 0,
         },
     )
     expected = {
@@ -273,6 +284,10 @@ def test_write_environ_writes_all_settings(
         "RIVA_LLM_HEALTH_TTL_SECONDS": "18.0",
         "RIVA_TASKS_CONCURRENCY": "8",
         "RIVA_TASKS_SHUTDOWN_TIMEOUT_SECONDS": "12.5",
+        "RIVA_TASKS_QUEUE_TIMEOUT_SECONDS": "180.0",
+        "RIVA_TASKS_STALL_TIMEOUT_SECONDS": "65.0",
+        "RIVA_TASKS_RECOVERY_TIMEOUT_SECONDS": "75.0",
+        "RIVA_TASKS_MAX_RECOVERY_ATTEMPTS": "0",
         "RIVA_CORS_ALLOWED_ORIGINS": "https://a.test,https://b.test",
         "RIVA_CORS_ALLOW_CREDENTIALS": "false",
         "RIVA_SESSION_DIGEST_KEY": "digest-key",

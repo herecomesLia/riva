@@ -1,13 +1,16 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import procrastinate
 
 from riva.core.config import Settings
-from riva.db import Database
-from riva.llm import LLMClient
 from riva.tasks.errors import TaskError
+
+if TYPE_CHECKING:
+    from riva.db import Database
+    from riva.llm import LLMClient
 
 
 @dataclass(slots=True)
@@ -18,6 +21,9 @@ class TaskResources:
 
 @asynccontextmanager
 async def task_resources(settings: Settings) -> AsyncGenerator[TaskResources]:
+    from riva.db import Database
+    from riva.llm import LLMClient
+
     async with (
         Database(settings.database) as database,
         LLMClient(settings.llm) as llm,

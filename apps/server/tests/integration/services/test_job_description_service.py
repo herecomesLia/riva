@@ -116,7 +116,7 @@ async def test_matching_rejects_active_extraction_without_changing_matching(
     from riva.models import User
     from riva.models.career_profile import CareerProfile
     from riva.services.errors import ConflictError
-    from riva.tasks import TaskErrorCode
+    from riva.tasks import TaskController, TaskErrorCode
 
     async with extraction_database.sessionmaker() as session:
         role = await session.get(Role, extraction_role)
@@ -128,8 +128,13 @@ async def test_matching_rejects_active_extraction_without_changing_matching(
         await session.execute(text("SET LOCAL search_path TO procrastinate, public"))
         await session.execute(
             text("UPDATE procrastinate_jobs SET status = :status WHERE id = :id"),
-            {"status": status, "id": role.jd_extraction.job_id},
+            {
+                "status": "doing" if status == "aborting" else status,
+                "id": role.jd_extraction.job_id,
+            },
         )
+        if status == "aborting":
+            await TaskController(session).abort(role.jd_extraction.job_id)
         await session.commit()
         with pytest.raises(ConflictError):
             await RoleService(session).start_matching_analysis(user, role.id)

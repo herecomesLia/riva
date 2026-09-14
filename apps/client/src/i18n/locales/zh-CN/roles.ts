@@ -197,6 +197,7 @@ export const roles = {
     failureCodes: {
       invalid_output: "分析结果格式有误，请重试。",
       llm_unavailable: "AI 服务暂时不可用，请稍后重试。",
+      service_unavailable: "服务暂时不可用，请稍后重试。",
       internal_error: "分析失败，请重试。",
     },
     cardDescription: "结合当前求职档案与岗位 JD，查看能力匹配和面试准备重点。",

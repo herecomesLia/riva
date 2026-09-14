@@ -8,6 +8,7 @@
 export type TaskErrorCode = (typeof TaskErrorCode)[keyof typeof TaskErrorCode]
 
 export const TaskErrorCode = {
+  service_unavailable: "service_unavailable",
   invalid_output: "invalid_output",
   llm_unavailable: "llm_unavailable",
   internal_error: "internal_error",

@@ -1,7 +1,6 @@
 from uuid import UUID
 
 from procrastinate import JobContext
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.ai.career_profile import CareerProfileExtractor
 from riva.llm.errors import LLMOutputError, LLMUnavailableError
@@ -11,11 +10,10 @@ from riva.models.career_profile import (
     CareerProfileExtraction,
 )
 from riva.tasks import (
-    JobStatus,
     Task,
+    TaskAttempt,
     TaskErrorCode,
     app,
-    get_job_status,
     get_task_resources,
 )
 
@@ -31,10 +29,12 @@ async def extract_career_profile_text(
 ) -> None:
     resources = get_task_resources(context)
     user_id = UUID(user_id)
-    job_id = context.job.id
+    attempt = TaskAttempt(context.job)
     async with resources.database.sessionmaker() as session:
         extraction = await session.get(CareerProfileExtraction, user_id)
-        if extraction is None or extraction.job_id != job_id:
+        if extraction is None or not await attempt.is_current(
+            session, extraction.job_id
+        ):
             return
 
     try:
@@ -43,8 +43,8 @@ async def extract_career_profile_text(
             extraction = await session.get(
                 CareerProfileExtraction, user_id, with_for_update=True
             )
-            if extraction is None or not await _can_write_career_profile_extraction(
-                session, extraction, job_id=job_id
+            if extraction is None or not await attempt.lock_for_write(
+                session, extraction.job_id
             ):
                 return
             profile = await session.get(CareerProfile, user_id)
@@ -55,6 +55,7 @@ async def extract_career_profile_text(
                 setattr(profile, field, getattr(content, field))
             extraction.job_id = None
             extraction.error_code = None
+            await attempt.finish(session)
             await session.commit()
     except Exception as exc:
         if isinstance(exc, LLMOutputError):
@@ -67,19 +68,10 @@ async def extract_career_profile_text(
             extraction = await session.get(
                 CareerProfileExtraction, user_id, with_for_update=True
             )
-            if extraction is not None and await _can_write_career_profile_extraction(
-                session, extraction, job_id=job_id
+            if extraction is not None and await attempt.lock_for_write(
+                session, extraction.job_id
             ):
                 extraction.error_code = error_code
+                await attempt.finish(session, failed=True)
                 await session.commit()
         raise
-
-
-async def _can_write_career_profile_extraction(
-    session: AsyncSession, extraction: CareerProfileExtraction, *, job_id: int
-) -> bool:
-    # The caller must hold the extraction row lock until the write is committed.
-    if extraction.job_id != job_id:
-        return False
-    # An abort request keeps the job ID but revokes permission to write.
-    return await get_job_status(session, job_id) is JobStatus.RUNNING

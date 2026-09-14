@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -8,6 +9,7 @@ from structlog.testing import capture_logs
 from riva.core.config import LLMSettings, Settings
 from riva.db import Database
 from riva.schemas.health import HealthStatus
+from riva.tasks import TaskSupervisor
 
 
 def _event(
@@ -28,15 +30,33 @@ def _llm_double(*, status: HealthStatus = HealthStatus.unavailable) -> MagicMock
     return llm
 
 
-async def test_lifespan_starts_and_stops_with_real_database(app: FastAPI) -> None:
-    with capture_logs() as events:
-        async with LifespanManager(app):
-            pass
+async def test_lifespan_stops_supervisor_before_disposing_database(
+    app, database, monkeypatch
+):
+    started = asyncio.Event()
+    stopped = asyncio.Event()
+    sweep = TaskSupervisor.sweep
+    dispose = database.dispose
 
-    _event(events, "app.start", "in_progress")
-    _event(events, "app.stop", "in_progress")
-    assert _event(events, "app.start", "succeeded")["duration_ms"] >= 0
-    assert _event(events, "app.stop", "succeeded")["duration_ms"] >= 0
+    async def tracked_sweep(supervisor):
+        try:
+            await sweep(supervisor)
+            started.set()
+            await asyncio.Event().wait()
+        finally:
+            stopped.set()
+
+    async def checked_dispose():
+        assert stopped.is_set()
+        await dispose()
+
+    monkeypatch.setattr(TaskSupervisor, "sweep", tracked_sweep)
+    monkeypatch.setattr(database, "dispose", checked_dispose)
+    async with LifespanManager(app):
+        async with asyncio.timeout(5):
+            await started.wait()
+        assert not stopped.is_set()
+    assert stopped.is_set()
 
 
 async def test_lifespan_starts_with_llm_not_configured(app: FastAPI) -> None:

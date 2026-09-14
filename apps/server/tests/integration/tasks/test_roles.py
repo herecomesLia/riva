@@ -27,13 +27,12 @@ from riva.models.role import (
 from riva.services.job_descriptions import JobDescriptionService
 from riva.services.roles import RoleService
 from riva.tasks import (
-    JobStatus,
     Task,
+    TaskController,
     TaskErrorCode,
     TaskResources,
     TaskStatus,
     app,
-    get_job_status,
 )
 from riva.tasks.core.app import create_task_connector
 from riva.tasks.registry import configure_task_registry
@@ -155,7 +154,15 @@ async def test_failure_preserves_content_and_can_be_resolved(
                 JobDescriptionContent.model_validate(role.jd, from_attributes=True)
                 == CONTENT
             )
-            assert await get_job_status(session, job_id) is JobStatus.SUCCEEDED
+            assert (
+                await session.scalar(
+                    text(
+                        "SELECT status FROM procrastinate.procrastinate_jobs WHERE id = :id"
+                    ),
+                    {"id": job_id},
+                )
+                == "succeeded"
+            )
 
 
 @pytest.mark.parametrize("action", ["supersede", "abort", "delete"])
@@ -225,7 +232,10 @@ async def test_late_extraction_cannot_write_after_lifecycle_change(
                     user.active_role_id = extraction_role
                     await session.commit()
                     await RoleService(session).delete(user, extraction_role)
-                assert await get_job_status(session, job_id) is JobStatus.ABORTING
+                assert (
+                    await TaskController(session).get_status(job_id)
+                    is TaskStatus.ABORTING
+                )
                 # The lifecycle command must finish while the LLM is still waiting.
                 assert not running.done()
             release.set()
@@ -274,7 +284,15 @@ async def test_identical_extraction_preserves_content_versions(
         assert role.matching.jd_updated_at == role.jd.updated_at
         assert role.jd_extraction.job_id is None
         assert role.jd_extraction.error_code is None
-        assert await get_job_status(session, job_id) is JobStatus.SUCCEEDED
+        assert (
+            await session.scalar(
+                text(
+                    "SELECT status FROM procrastinate.procrastinate_jobs WHERE id = :id"
+                ),
+                {"id": job_id},
+            )
+            == "succeeded"
+        )
 
 
 MATCHING_RESULT = RoleMatchingResult(

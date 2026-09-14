@@ -10,15 +10,10 @@ from riva.models.role import (
 from riva.services.errors import ConflictError, NotFoundError
 from riva.services.types import UNSET, TaskState
 from riva.tasks import (
-    JobStatus,
     Task,
+    TaskController,
     TaskErrorCode,
     TaskStatus,
-    cancel_job,
-    defer_job,
-    get_job_status,
-    get_task_status,
-    retry_job,
 )
 from riva.utils import utc_now
 
@@ -26,6 +21,7 @@ from riva.utils import utc_now
 class JobDescriptionService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+        self.tasks = TaskController(session)
 
     async def update(
         self,
@@ -39,9 +35,7 @@ class JobDescriptionService:
         business_domains: list[str] | UNSET = UNSET,
     ) -> Role:
         extraction = await self._lock_extraction(role)
-        if extraction.job_id is not None and await get_job_status(
-            self.session, extraction.job_id
-        ) in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.ABORTING}:
+        if await self.tasks.is_active(extraction.job_id):
             raise ConflictError("Abort the active extraction before updating the JD.")
         jd = role.jd
         await self.session.refresh(jd)
@@ -71,10 +65,9 @@ class JobDescriptionService:
 
     async def extract_text(self, role: Role, *, text: str) -> None:
         extraction = await self._lock_extraction(role)
-        if extraction.job_id is not None:
-            await cancel_job(self.session, extraction.job_id, abort=True)
-        extraction.job_id = await defer_job(
-            self.session,
+        if await self.tasks.is_active(extraction.job_id):
+            await self.tasks.abort(extraction.job_id)
+        extraction.job_id = await self.tasks.start(
             Task.EXTRACT_JD_TEXT,
             role_id=str(role.id),
             text=text,
@@ -85,35 +78,23 @@ class JobDescriptionService:
     async def get_extraction_state(self, role: Role) -> TaskState:
         # Keep the current job and its error stable while reading the job status.
         extraction = await self._lock_extraction(role, shared=True)
-        status = await get_task_status(self.session, extraction.job_id)
+        status = await self.tasks.get_status(extraction.job_id)
         return TaskState(
             status,
-            (extraction.error_code or TaskErrorCode.INTERNAL_ERROR)
+            (extraction.error_code or TaskErrorCode.SERVICE_UNAVAILABLE)
             if status is TaskStatus.FAILED
             else None,
         )
 
     async def retry_extraction(self, role: Role) -> None:
         extraction = await self._lock_extraction(role)
-        if (
-            extraction.job_id is None
-            or await get_job_status(self.session, extraction.job_id)
-            is not JobStatus.FAILED
-        ):
-            raise ConflictError("Only a failed JD extraction can be retried.")
-        await retry_job(self.session, extraction.job_id)
+        await self.tasks.retry(extraction.job_id)
         extraction.error_code = None
         await self.session.commit()
 
     async def abort_extraction(self, role: Role) -> None:
         extraction = await self._lock_extraction(role)
-        if extraction.job_id is None:
-            raise ConflictError("There is no active JD extraction to abort.")
-        status = await get_job_status(self.session, extraction.job_id)
-        if status in {JobStatus.QUEUED, JobStatus.RUNNING}:
-            await cancel_job(self.session, extraction.job_id, abort=True)
-        elif status is not JobStatus.ABORTING:
-            raise ConflictError("Only an active JD extraction can be aborted.")
+        await self.tasks.abort(extraction.job_id)
         await self.session.commit()
 
     async def _lock_extraction(

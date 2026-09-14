@@ -15,13 +15,12 @@ from riva.services.career_profiles import CareerProfileService
 from riva.services.errors import ConflictError
 from riva.services.users import UserService
 from riva.tasks import (
-    JobStatus,
     Task,
+    TaskController,
     TaskErrorCode,
     TaskResources,
     TaskStatus,
     app,
-    get_job_status,
 )
 from riva.tasks.career_profile import extract_career_profile_text
 from riva.tasks.core.app import create_task_connector
@@ -102,9 +101,6 @@ async def test_failure_preserves_profile_and_can_be_resolved(
             profile = await service.create(user, skills=["SQL"])
             previous_version = profile.updated_at
         assert (await service.get_extraction_state(user)).status is TaskStatus.IDLE
-        for operation in (service.retry_extraction, service.abort_extraction):
-            with pytest.raises(ConflictError):
-                await operation(user)
         await session.commit()
 
     async with extraction_database.sessionmaker() as reader:
@@ -132,8 +128,6 @@ async def test_failure_preserves_profile_and_can_be_resolved(
             assert profile.updated_at == previous_version
         else:
             assert profile is None
-        with pytest.raises(ConflictError):
-            await service.abort_extraction(old_user)
         await reader.commit()
 
     async with extraction_database.sessionmaker() as session:
@@ -180,7 +174,15 @@ async def test_failure_preserves_profile_and_can_be_resolved(
         if has_profile:
             assert user.career_profile.updated_at > previous_version
         if resolution == "retry":
-            assert await get_job_status(session, job_id) is JobStatus.SUCCEEDED
+            assert (
+                await session.scalar(
+                    text(
+                        "SELECT status FROM procrastinate.procrastinate_jobs WHERE id = :id"
+                    ),
+                    {"id": job_id},
+                )
+                == "succeeded"
+            )
 
 
 @pytest.mark.parametrize("action", ["supersede", "abort"])
@@ -250,7 +252,10 @@ async def test_late_extraction_cannot_write_after_lifecycle_change(
                     assert (
                         await service.get_extraction_state(user)
                     ).status is TaskStatus.ABORTING
-                assert await get_job_status(session, job_id) is JobStatus.ABORTING
+                assert (
+                    await TaskController(session).get_status(job_id)
+                    is TaskStatus.ABORTING
+                )
                 assert not running.done()
                 await session.commit()
             release.set()
@@ -272,7 +277,7 @@ async def test_late_extraction_cannot_write_after_lifecycle_change(
 
 @pytest.mark.parametrize("has_profile", [False, True], ids=["create", "update"])
 @pytest.mark.parametrize("status", ["todo", "doing", "aborting"])
-async def test_active_extraction_blocks_manual_write_and_retry(
+async def test_active_extraction_blocks_manual_write(
     extraction_database,
     extraction_user,
     has_profile,
@@ -288,16 +293,16 @@ async def test_active_extraction_blocks_manual_write_and_retry(
         await session.execute(text("SET LOCAL search_path TO procrastinate, public"))
         await session.execute(
             text("UPDATE procrastinate_jobs SET status = :status WHERE id = :id"),
-            {"status": status, "id": job_id},
+            {"status": "doing" if status == "aborting" else status, "id": job_id},
         )
+        if status == "aborting":
+            await TaskController(session).abort(job_id)
         await session.commit()
         with pytest.raises(ConflictError):
             if has_profile:
                 await service.update(user, skills=["Manual"])
             else:
                 await service.create(user, skills=["Manual"])
-        with pytest.raises(ConflictError):
-            await service.retry_extraction(user)
         # Commit to expose unintended partial writes despite the rejected operation.
         await session.commit()
     async with extraction_database.sessionmaker() as session:

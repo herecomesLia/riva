@@ -292,6 +292,7 @@ async def test_extraction_http_lifecycle_without_profile(client, database):
         (TaskErrorCode.INVALID_OUTPUT, "Unable to complete the task."),
         (TaskErrorCode.INTERNAL_ERROR, "Unable to complete the task."),
         (TaskErrorCode.LLM_UNAVAILABLE, "LLM service is temporarily unavailable."),
+        (None, "Service is temporarily unavailable. Please try again later."),
     ],
 )
 async def test_extraction_failure_returns_only_public_state(
@@ -309,8 +310,15 @@ async def test_extraction_failure_returns_only_public_state(
     assert response.status_code == 200
     assert response.json() == {
         "status": "failed",
-        "error": {"code": code.value, "message": message},
+        "error": {
+            "code": (code or TaskErrorCode.SERVICE_UNAVAILABLE).value,
+            "message": message,
+        },
     }
+    if code is None:
+        response = await client.post(f"{EXTRACTION_PATH}/retry", headers=ORIGIN_HEADERS)
+        assert response.status_code == 202
+        assert (await client.get(EXTRACTION_PATH)).json()["status"] == "queued"
 
 
 @pytest.mark.parametrize(

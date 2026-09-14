@@ -210,6 +210,7 @@ export const roles = {
     failureCodes: {
       invalid_output: "The analysis output was invalid. Please try again.",
       llm_unavailable: "The AI service is unavailable. Please try again later.",
+      service_unavailable: "The service is temporarily unavailable. Please try again later.",
       internal_error: "The analysis failed. Please try again.",
     },
     cardDescription:

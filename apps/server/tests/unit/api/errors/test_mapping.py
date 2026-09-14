@@ -17,12 +17,15 @@ from riva.services.errors import (
     SessionExpiredError,
     UsernameTakenError,
 )
+from riva.tasks.errors import TaskError, TaskStateError
 
 
 @pytest.mark.parametrize(
     ("exception", "expected"),
     [
         (UsernameTakenError(), HttpErrorPolicy(409)),
+        (TaskStateError(), HttpErrorPolicy(409)),
+        (TaskError("private task diagnostic"), HttpErrorPolicy(500)),
         (InvalidCredentialsError(), HttpErrorPolicy(401)),
         (InvalidSessionError(), HttpErrorPolicy(401, clear_session_cookie=True)),
         (SessionExpiredError(), HttpErrorPolicy(401, clear_session_cookie=True)),
@@ -93,4 +96,13 @@ def test_resolve_error_details_does_not_use_error_attributes() -> None:
     assert resolve_error_details(ErrorWithPublicAttributes()) == ErrorDetails(
         ErrorCode.SERVER_INTERNAL_ERROR,
         "An internal server error occurred.",
+    )
+
+
+def test_task_state_error_is_public_but_infrastructure_diagnostics_are_not() -> None:
+    assert resolve_error_details(
+        TaskStateError("There is no task to abort.")
+    ) == ErrorDetails(ErrorCode.RESOURCE_CONFLICT, "There is no task to abort.")
+    assert resolve_error_details(TaskError("private task diagnostic")) == ErrorDetails(
+        ErrorCode.SERVER_INTERNAL_ERROR, "An internal server error occurred."
     )

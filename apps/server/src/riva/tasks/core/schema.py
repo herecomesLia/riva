@@ -1,7 +1,11 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy.schema import CreateSchema, DropSchema
 
-from riva.db import Database
 from riva.tasks.core.app import TASK_SCHEMA, app, create_task_connector
+
+if TYPE_CHECKING:
+    from riva.db import Database
 
 JOBS_TABLE = "procrastinate_jobs"
 

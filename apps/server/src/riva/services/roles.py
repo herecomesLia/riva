@@ -17,20 +17,17 @@ from riva.models.user import User
 from riva.services.errors import ConflictError, NotFoundError
 from riva.services.types import UNSET, TaskState
 from riva.tasks import (
-    JobStatus,
     Task,
+    TaskController,
     TaskErrorCode,
     TaskStatus,
-    cancel_job,
-    defer_job,
-    get_job_status,
-    get_task_status,
 )
 
 
 class RoleService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+        self.tasks = TaskController(session)
 
     async def list(self, user: User) -> list[Role]:
         result = await self.session.scalars(
@@ -132,13 +129,11 @@ class RoleService:
         )
         if extraction is None:
             raise NotFoundError("Target role was not found.")
-        if extraction.job_id is not None:
-            await cancel_job(self.session, extraction.job_id, abort=True)
+        if await self.tasks.is_active(extraction.job_id):
+            await self.tasks.abort(extraction.job_id)
         analysis = await self._lock_matching_analysis(role)
-        if analysis.job_id is not None and await get_job_status(
-            self.session, analysis.job_id
-        ) in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.ABORTING}:
-            await cancel_job(self.session, analysis.job_id, abort=True)
+        if await self.tasks.is_active(analysis.job_id):
+            await self.tasks.abort(analysis.job_id)
         if user.active_role_id == role.id:
             user.active_role_id = None
         await self.session.delete(role)
@@ -159,16 +154,14 @@ class RoleService:
         analysis = await self._lock_matching_analysis(role)
         if await self.session.get(CareerProfile, user.id) is None:
             raise NotFoundError("Career profile was not found.")
-        if extraction.job_id is not None and await get_job_status(
-            self.session, extraction.job_id
-        ) in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.ABORTING}:
+        if await self.tasks.is_active(extraction.job_id):
             raise ConflictError(
                 "Finish or abort the active JD extraction before matching."
             )
-        if analysis.job_id is not None:
-            await cancel_job(self.session, analysis.job_id, abort=True)
-        analysis.job_id = await defer_job(
-            self.session, Task.ANALYZE_ROLE_MATCHING, role_id=str(role.id)
+        if await self.tasks.is_active(analysis.job_id):
+            await self.tasks.abort(analysis.job_id)
+        analysis.job_id = await self.tasks.start(
+            Task.ANALYZE_ROLE_MATCHING, role_id=str(role.id)
         )
         analysis.error_code = None
         await self.session.commit()
@@ -176,10 +169,10 @@ class RoleService:
     async def get_matching_analysis_state(self, user: User, role_id: UUID) -> TaskState:
         role = await self.get(user, role_id)
         analysis = await self._lock_matching_analysis(role, shared=True)
-        status = await get_task_status(self.session, analysis.job_id)
+        status = await self.tasks.get_status(analysis.job_id)
         return TaskState(
             status,
-            (analysis.error_code or TaskErrorCode.INTERNAL_ERROR)
+            (analysis.error_code or TaskErrorCode.SERVICE_UNAVAILABLE)
             if status is TaskStatus.FAILED
             else None,
         )
@@ -187,13 +180,7 @@ class RoleService:
     async def abort_matching_analysis(self, user: User, role_id: UUID) -> None:
         role = await self.get(user, role_id)
         analysis = await self._lock_matching_analysis(role)
-        if analysis.job_id is None:
-            raise ConflictError("There is no active role matching analysis to abort.")
-        status = await get_job_status(self.session, analysis.job_id)
-        if status in {JobStatus.QUEUED, JobStatus.RUNNING}:
-            await cancel_job(self.session, analysis.job_id, abort=True)
-        elif status is not JobStatus.ABORTING:
-            raise ConflictError("Only an active role matching analysis can be aborted.")
+        await self.tasks.abort(analysis.job_id)
         await self.session.commit()
 
     async def _lock_matching_analysis(

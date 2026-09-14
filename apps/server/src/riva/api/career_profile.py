@@ -130,6 +130,7 @@ async def get_career_profile_extraction_state(
         error = TaskErrorBody(
             code=state.error_code,
             message={
+                TaskErrorCode.SERVICE_UNAVAILABLE: "Service is temporarily unavailable. Please try again later.",
                 TaskErrorCode.INVALID_OUTPUT: "Unable to complete the task.",
                 TaskErrorCode.LLM_UNAVAILABLE: "LLM service is temporarily unavailable.",
                 TaskErrorCode.INTERNAL_ERROR: "Unable to complete the task.",

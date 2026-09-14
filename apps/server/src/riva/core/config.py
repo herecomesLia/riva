@@ -184,13 +184,24 @@ class LLMSettings(BaseModel):
 
 class TaskSettings(BaseModel):
     concurrency: int = Field(default=4, gt=0)
-    shutdown_timeout_seconds: float = Field(default=30, ge=0)
+    shutdown_timeout_seconds: float = Field(default=30, ge=0, allow_inf_nan=False)
+    queue_timeout_seconds: float = Field(default=300, gt=0, allow_inf_nan=False)
+    stall_timeout_seconds: float = Field(default=90, gt=0, allow_inf_nan=False)
+    recovery_timeout_seconds: float = Field(default=120, gt=0, allow_inf_nan=False)
+    max_recovery_attempts: int = Field(default=2, ge=0)
+
+    @model_validator(mode="after")
+    def validate_recovery(self) -> Self:
+        # Procrastinate 3.9 sends heartbeats every 10 seconds by default.
+        if self.stall_timeout_seconds < self.shutdown_timeout_seconds + 30:
+            raise ValueError(
+                "stall_timeout_seconds must cover shutdown_timeout_seconds plus 30 seconds of heartbeat margin."
+            )
+        return self
 
     def write_environ(self) -> None:
-        os.environ["RIVA_TASKS_CONCURRENCY"] = str(self.concurrency)
-        os.environ["RIVA_TASKS_SHUTDOWN_TIMEOUT_SECONDS"] = str(
-            self.shutdown_timeout_seconds
-        )
+        for name, value in self.model_dump().items():
+            os.environ[f"RIVA_TASKS_{name.upper()}"] = str(value)
 
 
 class Settings(BaseModel):

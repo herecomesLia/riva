@@ -621,7 +621,12 @@ export const getSetActiveRoleRequestMock = (
 ): SetActiveRoleRequest => ({ roleId: faker.string.uuid(), ...overrideResponse })
 
 export const getTaskErrorCodeMock = (): TaskErrorCode =>
-  faker.helpers.arrayElement(["invalid_output", "llm_unavailable", "internal_error"] as const)
+  faker.helpers.arrayElement([
+    "service_unavailable",
+    "invalid_output",
+    "llm_unavailable",
+    "internal_error",
+  ] as const)
 
 export const getTaskErrorBodyMock = (
   overrideResponse: Partial<TaskErrorBody> = {},

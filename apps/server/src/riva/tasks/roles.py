@@ -2,7 +2,6 @@ from uuid import UUID
 
 from procrastinate import JobContext
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.ai.roles import JobDescriptionExtractor, RoleMatchingAnalyzer
 from riva.llm.errors import LLMOutputError, LLMUnavailableError
@@ -16,11 +15,10 @@ from riva.models.role import (
     RoleMatchingAnalysis,
 )
 from riva.tasks import (
-    JobStatus,
     Task,
+    TaskAttempt,
     TaskErrorCode,
     app,
-    get_job_status,
     get_task_resources,
 )
 from riva.tasks.errors import TaskError
@@ -36,10 +34,12 @@ from riva.utils import utc_now
 async def extract_jd_text(context: JobContext, *, role_id: str, text: str) -> None:
     resources = get_task_resources(context)
     role_id = UUID(role_id)
-    job_id = context.job.id
+    attempt = TaskAttempt(context.job)
     async with resources.database.sessionmaker() as session:
         extraction = await session.get(JobDescriptionExtraction, role_id)
-        if extraction is None or extraction.job_id != job_id:
+        if extraction is None or not await attempt.is_current(
+            session, extraction.job_id
+        ):
             return
 
     try:
@@ -48,16 +48,29 @@ async def extract_jd_text(context: JobContext, *, role_id: str, text: str) -> No
             extraction = await session.get(
                 JobDescriptionExtraction, role_id, with_for_update=True
             )
-            if extraction is None or not await _can_write_jd_extraction(
-                session, extraction, job_id=job_id
+            if extraction is None or not await attempt.lock_for_write(
+                session, extraction.job_id
             ):
                 return
             jd = await session.get(JobDescription, role_id)
             if jd is None:
                 raise TaskError("Job description was not found.")
-            await _apply_jd_extraction(session, jd, content)
+            content_changed = any(
+                getattr(jd, field) != getattr(content, field)
+                for field in JobDescriptionContent.model_fields
+            )
+            for field in JobDescriptionContent.model_fields:
+                setattr(jd, field, getattr(content, field))
+            if content_changed:
+                jd.updated_at = utc_now()
+                await session.execute(
+                    update(Role)
+                    .where(Role.id == jd.role_id)
+                    .values(updated_at=jd.updated_at)
+                )
             extraction.job_id = None
             extraction.error_code = None
+            await attempt.finish(session)
             await session.commit()
     except Exception as exc:
         if isinstance(exc, LLMOutputError):
@@ -70,38 +83,13 @@ async def extract_jd_text(context: JobContext, *, role_id: str, text: str) -> No
             extraction = await session.get(
                 JobDescriptionExtraction, role_id, with_for_update=True
             )
-            if extraction is not None and await _can_write_jd_extraction(
-                session, extraction, job_id=job_id
+            if extraction is not None and await attempt.lock_for_write(
+                session, extraction.job_id
             ):
                 extraction.error_code = error_code
+                await attempt.finish(session, failed=True)
                 await session.commit()
         raise
-
-
-async def _can_write_jd_extraction(
-    session: AsyncSession, extraction: JobDescriptionExtraction, *, job_id: int
-) -> bool:
-    # The caller must hold the extraction row lock until the write is committed.
-    if extraction.job_id != job_id:
-        return False
-    # An abort request keeps the job ID but revokes permission to write.
-    return await get_job_status(session, job_id) is JobStatus.RUNNING
-
-
-async def _apply_jd_extraction(
-    session: AsyncSession, jd: JobDescription, content: JobDescriptionContent
-) -> None:
-    content_changed = any(
-        getattr(jd, field) != getattr(content, field)
-        for field in JobDescriptionContent.model_fields
-    )
-    for field in JobDescriptionContent.model_fields:
-        setattr(jd, field, getattr(content, field))
-    if content_changed:
-        jd.updated_at = utc_now()
-        await session.execute(
-            update(Role).where(Role.id == jd.role_id).values(updated_at=jd.updated_at)
-        )
 
 
 @app.task(
@@ -113,11 +101,13 @@ async def _apply_jd_extraction(
 async def analyze_role_matching(context: JobContext, *, role_id: str) -> None:
     resources = get_task_resources(context)
     role_id = UUID(role_id)
-    job_id = context.job.id
+    attempt = TaskAttempt(context.job)
     try:
         async with resources.database.sessionmaker() as session:
             analysis = await session.get(RoleMatchingAnalysis, role_id)
-            if analysis is None or analysis.job_id != job_id:
+            if analysis is None or not await attempt.is_current(
+                session, analysis.job_id
+            ):
                 return
             # Read both content rows and their versions in one statement snapshot.
             row = (
@@ -150,8 +140,8 @@ async def analyze_role_matching(context: JobContext, *, role_id: str) -> None:
             analysis = await session.get(
                 RoleMatchingAnalysis, role_id, with_for_update=True
             )
-            if analysis is None or not await _can_write_role_matching(
-                session, analysis, job_id=job_id
+            if analysis is None or not await attempt.lock_for_write(
+                session, analysis.job_id
             ):
                 return
             matching = await session.get(RoleMatching, role_id)
@@ -163,6 +153,7 @@ async def analyze_role_matching(context: JobContext, *, role_id: str) -> None:
             matching.generated_at = utc_now()
             analysis.job_id = None
             analysis.error_code = None
+            await attempt.finish(session)
             await session.commit()
     except Exception as exc:
         if isinstance(exc, LLMOutputError):
@@ -175,19 +166,10 @@ async def analyze_role_matching(context: JobContext, *, role_id: str) -> None:
             analysis = await session.get(
                 RoleMatchingAnalysis, role_id, with_for_update=True
             )
-            if analysis is not None and await _can_write_role_matching(
-                session, analysis, job_id=job_id
+            if analysis is not None and await attempt.lock_for_write(
+                session, analysis.job_id
             ):
                 analysis.error_code = error_code
+                await attempt.finish(session, failed=True)
                 await session.commit()
         raise
-
-
-async def _can_write_role_matching(
-    session: AsyncSession, analysis: RoleMatchingAnalysis, *, job_id: int
-) -> bool:
-    # The caller holds the analysis row lock until commit. Abort revokes writes
-    # even when the current job ID has not changed.
-    if analysis.job_id != job_id:
-        return False
-    return await get_job_status(session, job_id) is JobStatus.RUNNING

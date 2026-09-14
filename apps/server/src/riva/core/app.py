@@ -16,6 +16,7 @@ from riva.core.logging import RequestLoggingMiddleware
 from riva.db import Database
 from riva.llm import LLMClient
 from riva.schemas.health import HealthStatus
+from riva.tasks.core.runtime import TaskSupervisor
 from riva.utils import seconds_to_ms
 
 
@@ -71,7 +72,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             )
 
             try:
-                yield
+                async with TaskSupervisor(database, settings.tasks).run():
+                    yield
             finally:
                 shutdown_started_at = perf_counter()
                 logger.info(

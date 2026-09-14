@@ -18,6 +18,7 @@ from riva.services.errors import (
     NotFoundError,
     SessionExpiredError,
 )
+from riva.tasks.errors import TaskStateError
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,7 @@ HTTP_ERROR_POLICIES: dict[type[Exception], HttpErrorPolicy] = {
     AuthenticationError: HttpErrorPolicy(status.HTTP_401_UNAUTHORIZED),
     NotFoundError: HttpErrorPolicy(status.HTTP_404_NOT_FOUND),
     ConflictError: HttpErrorPolicy(status.HTTP_409_CONFLICT),
+    TaskStateError: HttpErrorPolicy(status.HTTP_409_CONFLICT),
     DomainValidationError: HttpErrorPolicy(status.HTTP_422_UNPROCESSABLE_CONTENT),
     DependencyUnavailableError: HttpErrorPolicy(status.HTTP_503_SERVICE_UNAVAILABLE),
     AuthRequiredError: HttpErrorPolicy(status.HTTP_401_UNAUTHORIZED),
