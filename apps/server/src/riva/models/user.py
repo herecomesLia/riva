@@ -12,7 +12,7 @@ from riva.utils import utc_now
 
 if TYPE_CHECKING:
     from riva.models.auth import AuthSession
-    from riva.models.career_profile import CareerProfile
+    from riva.models.career_profile import CareerProfile, CareerProfileExtraction
     from riva.models.role import Role
 
 
@@ -81,6 +81,13 @@ class User(Base):
 
     career_profile: Mapped[CareerProfile | None] = relationship(
         "CareerProfile",
+        uselist=False,
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    career_profile_extraction: Mapped[CareerProfileExtraction | None] = relationship(
+        "CareerProfileExtraction",
         uselist=False,
         cascade="all, delete-orphan",
         lazy="selectin",

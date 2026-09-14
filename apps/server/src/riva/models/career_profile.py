@@ -4,13 +4,14 @@ from typing import Self
 from uuid import UUID
 
 from pydantic import BaseModel, Field, HttpUrl, model_validator
-from sqlalchemy import DateTime, ForeignKey, text
+from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql.sqltypes import Uuid
 
 from riva.db.base import Base
 from riva.db.types import PydanticJSONB
 from riva.models.types import NonBlankStr, YearMonthRangeModel
+from riva.tasks.types import TaskErrorCode
 from riva.utils import utc_now
 
 
@@ -98,6 +99,23 @@ class CareerProfileContent(BaseModel):
                 "work experience skills must exist in the career profile skills list"
             )
         return self
+
+
+class CareerProfileExtraction(Base):
+    __tablename__ = "career_profile_extractions"
+
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    job_id: Mapped[int | None] = mapped_column(BigInteger)
+    error_code: Mapped[TaskErrorCode | None] = mapped_column(
+        Enum(
+            TaskErrorCode,
+            values_callable=lambda enum: [member.value for member in enum],
+            native_enum=False,
+            validate_strings=True,
+        )
+    )
 
 
 class CareerProfile(Base):
