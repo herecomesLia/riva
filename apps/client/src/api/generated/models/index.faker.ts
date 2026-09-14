@@ -8,6 +8,7 @@ import { faker } from "@faker-js/faker"
 
 import type {
   CareerProfileResponse,
+  CareerProfileTextExtractionRequest,
   CreateCareerProfileRequest,
   CreateRoleRequest,
   EducationEntryRequest,
@@ -138,6 +139,13 @@ export const getCareerProfileResponseMock = (
   ),
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
+  ...overrideResponse,
+})
+
+export const getCareerProfileTextExtractionRequestMock = (
+  overrideResponse: Partial<CareerProfileTextExtractionRequest> = {},
+): CareerProfileTextExtractionRequest => ({
+  text: faker.string.alpha({ length: { min: 1, max: 20 } }),
   ...overrideResponse,
 })
 

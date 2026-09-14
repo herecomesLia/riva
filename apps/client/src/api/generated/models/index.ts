@@ -6,6 +6,7 @@
  */
 
 export * from "./careerProfileResponse"
+export * from "./careerProfileTextExtractionRequest"
 export * from "./createCareerProfileRequest"
 export * from "./createRoleRequest"
 export * from "./educationEntryRequest"

@@ -6,7 +6,10 @@
  */
 import type {
   CareerProfileResponse,
+  CareerProfileTextExtractionRequest,
   CreateCareerProfileRequest,
+  TaskFailureResponse,
+  TaskStatusResponse,
   UpdateCareerProfileRequest,
 } from "../../models"
 
@@ -55,7 +58,55 @@ export const getCareerProfileApi = () => {
       options,
     )
   }
-  return { getCareerProfile, createCareerProfile, updateCareerProfile }
+  /**
+   * @summary Extract Career Profile From Text
+   */
+  const extractCareerProfileFromText = (
+    careerProfileTextExtractionRequest: CareerProfileTextExtractionRequest,
+    options?: SecondParameter<typeof request<void>>,
+  ) => {
+    return request<void>(
+      {
+        url: `/api/career-profile/extraction/text`,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        data: careerProfileTextExtractionRequest,
+      },
+      options,
+    )
+  }
+  /**
+   * @summary Get Career Profile Extraction State
+   */
+  const getCareerProfileExtractionState = (
+    options?: SecondParameter<typeof request<TaskStatusResponse | TaskFailureResponse>>,
+  ) => {
+    return request<TaskStatusResponse | TaskFailureResponse>(
+      { url: `/api/career-profile/extraction`, method: "GET" },
+      options,
+    )
+  }
+  /**
+   * @summary Retry Career Profile Extraction
+   */
+  const retryCareerProfileExtraction = (options?: SecondParameter<typeof request<void>>) => {
+    return request<void>({ url: `/api/career-profile/extraction/retry`, method: "POST" }, options)
+  }
+  /**
+   * @summary Abort Career Profile Extraction
+   */
+  const abortCareerProfileExtraction = (options?: SecondParameter<typeof request<void>>) => {
+    return request<void>({ url: `/api/career-profile/extraction/abort`, method: "POST" }, options)
+  }
+  return {
+    getCareerProfile,
+    createCareerProfile,
+    updateCareerProfile,
+    extractCareerProfileFromText,
+    getCareerProfileExtractionState,
+    retryCareerProfileExtraction,
+    abortCareerProfileExtraction,
+  }
 }
 export type GetCareerProfileResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getCareerProfileApi>["getCareerProfile"]>>
@@ -65,4 +116,16 @@ export type CreateCareerProfileResult = NonNullable<
 >
 export type UpdateCareerProfileResult = NonNullable<
   Awaited<ReturnType<ReturnType<typeof getCareerProfileApi>["updateCareerProfile"]>>
+>
+export type ExtractCareerProfileFromTextResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getCareerProfileApi>["extractCareerProfileFromText"]>>
+>
+export type GetCareerProfileExtractionStateResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getCareerProfileApi>["getCareerProfileExtractionState"]>>
+>
+export type RetryCareerProfileExtractionResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getCareerProfileApi>["retryCareerProfileExtraction"]>>
+>
+export type AbortCareerProfileExtractionResult = NonNullable<
+  Awaited<ReturnType<ReturnType<typeof getCareerProfileApi>["abortCareerProfileExtraction"]>>
 >

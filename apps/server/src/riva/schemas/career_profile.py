@@ -18,6 +18,10 @@ from riva.schemas.base import (
 )
 
 
+class CareerProfileTextExtractionRequest(RequestModel):
+    text: NonBlankStr = Field(description="Source resume text to extract.")
+
+
 class EducationEntryRequest(EducationEntry, RequestModel):
     pass
 

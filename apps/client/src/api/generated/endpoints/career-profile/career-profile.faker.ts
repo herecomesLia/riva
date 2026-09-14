@@ -6,11 +6,13 @@
  */
 import { faker } from "@faker-js/faker"
 
-import type { CareerProfileResponse } from "../../models"
+import type { CareerProfileResponse, TaskFailureResponse, TaskStatusResponse } from "../../models"
 
 import {
   getEducationEntryResponseMock,
   getProjectEntryResponseMock,
+  getTaskFailureResponseMock,
+  getTaskStatusResponseMock,
   getWorkExperienceEntryResponseMock,
 } from "../../models/index.faker"
 
@@ -76,3 +78,10 @@ export const getUpdateCareerProfileResponseMock = (
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
 })
+
+export const getGetCareerProfileExtractionStateResponseMock = ():
+  TaskStatusResponse | TaskFailureResponse =>
+  faker.helpers.arrayElement([
+    { ...getTaskStatusResponseMock() },
+    { ...getTaskFailureResponseMock() },
+  ])

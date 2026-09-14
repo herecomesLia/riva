@@ -7,10 +7,11 @@
 import { HttpResponse, http } from "msw"
 import type { RequestHandlerOptions } from "msw"
 
-import type { CareerProfileResponse } from "../../models"
+import type { CareerProfileResponse, TaskFailureResponse, TaskStatusResponse } from "../../models"
 
 import {
   getCreateCareerProfileResponseMock,
+  getGetCareerProfileExtractionStateResponseMock,
   getGetCareerProfileResponseMock,
   getUpdateCareerProfileResponseMock,
 } from "./career-profile.faker"
@@ -19,6 +20,7 @@ export {
   getGetCareerProfileResponseMock,
   getCreateCareerProfileResponseMock,
   getUpdateCareerProfileResponseMock,
+  getGetCareerProfileExtractionStateResponseMock,
 } from "./career-profile.faker"
 
 export const getGetCareerProfileMockHandler = (
@@ -92,8 +94,94 @@ export const getUpdateCareerProfileMockHandler = (
     options,
   )
 }
+
+export const getExtractCareerProfileFromTextMockHandler = (
+  overrideResponse?:
+    void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/career-profile/extraction/text",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      if (typeof overrideResponse === "function") {
+        await overrideResponse(info)
+      }
+
+      return new HttpResponse(null, { status: 202 })
+    },
+    options,
+  )
+}
+
+export const getGetCareerProfileExtractionStateMockHandler = (
+  overrideResponse?:
+    | TaskStatusResponse
+    | TaskFailureResponse
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) =>
+        | Promise<TaskStatusResponse | TaskFailureResponse>
+        | TaskStatusResponse
+        | TaskFailureResponse),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/career-profile/extraction",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetCareerProfileExtractionStateResponseMock(),
+        { status: 200 },
+      )
+    },
+    options,
+  )
+}
+
+export const getRetryCareerProfileExtractionMockHandler = (
+  overrideResponse?:
+    void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/career-profile/extraction/retry",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      if (typeof overrideResponse === "function") {
+        await overrideResponse(info)
+      }
+
+      return new HttpResponse(null, { status: 202 })
+    },
+    options,
+  )
+}
+
+export const getAbortCareerProfileExtractionMockHandler = (
+  overrideResponse?:
+    void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/career-profile/extraction/abort",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      if (typeof overrideResponse === "function") {
+        await overrideResponse(info)
+      }
+
+      return new HttpResponse(null, { status: 202 })
+    },
+    options,
+  )
+}
 export const getCareerProfileApiMock = () => [
   getGetCareerProfileMockHandler(),
   getCreateCareerProfileMockHandler(),
   getUpdateCareerProfileMockHandler(),
+  getExtractCareerProfileFromTextMockHandler(),
+  getGetCareerProfileExtractionStateMockHandler(),
+  getRetryCareerProfileExtractionMockHandler(),
+  getAbortCareerProfileExtractionMockHandler(),
 ]
