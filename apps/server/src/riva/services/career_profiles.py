@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from riva.models.career_profile import (
     CareerProfile,
+    CareerProfileExtraction,
     EducationEntry,
     ProjectEntry,
     WorkExperienceEntry,
@@ -15,6 +16,16 @@ from riva.services.errors import (
     NotFoundError,
 )
 from riva.services.types import UNSET
+from riva.tasks import (
+    JobStatus,
+    Task,
+    TaskState,
+    cancel_job,
+    defer_job,
+    get_job_status,
+    get_task_state,
+    retry_job,
+)
 
 
 class CareerProfileService:
@@ -36,6 +47,14 @@ class CareerProfileService:
         projects: list[ProjectEntry] | None = None,
         skills: list[NonBlankStr] | None = None,
     ) -> CareerProfile:
+        extraction = await self._lock_extraction(user)
+        if extraction.job_id is not None and await get_job_status(
+            self.session, extraction.job_id
+        ) in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.ABORTING}:
+            raise ConflictError(
+                "Abort the active extraction before creating the career profile."
+            )
+        await self.session.refresh(user, attribute_names=["career_profile"])
         if user.career_profile is not None:
             raise ConflictError("Career profile already exists.")
 
@@ -60,6 +79,8 @@ class CareerProfileService:
         )
         user.career_profile = profile
         self.session.add(profile)
+        extraction.job_id = None
+        extraction.error_code = None
 
         try:
             await self.session.commit()
@@ -78,14 +99,16 @@ class CareerProfileService:
         projects: list[ProjectEntry] | UNSET = UNSET,
         skills: list[NonBlankStr] | UNSET = UNSET,
     ) -> CareerProfile:
+        extraction = await self._lock_extraction(user)
+        if extraction.job_id is not None and await get_job_status(
+            self.session, extraction.job_id
+        ) in {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.ABORTING}:
+            raise ConflictError(
+                "Abort the active extraction before updating the career profile."
+            )
+        await self.session.refresh(user, attribute_names=["career_profile"])
         profile = await self.get(user)
-        if (
-            education is UNSET
-            and work_experiences is UNSET
-            and projects is UNSET
-            and skills is UNSET
-        ):
-            return profile
+        await self.session.refresh(profile)
 
         next_work_experiences = (
             profile.work_experiences if work_experiences is UNSET else work_experiences
@@ -109,5 +132,69 @@ class CareerProfileService:
         if skills is not UNSET:
             profile.skills = skills
 
+        extraction.job_id = None
+        extraction.error_code = None
         await self.session.commit()
         return profile
+
+    async def extract_text(self, user: User, *, text: str) -> None:
+        extraction = await self._lock_extraction(user)
+        if extraction.job_id is not None:
+            await cancel_job(self.session, extraction.job_id, abort=True)
+        extraction.job_id = await defer_job(
+            self.session,
+            Task.EXTRACT_CAREER_PROFILE_TEXT,
+            user_id=str(user.id),
+            text=text,
+        )
+        extraction.error_code = None
+        await self.session.commit()
+
+    async def get_extraction_state(self, user: User) -> TaskState:
+        # Keep the current job and its error stable while reading the job status.
+        extraction = await self._lock_extraction(user, shared=True)
+        return await get_task_state(
+            self.session, extraction.job_id, extraction.error_code
+        )
+
+    async def retry_extraction(self, user: User) -> None:
+        extraction = await self._lock_extraction(user)
+        if (
+            extraction.job_id is None
+            or await get_job_status(self.session, extraction.job_id)
+            is not JobStatus.FAILED
+        ):
+            raise ConflictError(
+                "Only a failed career profile extraction can be retried."
+            )
+        await retry_job(self.session, extraction.job_id)
+        extraction.error_code = None
+        await self.session.commit()
+
+    async def abort_extraction(self, user: User) -> None:
+        extraction = await self._lock_extraction(user)
+        if extraction.job_id is None:
+            raise ConflictError(
+                "There is no active career profile extraction to abort."
+            )
+        status = await get_job_status(self.session, extraction.job_id)
+        if status in {JobStatus.QUEUED, JobStatus.RUNNING}:
+            await cancel_job(self.session, extraction.job_id, abort=True)
+        elif status is not JobStatus.ABORTING:
+            raise ConflictError(
+                "Only an active career profile extraction can be aborted."
+            )
+        await self.session.commit()
+
+    async def _lock_extraction(
+        self, user: User, *, shared: bool = False
+    ) -> CareerProfileExtraction:
+        extraction = await self.session.get(
+            CareerProfileExtraction,
+            user.id,
+            with_for_update={"read": shared},
+            populate_existing=True,
+        )
+        if extraction is None:
+            raise NotFoundError("Career profile extraction state was not found.")
+        return extraction

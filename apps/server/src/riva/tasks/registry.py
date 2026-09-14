@@ -12,6 +12,9 @@ class TaskSpec:
 
 class Task(Enum):
     EXTRACT_JD_TEXT = TaskSpec(name="roles.extract_jd_text", queue="ai")
+    EXTRACT_CAREER_PROFILE_TEXT = TaskSpec(
+        name="career_profile.extract_career_profile_text", queue="ai"
+    )
     ANALYZE_ROLE_MATCHING = TaskSpec(name="roles.analyze_matching", queue="ai")
 
     @property
@@ -23,7 +26,7 @@ class Task(Enum):
         return self.value.queue
 
 
-IMPORT_PATHS: tuple[str, ...] = ("riva.tasks.roles",)
+IMPORT_PATHS: tuple[str, ...] = ("riva.tasks.roles", "riva.tasks.career_profile")
 
 
 def configure_task_registry(app: procrastinate.App) -> None:

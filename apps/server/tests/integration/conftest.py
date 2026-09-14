@@ -17,7 +17,7 @@ from riva.core.app import create_app, wrap_cors
 from riva.core.config import DatabaseSettings, Settings
 from riva.db import Database
 from riva.db.base import Base
-from riva.models import User
+from riva.models import CareerProfileExtraction, User
 from riva.models.role import (
     JobDescription,
     JobDescriptionExtraction,
@@ -153,7 +153,12 @@ async def extraction_database(
 @pytest.fixture
 async def extraction_role(extraction_database: Database) -> UUID:
     async with extraction_database.sessionmaker() as session:
-        user = User(username="JDUser", password_hash="unused", display_name="JD User")
+        user = User(
+            username="JDUser",
+            password_hash="unused",
+            display_name="JD User",
+            career_profile_extraction=CareerProfileExtraction(),
+        )
         session.add(user)
         await session.flush()
         role = Role(

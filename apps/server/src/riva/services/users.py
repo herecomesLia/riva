@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from riva.core.config import Settings
 from riva.models import AuthSession
+from riva.models.career_profile import CareerProfileExtraction
 from riva.models.user import User, normalize_username
 from riva.services.errors import (
     InvalidCredentialsError,
@@ -53,6 +54,7 @@ class UserService:
             created_at=now,
             updated_at=now,
         )
+        user.career_profile_extraction = CareerProfileExtraction()
         token, auth_session = self._new_session(user, now)
         self.session.add(user)
         self.session.add(auth_session)
