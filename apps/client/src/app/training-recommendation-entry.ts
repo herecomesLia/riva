@@ -26,7 +26,7 @@ export function mapTrainingRecommendationToEntry(
       search: {
         entry: "history",
         roleId,
-        round: recommendation.round,
+        interviewType: recommendation.interviewType,
         difficulty: recommendation.difficulty,
       },
       to: "/interview",

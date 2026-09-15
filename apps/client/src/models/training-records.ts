@@ -1,3 +1,4 @@
+import type { InterviewType } from "./interview-workflow"
 export type TrainingRecordKind = "targetedPractice" | "mockInterview"
 
 export type TrainingRecordStatus = "completed" | "endedEarly" | "partiallyCompleted"
@@ -14,9 +15,6 @@ export type TrainingRecordQuestionType =
   | "technicalFoundation"
   | "resumeRisk"
   | "motivation"
-
-export type TrainingRecordInterviewRound =
-  "hr" | "firstBusiness" | "technical" | "manager" | "final" | "comprehensive"
 
 export type TrainingRecordRole = {
   id: string
@@ -163,7 +161,7 @@ export type TrainingRecordRecommendation =
   | {
       action: "mockInterview"
       reason: string
-      round: TrainingRecordInterviewRound
+      interviewType: InterviewType
       difficulty: TrainingRecordDifficulty
       focusAreas: string[]
     }
@@ -196,7 +194,7 @@ export type TargetedPracticeRecordSummary = TrainingRecordSummaryBase & {
 
 export type MockInterviewRecordSummary = TrainingRecordSummaryBase & {
   kind: "mockInterview"
-  round: TrainingRecordInterviewRound
+  interviewType: InterviewType
   difficulty: TrainingRecordDifficulty
 }
 
@@ -280,7 +278,7 @@ export type MockInterviewRecordDetailResponse = TrainingRecordDetailBase & {
   kind: "mockInterview"
   completionReason: "formalQuestionsCompleted" | "userEndedEarly"
   setup: {
-    round: TrainingRecordInterviewRound
+    interviewType: InterviewType
     difficulty: TrainingRecordDifficulty
     plannedDurationMinutes: 15 | 30 | 45
   }

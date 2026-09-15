@@ -267,7 +267,7 @@ function toSummary(
   return {
     role,
     company,
-    round: session.configuration.round,
+    interviewType: session.configuration.interviewType,
     difficulty: session.configuration.difficulty,
     completedMainQuestions: session.progress.completedMainQuestions,
     totalMainQuestions: session.progress.totalMainQuestions,

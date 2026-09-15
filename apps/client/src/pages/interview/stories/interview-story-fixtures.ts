@@ -1,3 +1,4 @@
+import { interviewTypes } from "@/models/interview-workflow"
 import { interviewFixture } from "@/mocks/fixtures/interview"
 import type {
   CandidateQuestionExchange,
@@ -24,7 +25,7 @@ export function createInterviewSetupStoryFixture(
         id: "role_frontend_bytedance",
         title: "Senior Frontend Engineer",
         company: "ByteDance",
-        supportedRounds: ["hr", "firstBusiness", "technical", "manager", "final", "comprehensive"],
+        supportedInterviewTypes: [...interviewTypes],
       },
     ],
     availableDifficulties: ["basic", "pressure"],
@@ -39,7 +40,7 @@ export function createInterviewSetupStoryFixture(
       id: "role_product_manager_meituan",
       title: "Product Manager",
       company: "Meituan",
-      supportedRounds: ["hr", "firstBusiness", "manager", "final", "comprehensive"],
+      supportedInterviewTypes: [...interviewTypes],
     })
   if (scenario === "prerequisiteNotMet")
     setup.availability = { status: "blocked", reason: "profileIncomplete" }
@@ -102,7 +103,7 @@ export function createInterviewSessionStoryFixture() {
   const summary: InterviewSessionSummary = {
     role: "Senior Frontend Engineer",
     company: "ByteDance",
-    round: interviewFixture.configuration.round,
+    interviewType: interviewFixture.configuration.interviewType,
     difficulty: interviewFixture.configuration.difficulty,
     ...interviewFixture.progress,
     completedMainQuestions: 1,

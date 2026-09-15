@@ -63,14 +63,14 @@ export const HistoricalRoleUnavailable = meta.story({
   },
 })
 
-export const HistoricalRoundAdjusted = meta.story({
+export const HistoricalTypeAdjusted = meta.story({
   args: {
     status: "ready",
     setup: createInterviewSetupStoryFixture(),
     historyEntryResolution: {
       status: "adjusted",
       configuration: createInterviewSetupStoryFixture().defaultConfiguration,
-      adjustments: ["interviewRoundUnsupported"],
+      adjustments: ["interviewTypeUnsupported"],
     },
     isStarting: false,
     onStart: fn(async () => undefined),
@@ -190,15 +190,16 @@ export const ProductHrBasic = meta.story({
     await userEvent.click(canvas.getByTestId("interview-role-trigger"))
     await userEvent.click(await screen.findByRole("option", { name: "Product Manager · Meituan" }))
     await expect(
-      canvas.queryByRole("button", { name: /技术面|technical/i }),
-    ).not.toBeInTheDocument()
+      canvas.getByRole("button", { name: /专业面|Professional interview/i }),
+    ).toBeInTheDocument()
+    await userEvent.click(canvas.getByRole("button", { name: /HR/i }))
     await userEvent.click(canvas.getByRole("button", { name: /基础|Basic/i }))
     await userEvent.click(
       canvas.getByRole("button", { name: /开始模拟面试|Start mock interview/i }),
     )
     await expect(onStartProductHrBasic).toHaveBeenCalledWith({
       roleId: "role_product_manager_meituan",
-      round: "hr",
+      interviewType: "hr",
       difficulty: "basic",
       durationMinutes: 30,
     })
@@ -221,22 +222,22 @@ export const JobDescriptionMissing = meta.story({
   },
 })
 
-const onStartFrontendTechnicalPressure = fn(async () => undefined)
+const onStartFrontendProfessionalPressure = fn(async () => undefined)
 
-export const FrontendTechnicalPressure = meta.story({
+export const FrontendProfessionalPressure = meta.story({
   args: {
     status: "ready",
     setup: createInterviewSetupStoryFixture(),
     isStarting: false,
-    onStart: onStartFrontendTechnicalPressure,
+    onStart: onStartFrontendProfessionalPressure,
   },
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(
       canvas.getByRole("button", { name: /开始模拟面试|Start mock interview/i }),
     )
-    await expect(onStartFrontendTechnicalPressure).toHaveBeenCalledWith({
+    await expect(onStartFrontendProfessionalPressure).toHaveBeenCalledWith({
       roleId: "role_frontend_bytedance",
-      round: "technical",
+      interviewType: "professional",
       difficulty: "pressure",
       durationMinutes: 30,
     })

@@ -11,7 +11,7 @@ import { InterviewSessionView, type InterviewSessionViewProps } from "./Intervie
 const summary = {
   role: "高级前端工程师",
   company: "字节跳动",
-  round: "technical",
+  interviewType: "professional",
   difficulty: "pressure",
   completedMainQuestions: 0,
   totalMainQuestions: 3,

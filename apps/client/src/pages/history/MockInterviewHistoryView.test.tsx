@@ -59,7 +59,7 @@ describe("MockInterviewHistoryView", () => {
     const retryHref = retryLink.getAttribute("href") ?? ""
     expect(retryHref).toContain("entry=history")
     expect(retryHref).toContain(`roleId=${encodeURIComponent(record.role.id)}`)
-    expect(retryHref).toContain(`round=${record.setup.round}`)
+    expect(retryHref).toContain(`interviewType=${record.setup.interviewType}`)
     expect(retryHref).toContain(`difficulty=${record.setup.difficulty}`)
     expect(retryHref).toContain(`durationMinutes=${record.setup.plannedDurationMinutes}`)
     expect(retryHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)

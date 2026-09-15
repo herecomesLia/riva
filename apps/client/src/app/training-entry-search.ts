@@ -1,8 +1,5 @@
-import type {
-  InterviewDifficulty,
-  InterviewDurationMinutes,
-  InterviewRound,
-} from "@/models/interview-workflow"
+import { interviewTypes } from "@/models/interview-workflow"
+import type { InterviewDifficulty, InterviewDurationMinutes } from "@/models/interview-workflow"
 import type { Difficulty, QuestionSource, QuestionType } from "@/models/practice-workflow"
 import type {
   InterviewTrainingEntryParameters,
@@ -19,14 +16,6 @@ const practiceQuestionTypes: QuestionType[] = [
 ]
 const practiceDifficulties: Difficulty[] = ["basic", "pressure"]
 const practiceSources: QuestionSource[] = ["personalized", "saved", "history"]
-const interviewRounds: InterviewRound[] = [
-  "hr",
-  "firstBusiness",
-  "technical",
-  "manager",
-  "final",
-  "comprehensive",
-]
 const interviewDifficulties: InterviewDifficulty[] = ["basic", "pressure"]
 const interviewDurations: InterviewDurationMinutes[] = [15, 30, 45]
 
@@ -56,7 +45,9 @@ export function parseInterviewEntrySearch(search: Record<string, unknown>): Inte
   return compact({
     entry: search.entry === "history" ? "history" : undefined,
     roleId: nonEmptyString(search.roleId),
-    round: includes(interviewRounds, search.round) ? search.round : undefined,
+    interviewType: includes(interviewTypes, search.interviewType)
+      ? search.interviewType
+      : undefined,
     difficulty: includes(interviewDifficulties, search.difficulty) ? search.difficulty : undefined,
     durationMinutes:
       duration !== undefined && interviewDurations.includes(duration as InterviewDurationMinutes)

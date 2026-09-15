@@ -6,7 +6,7 @@ import type { InterviewConfiguration } from "@/models/interview-workflow"
 
 const configuration: InterviewConfiguration = {
   roleId: "selected-role",
-  round: "manager",
+  interviewType: "manager",
   difficulty: "basic",
   durationMinutes: 15,
 }

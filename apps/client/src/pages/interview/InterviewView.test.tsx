@@ -42,12 +42,14 @@ describe("InterviewView", () => {
     expect(loadingState).toHaveAttribute("aria-busy", "true")
     expect(loadingState.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(7)
     expect(screen.queryByText(i18n.t("interview.setup.fields.role"))).not.toBeInTheDocument()
-    expect(screen.queryByText(i18n.t("interview.setup.fields.round"))).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(i18n.t("interview.setup.fields.interviewType")),
+    ).not.toBeInTheDocument()
     expect(screen.queryByText(i18n.t("interview.setup.fields.difficulty"))).not.toBeInTheDocument()
     expect(screen.queryByText(i18n.t("interview.setup.fields.duration"))).not.toBeInTheDocument()
   })
 
-  it("renders service-provided roles, rounds, difficulties, and duration preferences", async () => {
+  it("renders service-provided roles, types, difficulties, and duration preferences", async () => {
     renderReadyView()
 
     const setupCard = (await screen.findByText(i18n.t("interview.setup.title"))).closest(
@@ -57,9 +59,10 @@ describe("InterviewView", () => {
     expect(setupCard?.parentElement).not.toHaveClass("max-w-4xl")
 
     expect(await screen.findByText("Senior Frontend Engineer · ByteDance")).toBeInTheDocument()
-    for (const round of createInterviewSetupStoryFixture().roles[0].supportedRounds) {
+    for (const interviewType of createInterviewSetupStoryFixture().roles[0]
+      .supportedInterviewTypes) {
       expect(
-        screen.getByRole("button", { name: i18n.t(`interview.rounds.${round}`) }),
+        screen.getByRole("button", { name: i18n.t(`interview.types.${interviewType}`) }),
       ).toBeVisible()
     }
     for (const difficulty of createInterviewSetupStoryFixture().availableDifficulties) {
@@ -76,7 +79,7 @@ describe("InterviewView", () => {
     }
   })
 
-  it("updates available rounds when the selected service role changes", async () => {
+  it("preserves professional interviews when switching to a non-developer role", async () => {
     const user = userEvent.setup()
     renderReadyView(undefined, false, createInterviewSetupStoryFixture("multipleRolesReady"))
 
@@ -84,12 +87,11 @@ describe("InterviewView", () => {
     await user.click(await screen.findByRole("option", { name: "Product Manager · Meituan" }))
 
     expect(
-      screen.queryByRole("button", { name: i18n.t("interview.rounds.technical") }),
-    ).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: i18n.t("interview.rounds.hr") })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    )
+      screen.queryByRole("button", { name: i18n.t("interview.types.professional") }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: i18n.t("interview.types.professional") }),
+    ).toHaveAttribute("aria-pressed", "true")
   })
 
   it("keeps setup dividers spaced without doubling the footer gap", async () => {
@@ -100,10 +102,10 @@ describe("InterviewView", () => {
     )
     expect(roleField).toHaveClass("pb-5")
 
-    const roundFieldSet = screen
-      .getByText(i18n.t("interview.setup.fields.round"))
+    const interviewTypeFieldSet = screen
+      .getByText(i18n.t("interview.setup.fields.interviewType"))
       .closest('[data-slot="field-set"]')
-    expect(roundFieldSet?.parentElement).toHaveClass("border-t", "border-border", "py-5")
+    expect(interviewTypeFieldSet?.parentElement).toHaveClass("border-t", "border-border", "py-5")
 
     const difficultyFieldSet = screen
       .getByText(i18n.t("interview.setup.fields.difficulty"))

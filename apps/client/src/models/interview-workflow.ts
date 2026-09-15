@@ -1,5 +1,6 @@
-export type InterviewRound =
-  "hr" | "firstBusiness" | "technical" | "manager" | "final" | "comprehensive"
+export const interviewTypes = ["hr", "professional", "manager", "comprehensive"] as const
+
+export type InterviewType = (typeof interviewTypes)[number]
 
 export type InterviewDifficulty = "basic" | "pressure"
 
@@ -7,7 +8,7 @@ export type InterviewDurationMinutes = 15 | 30 | 45
 
 export type InterviewConfiguration = {
   roleId: string
-  round: InterviewRound
+  interviewType: InterviewType
   difficulty: InterviewDifficulty
   durationMinutes: InterviewDurationMinutes
 }
@@ -16,7 +17,7 @@ export type InterviewRoleOption = {
   id: string
   title: string
   company: string | null
-  supportedRounds: InterviewRound[]
+  supportedInterviewTypes: InterviewType[]
 }
 
 export type InterviewAvailability =

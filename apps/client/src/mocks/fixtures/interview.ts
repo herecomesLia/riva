@@ -10,7 +10,7 @@ export const interviewFixture = {
   sessionId: "interview-session",
   configuration: {
     roleId: "role_frontend",
-    round: "technical",
+    interviewType: "professional",
     difficulty: "pressure",
     durationMinutes: 30,
   },

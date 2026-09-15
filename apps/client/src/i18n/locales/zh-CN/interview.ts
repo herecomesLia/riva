@@ -3,21 +3,19 @@ export const interview = {
   description: "按真实面试节奏完成连续问答，并在结束后获得整场复盘和下一步训练建议。",
   setup: {
     title: "配置本次面试",
-    description: "选择目标岗位、面试轮次和难度，Riva 将据此准备本次模拟面试。",
+    description: "选择目标岗位、面试类型和难度，Riva 将据此准备本次模拟面试。",
     fields: {
       role: "目标岗位",
-      round: "面试轮次",
+      interviewType: "面试类型",
       difficulty: "面试难度",
       duration: "预计面试时长",
     },
     durationMinutes: "{{minutes}} 分钟",
   },
-  rounds: {
+  types: {
     hr: "HR 面",
-    firstBusiness: "业务一面",
-    technical: "技术面",
+    professional: "专业面",
     manager: "主管面",
-    final: "终面",
     comprehensive: "综合模拟",
   },
   difficulty: {

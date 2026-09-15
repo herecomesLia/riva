@@ -67,13 +67,11 @@ export const history = {
     resumeRisk: "简历风险",
     motivation: "求职动机",
   },
-  rounds: {
+  types: {
     hr: "HR 面",
-    firstBusiness: "业务初面",
-    technical: "技术面",
+    professional: "专业面",
     manager: "主管面",
-    final: "终面",
-    comprehensive: "综合面",
+    comprehensive: "综合模拟",
   },
   difficulty: {
     basic: "基础",
@@ -196,7 +194,7 @@ export const history = {
     retry: "开始新模拟面试",
     summaryTitle: "面试概览",
     role: "面试岗位",
-    round: "面试轮次",
+    interviewType: "面试类型",
     difficulty: "难度",
     plannedDuration: "计划时长",
     actualDuration: "实际时长",

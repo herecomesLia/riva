@@ -1,3 +1,4 @@
+import { interviewTypes } from "@/models/interview-workflow"
 import { interviewFaker } from "@/mocks/fakers/interview"
 import type {
   InterviewConfiguration,
@@ -37,13 +38,13 @@ function buildSetup(
       id,
       title,
       company,
-      supportedRounds: ["hr", "firstBusiness", "technical", "manager", "final", "comprehensive"],
+      supportedInterviewTypes: [...interviewTypes],
     })),
     availableDifficulties: ["basic", "pressure"],
     availableDurationMinutes: [15, 30, 45],
     defaultConfiguration: {
       roleId: ready.find(({ id }) => id === data.activeRoleId)?.id ?? ready[0]?.id ?? null,
-      round: "technical",
+      interviewType: "professional",
       difficulty: "pressure",
       durationMinutes: 30,
     },

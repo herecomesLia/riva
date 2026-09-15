@@ -98,8 +98,8 @@ function RecommendationDataContent({
         {"questionType" in content && (
           <Badge variant="outline">{t(`history.questionTypes.${content.questionType}`)}</Badge>
         )}
-        {"round" in content && (
-          <Badge variant="outline">{t(`history.rounds.${content.round}`)}</Badge>
+        {"interviewType" in content && (
+          <Badge variant="outline">{t(`history.types.${content.interviewType}`)}</Badge>
         )}
         <Badge variant="outline">
           <Clock3Icon />

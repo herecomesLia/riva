@@ -9,7 +9,7 @@ export const dashboardFixture = {
     recommendation: {
       action: "mockInterview",
       reason: "可以进一步在连续问答中验证表达稳定性。",
-      round: "technical",
+      interviewType: "professional",
       difficulty: "pressure",
       focusAreas: ["结果证据"],
     },

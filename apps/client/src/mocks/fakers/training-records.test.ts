@@ -22,7 +22,7 @@ describe("trainingRecordsFaker", () => {
     expect(faker.list({ ...input, page: 2 }).items).toMatchObject([
       {
         id: interview.id,
-        round: interview.setup.round,
+        interviewType: interview.setup.interviewType,
         reviewSummary: interview.overallReview.content.summary,
       },
     ])

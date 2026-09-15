@@ -44,7 +44,7 @@ import type {
   CandidateQuestionExchange,
   InterviewConversationItem,
   InterviewDifficulty,
-  InterviewRound,
+  InterviewType,
   InterviewPrompt,
 } from "@/models/interview-workflow"
 
@@ -55,7 +55,7 @@ import { InterviewConversationHistory } from "./components/InterviewConversation
 export type InterviewSessionSummary = {
   role: string
   company: string | null
-  round: InterviewRound
+  interviewType: InterviewType
   difficulty: InterviewDifficulty
   completedMainQuestions: number
   totalMainQuestions: number | null
@@ -171,7 +171,7 @@ function SessionSummaryHeader({ summary }: { summary: InterviewSessionSummary })
   return (
     <header className="flex flex-col gap-2 border-b pb-5">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="secondary">{t(`interview.rounds.${summary.round}`)}</Badge>
+        <Badge variant="secondary">{t(`interview.types.${summary.interviewType}`)}</Badge>
         <Badge variant="outline">{t(`interview.difficulty.${summary.difficulty}`)}</Badge>
       </div>
       <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -213,7 +213,7 @@ function SessionHeader({
       <header className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">{t(`interview.rounds.${summary.round}`)}</Badge>
+            <Badge variant="secondary">{t(`interview.types.${summary.interviewType}`)}</Badge>
             <Badge variant="outline">{t(`interview.difficulty.${summary.difficulty}`)}</Badge>
           </div>
           <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">

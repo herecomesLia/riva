@@ -1,7 +1,7 @@
 import type {
   InterviewDifficulty,
   InterviewDurationMinutes,
-  InterviewRound,
+  InterviewType,
   InterviewSetup,
 } from "./interview-workflow"
 import type {
@@ -25,14 +25,14 @@ export type PracticeTrainingEntryParameters = {
 
 export type InterviewTrainingEntryParameters = {
   roleId?: string
-  round?: InterviewRound
+  interviewType?: InterviewType
   difficulty?: InterviewDifficulty
   durationMinutes?: InterviewDurationMinutes
 }
 
 export type TrainingEntryAdjustmentReason =
   | "practiceQuestionTypeUnsupported"
-  | "interviewRoundUnsupported"
+  | "interviewTypeUnsupported"
   | "difficultyUnavailable"
   | "durationUnavailable"
 
@@ -178,7 +178,7 @@ export function resolveInterviewTrainingEntry(
       reason: roleAvailability.reason,
       configuration: {
         roleId: null,
-        round: parameters.round ?? setup.defaultConfiguration.round,
+        interviewType: parameters.interviewType ?? setup.defaultConfiguration.interviewType,
         difficulty: setup.availableDifficulties.includes(
           parameters.difficulty ?? setup.defaultConfiguration.difficulty,
         )
@@ -198,11 +198,12 @@ export function resolveInterviewTrainingEntry(
     throw new Error("Available history target role is missing from interview setup.")
   }
   const adjustments: TrainingEntryAdjustmentReason[] = []
-  const requestedRound = parameters.round ?? setup.defaultConfiguration.round
-  const round = selectedRole.supportedRounds.includes(requestedRound)
-    ? requestedRound
-    : selectedRole.supportedRounds[0]
-  if (round !== requestedRound) adjustments.push("interviewRoundUnsupported")
+  const requestedInterviewType =
+    parameters.interviewType ?? setup.defaultConfiguration.interviewType
+  const interviewType = selectedRole.supportedInterviewTypes.includes(requestedInterviewType)
+    ? requestedInterviewType
+    : selectedRole.supportedInterviewTypes[0]
+  if (interviewType !== requestedInterviewType) adjustments.push("interviewTypeUnsupported")
   const requestedDifficulty = parameters.difficulty ?? setup.defaultConfiguration.difficulty
   const difficulty = setup.availableDifficulties.includes(requestedDifficulty)
     ? requestedDifficulty
@@ -216,7 +217,7 @@ export function resolveInterviewTrainingEntry(
 
   const configuration = {
     roleId: selectedRole.id,
-    round,
+    interviewType,
     difficulty,
     durationMinutes,
   }

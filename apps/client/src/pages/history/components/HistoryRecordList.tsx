@@ -129,7 +129,7 @@ function HistoryRecordCard({
   const detailLabel =
     record.kind === "targetedPractice"
       ? t(`history.questionTypes.${record.questionType}`)
-      : t(`history.rounds.${record.round}`)
+      : t(`history.types.${record.interviewType}`)
   const detailLink =
     record.kind === "targetedPractice" ? (
       <Link params={{ recordId: record.id }} search={search} to="/history/practice/$recordId" />

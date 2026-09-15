@@ -76,7 +76,7 @@ describe("TargetedPracticeHistoryView", () => {
     const recommendationHref = recommendationLink.getAttribute("href") ?? ""
     expect(recommendationHref).toContain("/interview?")
     expect(recommendationHref).toContain(`roleId=${encodeURIComponent(record.role.id)}`)
-    expect(recommendationHref).toContain(`round=${record.recommendation!.round}`)
+    expect(recommendationHref).toContain(`interviewType=${record.recommendation!.interviewType}`)
     expect(recommendationHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
   })
 

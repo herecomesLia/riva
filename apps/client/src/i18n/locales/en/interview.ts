@@ -5,21 +5,19 @@ export const interview = {
   setup: {
     title: "Configure this interview",
     description:
-      "Choose a target role, interview round, and difficulty so Riva can prepare your session.",
+      "Choose a target role, interview type, and difficulty so Riva can prepare your session.",
     fields: {
       role: "Target role",
-      round: "Interview round",
+      interviewType: "Interview type",
       difficulty: "Difficulty",
       duration: "Expected duration",
     },
     durationMinutes: "{{minutes}} min",
   },
-  rounds: {
-    hr: "HR round",
-    firstBusiness: "First business round",
-    technical: "Technical round",
-    manager: "Manager round",
-    final: "Final round",
+  types: {
+    hr: "HR interview",
+    professional: "Professional interview",
+    manager: "Manager interview",
     comprehensive: "Comprehensive mock",
   },
   difficulty: {

@@ -66,7 +66,7 @@ unavailable.exposedWeaknesses = []
 unavailable.recommendation = {
   action: "mockInterview",
   reason: "准备好案例后再进行一轮面试。",
-  round: "firstBusiness",
+  interviewType: "professional",
   difficulty: "pressure",
   focusAreas: ["结果证据"],
 }

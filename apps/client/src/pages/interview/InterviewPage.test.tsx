@@ -37,7 +37,7 @@ function createDeferred<T>() {
 function createStartedResponse(
   configuration: InterviewConfiguration = {
     roleId: "role_frontend_bytedance",
-    round: "technical",
+    interviewType: "professional",
     difficulty: "pressure",
     durationMinutes: 30,
   },
@@ -89,7 +89,7 @@ describe("InterviewPage", () => {
       const prepared = createMultipleReadyRolesResponse()
       prepared.setup.defaultConfiguration = {
         roleId: "role_product_manager_meituan",
-        round: "hr",
+        interviewType: "hr",
         difficulty: "basic",
         durationMinutes: 45,
       }
@@ -104,18 +104,18 @@ describe("InterviewPage", () => {
       })
 
       renderInterviewPage(
-        "/interview?entry=history&roleId=role_product_manager_meituan&round=hr&difficulty=basic&durationMinutes=45",
+        "/interview?entry=history&roleId=role_product_manager_meituan&interviewType=hr&difficulty=basic&durationMinutes=45",
       )
 
       expect(await screen.findByText("Product Manager · Meituan")).toBeInTheDocument()
       expect(vi.mocked(prepareInterviewTrainingEntry).mock.calls[0]?.[0]).toEqual({
         roleId: "role_product_manager_meituan",
-        round: "hr",
+        interviewType: "hr",
         difficulty: "basic",
         durationMinutes: 45,
       })
       expect(screen.getByTestId("interview-role-trigger")).toHaveTextContent("Product Manager")
-      expect(screen.getByRole("button", { name: i18n.t("interview.rounds.hr") })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: i18n.t("interview.types.hr") })).toHaveAttribute(
         "aria-pressed",
         "true",
       )
@@ -130,13 +130,13 @@ describe("InterviewPage", () => {
     },
   )
 
-  it("requires confirmation and explains adjusted round, difficulty, and duration", async () => {
+  it("requires confirmation and explains adjusted interviewType, difficulty, and duration", async () => {
     const user = userEvent.setup()
     const current = createStartedResponse()
     const prepared = createMultipleReadyRolesResponse()
     prepared.setup.defaultConfiguration = {
       roleId: "role_product_manager_meituan",
-      round: "hr",
+      interviewType: "hr",
       difficulty: "basic",
       durationMinutes: 15,
     }
@@ -146,7 +146,7 @@ describe("InterviewPage", () => {
       resolution: {
         status: "adjusted",
         configuration: prepared.setup.defaultConfiguration,
-        adjustments: ["interviewRoundUnsupported", "difficultyUnavailable", "durationUnavailable"],
+        adjustments: ["interviewTypeUnsupported", "difficultyUnavailable", "durationUnavailable"],
       },
     })
     vi.mocked(startInterview).mockImplementation(
@@ -154,12 +154,12 @@ describe("InterviewPage", () => {
     )
 
     renderInterviewPage(
-      "/interview?entry=history&roleId=role_product_manager_meituan&round=technical&difficulty=pressure&durationMinutes=45",
+      "/interview?entry=history&roleId=role_product_manager_meituan&interviewType=professional&difficulty=pressure&durationMinutes=45",
     )
 
     const alert = await screen.findByTestId("history-entry-adjusted")
     expect(alert).toHaveTextContent(
-      i18n.t("common.trainingEntry.adjustments.interviewRoundUnsupported"),
+      i18n.t("common.trainingEntry.adjustments.interviewTypeUnsupported"),
     )
     expect(alert).toHaveTextContent(
       i18n.t("common.trainingEntry.adjustments.difficultyUnavailable"),
@@ -198,7 +198,7 @@ describe("InterviewPage", () => {
     )
 
     renderInterviewPage(
-      "/interview?entry=history&roleId=role_archived&round=technical&difficulty=basic&durationMinutes=30",
+      "/interview?entry=history&roleId=role_archived&interviewType=professional&difficulty=basic&durationMinutes=30",
     )
 
     expect(await screen.findByTestId("history-entry-role-unavailable")).toHaveTextContent(
@@ -234,7 +234,9 @@ describe("InterviewPage", () => {
         },
       })
 
-    renderInterviewPage("/interview?entry=history&roleId=role_frontend_bytedance&round=technical")
+    renderInterviewPage(
+      "/interview?entry=history&roleId=role_frontend_bytedance&interviewType=professional",
+    )
     expect(await screen.findByTestId("history-entry-failed")).toBeInTheDocument()
     await user.click(
       screen.getByRole("button", { name: i18n.t("common.trainingEntry.failed.retry") }),
@@ -262,7 +264,7 @@ describe("InterviewPage", () => {
 
     expect(await screen.findByText("Senior Frontend Engineer · ByteDance")).toBeInTheDocument()
     expect(
-      screen.getByRole("button", { name: i18n.t("interview.rounds.technical") }),
+      screen.getByRole("button", { name: i18n.t("interview.types.professional") }),
     ).toBeInTheDocument()
     expect(prepareInterviewTrainingEntry).not.toHaveBeenCalled()
   })
@@ -356,12 +358,13 @@ describe("InterviewPage", () => {
 
     await user.click(await screen.findByTestId("interview-role-trigger"))
     await user.click(await screen.findByRole("option", { name: "Product Manager · Meituan" }))
+    await user.click(screen.getByRole("button", { name: i18n.t("interview.types.hr") }))
     await user.click(screen.getByRole("button", { name: i18n.t("interview.difficulty.basic") }))
     await user.click(screen.getByRole("button", { name: i18n.t("interview.actions.start") }))
 
     expect(vi.mocked(startInterview).mock.calls[0]?.[0]).toEqual({
       roleId: "role_product_manager_meituan",
-      round: "hr",
+      interviewType: "hr",
       difficulty: "basic",
       durationMinutes: 30,
     })

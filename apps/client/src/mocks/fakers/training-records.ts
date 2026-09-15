@@ -39,7 +39,7 @@ function toSummary(record: TrainingRecordDetail): TrainingRecordSummary {
     : {
         ...base,
         kind: record.kind,
-        round: record.setup.round,
+        interviewType: record.setup.interviewType,
         difficulty: record.setup.difficulty,
       }
 }

@@ -34,7 +34,7 @@ describe("mapTrainingRecommendationToEntry", () => {
       {
         action: "mockInterview",
         reason: "Validate the skill.",
-        round: "technical",
+        interviewType: "professional",
         difficulty: "basic",
         focusAreas: [],
       },
@@ -47,7 +47,7 @@ describe("mapTrainingRecommendationToEntry", () => {
       search: {
         entry: "history",
         roleId: "role-1",
-        round: "technical",
+        interviewType: "professional",
         difficulty: "basic",
       },
     })

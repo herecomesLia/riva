@@ -61,16 +61,16 @@ describe("training entry search application", () => {
       id: "role_active",
       title: "Frontend Engineer",
       company: null,
-      supportedRounds: ["technical"] as const,
+      supportedInterviewTypes: ["professional"] as const,
     }
     const setup: InterviewSetup = {
       availability: { status: "available" },
-      roles: [{ ...role, supportedRounds: ["technical"] }],
+      roles: [{ ...role, supportedInterviewTypes: ["professional"] }],
       availableDifficulties: ["basic"],
       availableDurationMinutes: [15],
       defaultConfiguration: {
         roleId: role.id,
-        round: "technical",
+        interviewType: "professional",
         difficulty: "basic",
         durationMinutes: 15,
       },
@@ -81,7 +81,7 @@ describe("training entry search application", () => {
         setup,
         {
           roleId: role.id,
-          round: "hr",
+          interviewType: "hr",
           difficulty: "pressure",
           durationMinutes: 45,
         },
@@ -89,10 +89,10 @@ describe("training entry search application", () => {
       ),
     ).toEqual({
       status: "adjusted",
-      adjustments: ["interviewRoundUnsupported", "difficultyUnavailable", "durationUnavailable"],
+      adjustments: ["interviewTypeUnsupported", "difficultyUnavailable", "durationUnavailable"],
       configuration: {
         roleId: role.id,
-        round: "technical",
+        interviewType: "professional",
         difficulty: "basic",
         durationMinutes: 15,
       },

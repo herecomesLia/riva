@@ -104,7 +104,7 @@ export const trainingRecordsFixture = {
     recommendation: {
       action: "mockInterview",
       reason: "可以进一步在连续问答中验证表达稳定性。",
-      round: "technical",
+      interviewType: "professional",
       difficulty: "pressure",
       focusAreas: ["结果证据"],
     },
@@ -125,7 +125,7 @@ export const trainingRecordsFixture = {
     totalQuestionCount: 1,
     overallScore: 82,
     completionReason: "formalQuestionsCompleted",
-    setup: { round: "firstBusiness", difficulty: "pressure", plannedDurationMinutes: 30 },
+    setup: { interviewType: "professional", difficulty: "pressure", plannedDurationMinutes: 30 },
     questions: [
       {
         ...structuredClone(question),

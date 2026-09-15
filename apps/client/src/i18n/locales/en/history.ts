@@ -68,13 +68,11 @@ export const history = {
     resumeRisk: "Resume risk",
     motivation: "Motivation",
   },
-  rounds: {
-    hr: "HR",
-    firstBusiness: "First business round",
-    technical: "Technical",
-    manager: "Manager",
-    final: "Final",
-    comprehensive: "Comprehensive",
+  types: {
+    hr: "HR interview",
+    professional: "Professional interview",
+    manager: "Manager interview",
+    comprehensive: "Comprehensive mock",
   },
   difficulty: {
     basic: "Basic",
@@ -204,7 +202,7 @@ export const history = {
     retry: "Start new mock interview",
     summaryTitle: "Interview overview",
     role: "Interview role",
-    round: "Round",
+    interviewType: "Interview type",
     difficulty: "Difficulty",
     plannedDuration: "Planned duration",
     actualDuration: "Actual duration",

@@ -93,7 +93,7 @@ export function MockInterviewHistoryView({
                   search={{
                     entry: "history",
                     roleId: state.data.role.id,
-                    round: state.data.setup.round,
+                    interviewType: state.data.setup.interviewType,
                     difficulty: state.data.setup.difficulty,
                     durationMinutes: state.data.setup.plannedDurationMinutes,
                   }}
@@ -173,7 +173,7 @@ function Summary({ record }: { record: MockInterviewRecordDetailResponse }) {
   const { i18n, t } = useTranslation()
   const values = [
     [t("history.mockDetail.role"), formatRole(record)],
-    [t("history.mockDetail.round"), t(`history.rounds.${record.setup.round}`)],
+    [t("history.mockDetail.interviewType"), t(`history.types.${record.setup.interviewType}`)],
     [t("history.mockDetail.difficulty"), t(`history.difficulty.${record.setup.difficulty}`)],
     [
       t("history.mockDetail.plannedDuration"),

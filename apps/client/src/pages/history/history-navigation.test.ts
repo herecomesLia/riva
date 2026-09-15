@@ -66,7 +66,7 @@ describe("training history navigation contracts", () => {
       parseInterviewEntrySearch({
         entry: "history",
         roleId: "role-1",
-        round: "technical",
+        interviewType: "professional",
         difficulty: "pressure",
         durationMinutes: "30",
         recordId: "must-not-pass",
@@ -77,7 +77,7 @@ describe("training history navigation contracts", () => {
     ).toEqual({
       entry: "history",
       roleId: "role-1",
-      round: "technical",
+      interviewType: "professional",
       difficulty: "pressure",
       durationMinutes: 30,
     })

@@ -43,12 +43,11 @@ describe("Interview service", () => {
     const page = await getInterviewPage()
     expect(page.session).toBeNull()
     expect(page.setup.roles.map(({ id }) => id)).toEqual(["first", "active"])
-    expect(page.setup.roles[0]?.supportedRounds).toEqual([
+    expect(page.setup.roles[0]?.supportedInterviewTypes).toEqual([
       "hr",
-      "firstBusiness",
-      "technical",
+      "professional",
       "manager",
-      "final",
+
       "comprehensive",
     ])
     expect(page.setup).toMatchObject({
@@ -57,7 +56,7 @@ describe("Interview service", () => {
       availableDurationMinutes: [15, 30, 45],
       defaultConfiguration: {
         roleId: "active",
-        round: "technical",
+        interviewType: "professional",
         difficulty: "pressure",
         durationMinutes: 30,
       },
@@ -112,7 +111,7 @@ describe("Interview service", () => {
       const start = vi.spyOn(interviewFaker, "start")
       const response = await prepareInterviewTrainingEntry({
         roleId,
-        round: "hr",
+        interviewType: "hr",
         difficulty: "basic",
         durationMinutes: 45,
       })
@@ -123,7 +122,7 @@ describe("Interview service", () => {
               status: "available",
               configuration: {
                 roleId,
-                round: "hr",
+                interviewType: "hr",
                 difficulty: "basic",
                 durationMinutes: 45,
               },

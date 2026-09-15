@@ -17,7 +17,7 @@ export const dashboardStoryFixture: DashboardResponse = {
     recommendation: {
       action: "mockInterview",
       reason: "单题结构已经稳定，可以在连续问答中验证临场表达。",
-      round: "technical",
+      interviewType: "professional",
       difficulty: "pressure",
       focusAreas: ["方案取舍", "跨团队协作"],
     },

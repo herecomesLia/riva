@@ -29,7 +29,7 @@ import type {
   InterviewConfiguration,
   InterviewDifficulty,
   InterviewDurationMinutes,
-  InterviewRound,
+  InterviewType,
   InterviewSetup,
 } from "@/models/interview-workflow"
 import type { InterviewTrainingEntryResolution } from "@/models/training-entry"
@@ -57,9 +57,11 @@ function getInitialConfiguration(
 
   return {
     roleId: selectedRole.id,
-    round: selectedRole.supportedRounds.includes(setup.defaultConfiguration.round)
-      ? setup.defaultConfiguration.round
-      : selectedRole.supportedRounds[0],
+    interviewType: selectedRole.supportedInterviewTypes.includes(
+      setup.defaultConfiguration.interviewType,
+    )
+      ? setup.defaultConfiguration.interviewType
+      : selectedRole.supportedInterviewTypes[0],
     difficulty: setup.availableDifficulties.includes(setup.defaultConfiguration.difficulty)
       ? setup.defaultConfiguration.difficulty
       : setup.availableDifficulties[0],
@@ -85,14 +87,14 @@ export function InterviewSetupForm({
   const form = useForm({
     defaultValues: getInitialConfiguration(setup, historyEntryResolution),
     onSubmit: async ({ value }) => {
-      if (!value.roleId || !value.round || !value.difficulty || !value.durationMinutes) {
+      if (!value.roleId || !value.interviewType || !value.difficulty || !value.durationMinutes) {
         return
       }
       setSubmitError(false)
       try {
         await onStart({
           roleId: value.roleId,
-          round: value.round,
+          interviewType: value.interviewType,
           difficulty: value.difficulty,
           durationMinutes: value.durationMinutes,
         })
@@ -141,9 +143,13 @@ export function InterviewSetupForm({
                       if (!value) return
                       field.handleChange(value)
                       const role = setup.roles.find(({ id }) => id === value)
-                      const currentRound = form.getFieldValue("round")
-                      if (role && (!currentRound || !role.supportedRounds.includes(currentRound))) {
-                        form.setFieldValue("round", role.supportedRounds[0])
+                      const currentInterviewType = form.getFieldValue("interviewType")
+                      if (
+                        role &&
+                        (!currentInterviewType ||
+                          !role.supportedInterviewTypes.includes(currentInterviewType))
+                      ) {
+                        form.setFieldValue("interviewType", role.supportedInterviewTypes[0])
                       }
                     }}
                     value={field.state.value}
@@ -178,7 +184,7 @@ export function InterviewSetupForm({
               {(roleId) => {
                 const selectedRole = setup.roles.find(({ id }) => id === roleId)
                 return (
-                  <form.Field name="round">
+                  <form.Field name="interviewType">
                     {(field) => (
                       <FieldSet data-disabled={pending}>
                         <FieldLegend
@@ -186,23 +192,23 @@ export function InterviewSetupForm({
                           variant="label"
                         >
                           <WorkflowIcon aria-hidden="true" />
-                          {t("interview.setup.fields.round")}
+                          {t("interview.setup.fields.interviewType")}
                         </FieldLegend>
                         <ToggleGroup
-                          aria-label={t("interview.setup.fields.round")}
+                          aria-label={t("interview.setup.fields.interviewType")}
                           className="flex w-full flex-wrap justify-start"
                           disabled={pending}
                           onValueChange={(values) => {
                             const value = values[0]
-                            if (value) field.handleChange(value as InterviewRound)
+                            if (value) field.handleChange(value as InterviewType)
                           }}
                           spacing={2}
                           value={field.state.value ? [field.state.value] : []}
                           variant="outline"
                         >
-                          {selectedRole?.supportedRounds.map((round) => (
-                            <ToggleGroupItem key={round} value={round}>
-                              {t(`interview.rounds.${round}`)}
+                          {selectedRole?.supportedInterviewTypes.map((interviewType) => (
+                            <ToggleGroupItem key={interviewType} value={interviewType}>
+                              {t(`interview.types.${interviewType}`)}
                             </ToggleGroupItem>
                           ))}
                         </ToggleGroup>
