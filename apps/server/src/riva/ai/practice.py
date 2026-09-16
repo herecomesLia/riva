@@ -52,7 +52,7 @@ class PracticeRoundAgent:
         # Bound each invocation including transient retries; correction gets a new budget.
         self._executor = LLMExecutor(execution_timeout_seconds=150)
 
-        graph = StateGraph(_PracticeState)
+        graph = StateGraph(_PracticeRoundState)
         graph.add_node("generate_question", self._generate_question)
         graph.add_node("wait_answer", self._wait_answer)
         graph.add_node("plan_next", self._plan_next)
@@ -247,7 +247,7 @@ class PracticeRoundAgent:
                 )
         raise LLMOutputError(f"{run_name} remained invalid after correction") from error
 
-    async def _generate_question(self, state: _PracticeState) -> dict[str, object]:
+    async def _generate_question(self, state: _PracticeRoundState) -> dict[str, object]:
         state = _read_state(state)
         question = await self._generate(
             self._question_model,
@@ -262,7 +262,7 @@ class PracticeRoundAgent:
         }
 
     async def _wait_answer(
-        self, state: _PracticeState
+        self, state: _PracticeRoundState
     ) -> Command[Literal["plan_next", "evaluate_and_review"]]:
         state = _read_state(state)
         if not state["turns"] or not isinstance(
@@ -295,7 +295,7 @@ class PracticeRoundAgent:
         )
 
     async def _plan_next(
-        self, state: _PracticeState
+        self, state: _PracticeRoundState
     ) -> Command[Literal["wait_answer", "evaluate_and_review"]]:
         state = _read_state(state)
         follow_up_count = (
@@ -324,7 +324,9 @@ class PracticeRoundAgent:
             goto="wait_answer",
         )
 
-    async def _evaluate_and_review(self, state: _PracticeState) -> dict[str, object]:
+    async def _evaluate_and_review(
+        self, state: _PracticeRoundState
+    ) -> dict[str, object]:
         state = _read_state(state)
         result = await self._generate(
             self._evaluation_model,
@@ -336,7 +338,7 @@ class PracticeRoundAgent:
         return {"result": result.model_dump(mode="json")}
 
 
-class _PracticeState(TypedDict):
+class _PracticeRoundState(TypedDict):
     profile: CareerProfileContent
     role: RoleContent
     question_type: PracticeQuestionType
@@ -394,7 +396,7 @@ class _EvaluationOutput(BaseModel):
     )
 
 
-_STATE_ADAPTER = TypeAdapter(_PracticeState)
+_STATE_ADAPTER = TypeAdapter(_PracticeRoundState)
 
 _PRACTICE_DIMENSION_WEIGHTS = {
     "relevance": 15,
@@ -420,7 +422,7 @@ def _parse_result(value: object) -> PracticeResult:
     return PracticeResult(score=score, **output.model_dump())
 
 
-def _read_state(value: object) -> _PracticeState:
+def _read_state(value: object) -> _PracticeRoundState:
     # Persist JSON only; restore domain types without custom serializer allowlists.
     state = _STATE_ADAPTER.validate_python(value)
     ids: set[UUID] = set()
@@ -434,7 +436,7 @@ def _read_state(value: object) -> _PracticeState:
     return state
 
 
-def _require_answer_wait(snapshot: StateSnapshot, state: _PracticeState) -> None:
+def _require_answer_wait(snapshot: StateSnapshot, state: _PracticeRoundState) -> None:
     if (
         snapshot.next != ("wait_answer",)
         or len(snapshot.interrupts) != 1
@@ -447,7 +449,7 @@ def _require_answer_wait(snapshot: StateSnapshot, state: _PracticeState) -> None
         raise ValueError("Practice is not waiting for an answer")
 
 
-def _practice_payload(state: _PracticeState) -> dict[str, object]:
+def _practice_payload(state: _PracticeRoundState) -> dict[str, object]:
     return {
         **PracticeRoundInput.model_validate(state).model_dump(mode="json"),
         "turns": [turn.model_dump(mode="json") for turn in state["turns"]],
