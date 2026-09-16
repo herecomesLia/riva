@@ -8,10 +8,10 @@ from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.memory import InMemorySaver
 
-from riva.ai.practice import PracticeAgent, PracticeInput
+from riva.ai.practice import PracticeRoundAgent, PracticeRoundInput
 from riva.llm import LLMClient
 from riva.models.career_profile import CareerProfileContent
-from riva.models.practice import PracticeAnswerTurn, PracticeReview
+from riva.models.practice import PracticeAnswerTurn
 from riva.models.role import JobDescriptionContent, RoleContent
 
 
@@ -39,25 +39,22 @@ def _evaluation() -> dict:
         "risk_awareness": 20,
     }
     return {
-        "dimensions": [
-            {
-                "dimension": dimension,
+        "dimension_scores": {
+            dimension: {
                 "score": score,
-                "explanation": ["Evidence from the answer"],
+                "explanation": "Evidence from the answer",
             }
             for dimension, score in scores.items()
-        ],
-        "review": {
-            "summary": "Relevant answer with limited supporting evidence.",
-            "strengths": ["Addresses the question"],
-            "issues": ["Lacks outcome evidence"],
-            "suggestions": ["Explain how the outcome was verified"],
         },
+        "summary": "Relevant answer with limited supporting evidence.",
+        "strengths": ["Addresses the question"],
+        "issues": ["Lacks outcome evidence"],
+        "suggestions": ["Explain how the outcome was verified"],
     }
 
 
-def _input(max_follow_ups: int = 1) -> PracticeInput:
-    return PracticeInput(
+def _input(max_follow_ups: int = 1) -> PracticeRoundInput:
+    return PracticeRoundInput(
         profile=CareerProfileContent(),
         role=RoleContent(title="Engineer", jd=JobDescriptionContent()),
         question_type="project",
@@ -68,7 +65,7 @@ def _input(max_follow_ups: int = 1) -> PracticeInput:
 
 def _engine(
     *, next_steps: Sequence[object] = ()
-) -> tuple[PracticeAgent, dict[str, AsyncMock]]:
+) -> tuple[PracticeRoundAgent, dict[str, AsyncMock]]:
     calls = {
         "_GeneratedQuestion": AsyncMock(
             side_effect=[_question("Describe your project.")]
@@ -92,7 +89,7 @@ def _engine(
 
     client = MagicMock(spec=LLMClient)
     client.chat_model.return_value.with_structured_output.side_effect = structured_model
-    return PracticeAgent(client, InMemorySaver()), calls
+    return PracticeRoundAgent(client, InMemorySaver()), calls
 
 
 async def test_start_is_idempotent() -> None:
@@ -107,6 +104,49 @@ async def test_start_is_idempotent() -> None:
     assert first.turns[0].content == "Describe your project."
     assert first.result is None
     calls["_GeneratedQuestion"].assert_awaited_once()
+
+
+async def test_finish_discards_unanswered_follow_up_and_recovers_evaluation() -> None:
+    agent, calls = _engine(
+        next_steps=[{"action": "follow_up", "question": _question("Why that design?")}]
+    )
+    round_id = uuid4()
+    initial = await agent.start(round_id, _input())
+    with pytest.raises(ValueError, match="main question"):
+        await agent.finish(round_id)
+    answer = PracticeAnswerTurn(id=uuid4(), content="I designed the cache.")
+    await agent.answer(round_id, answer)
+    calls["_EvaluationOutput"].side_effect = [
+        RuntimeError("Evaluation failed"),
+        _evaluation(),
+    ]
+    with pytest.raises(RuntimeError, match="Evaluation failed"):
+        await agent.finish(round_id)
+    completed = await agent.finish(round_id)
+    assert completed.turns == [initial.turns[0], answer]
+    assert completed.result is not None
+    assert await agent.finish(round_id) == completed
+    payload = json.loads(calls["_EvaluationOutput"].await_args.args[0][1].content)
+    assert len(payload["turns"]) == 2
+    calls["_NextStep"].assert_awaited_once()
+    assert calls["_EvaluationOutput"].await_count == 2
+
+
+async def test_restart_seeds_new_round_without_resetting_recovered_work() -> None:
+    agent, calls = _engine()
+    input = _input(max_follow_ups=0)
+    initial = await agent.start(uuid4(), input)
+    main_question = initial.turns[0]
+    replacement_id = uuid4()
+    restarted = await agent.restart(replacement_id, input, main_question)
+    assert restarted == initial
+    assert await agent.restart(replacement_id, input, main_question) == restarted
+    answer = PracticeAnswerTurn(id=uuid4(), content="New attempt")
+    completed = await agent.answer(replacement_id, answer)
+    assert completed.result is not None
+    assert await agent.restart(replacement_id, input, main_question) == completed
+    calls["_GeneratedQuestion"].assert_awaited_once()
+    calls["_EvaluationOutput"].assert_awaited_once()
 
 
 async def test_answer_retry_does_not_consume_answer_twice() -> None:
@@ -203,13 +243,8 @@ async def test_evaluation_builds_weighted_result() -> None:
 
     assert completed.result is not None
     # Five 15% dimensions, two 10% dimensions and one 5% dimension.
-    assert completed.result.evaluation.score == 60.5
-    assert [
-        item.model_dump() for item in completed.result.evaluation.dimensions
-    ] == _evaluation()["dimensions"]
-    assert completed.result.review == PracticeReview.model_validate(
-        _evaluation()["review"]
-    )
+    assert completed.result.score == 60.5
+    assert completed.result.model_dump(exclude={"score"}) == _evaluation()
 
 
 async def test_same_turn_id_with_different_answer_is_rejected() -> None:

@@ -1,10 +1,14 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from uuid import UUID
 
+import structlog
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 from sqlalchemy.engine import make_url
+
+logger = structlog.get_logger(__name__)
 
 
 @asynccontextmanager
@@ -26,3 +30,16 @@ async def setup_checkpoints(database_url: str) -> None:
     # removes checkpoints together with the business records they describe.
     async with open_checkpointer(database_url) as checkpointer:
         await checkpointer.setup()
+
+
+async def delete_checkpoints(database_url: str, round_ids: list[UUID]) -> None:
+    """Best-effort garbage collection, called only after business deletion commits."""
+    try:
+        async with open_checkpointer(database_url) as checkpointer:
+            for round_id in round_ids:
+                await checkpointer.adelete_thread(str(round_id))
+    except Exception:
+        logger.exception(
+            "practice_checkpoint_cleanup_failed",
+            round_ids=[str(id) for id in round_ids],
+        )

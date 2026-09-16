@@ -20,7 +20,7 @@ async def test_worker_resource_lifecycle(
     database = Database(settings.database)
     original_dispose = database.dispose
     llm = LLMClient(settings.llm)
-    practice_agent = Mock()
+    practice_round_agent = Mock()
     checkpointer = Mock()
     checkpointer_closed = Mock()
 
@@ -32,13 +32,15 @@ async def test_worker_resource_lifecycle(
         finally:
             checkpointer_closed()
 
-    def create_practice_agent(client: LLMClient, saver: object) -> Mock:
+    def create_practice_round_agent(client: LLMClient, saver: object) -> Mock:
         assert client is llm
         assert saver is checkpointer
-        return practice_agent
+        return practice_round_agent
 
     monkeypatch.setattr("riva.ai.checkpoints.open_checkpointer", open_checkpointer)
-    monkeypatch.setattr("riva.ai.practice.PracticeAgent", create_practice_agent)
+    monkeypatch.setattr(
+        "riva.ai.practice.PracticeRoundAgent", create_practice_round_agent
+    )
 
     dispose_mock = AsyncMock(wraps=original_dispose)
     monkeypatch.setattr(database, "dispose", dispose_mock)
@@ -66,7 +68,7 @@ async def test_worker_resource_lifecycle(
 
     async def run(**kwargs: object) -> None:
         assert kwargs["additional_context"] == {
-            "resources": TaskResources(database, llm, practice_agent)
+            "resources": TaskResources(database, llm, practice_round_agent)
         }
         if fails:
             raise failure

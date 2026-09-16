@@ -9,7 +9,7 @@ from riva.core.config import Settings
 from riva.tasks.errors import TaskError
 
 if TYPE_CHECKING:
-    from riva.ai.practice import PracticeAgent
+    from riva.ai.practice import PracticeRoundAgent
     from riva.db import Database
     from riva.llm import LLMClient
 
@@ -18,13 +18,13 @@ if TYPE_CHECKING:
 class TaskResources:
     database: Database
     llm: LLMClient
-    practice_agent: PracticeAgent
+    practice_round_agent: PracticeRoundAgent
 
 
 @asynccontextmanager
 async def task_resources(settings: Settings) -> AsyncGenerator[TaskResources]:
     from riva.ai.checkpoints import open_checkpointer
-    from riva.ai.practice import PracticeAgent
+    from riva.ai.practice import PracticeRoundAgent
     from riva.db import Database
     from riva.llm import LLMClient
 
@@ -36,7 +36,7 @@ async def task_resources(settings: Settings) -> AsyncGenerator[TaskResources]:
         yield TaskResources(
             database=database,
             llm=llm,
-            practice_agent=PracticeAgent(llm, checkpointer),
+            practice_round_agent=PracticeRoundAgent(llm, checkpointer),
         )
 
 

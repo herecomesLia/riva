@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from riva.ai.checkpoints import setup_checkpoints
 from riva.core.app import create_app, wrap_cors
 from riva.core.config import DatabaseSettings, Settings
 from riva.db import Database
@@ -21,8 +22,10 @@ from riva.models import CareerProfileExtraction, User
 from riva.models.career_profile import CareerProfile
 from riva.models.practice import (
     PracticeDifficulty,
+    PracticeDimensionScores,
     PracticeQuestionTurn,
     PracticeQuestionType,
+    PracticeResult,
 )
 from riva.models.role import (
     JobDescription,
@@ -80,6 +83,7 @@ async def _initialize_database(database_url: str) -> None:
     try:
         await database.reset()
         await setup_task_schema(database)
+        await setup_checkpoints(database_url)
     finally:
         await database.dispose()
 
@@ -215,6 +219,21 @@ def practice_question() -> PracticeQuestionTurn:
         },
         criteria=[{"dimension": "Ownership", "expectation": "Identify your work"}],
         reference_answer="Describe the work you personally completed.",
+    )
+
+
+@pytest.fixture
+def practice_result() -> PracticeResult:
+    return PracticeResult(
+        score=80,
+        dimension_scores={
+            dimension: {"score": 80, "explanation": "Concrete evidence"}
+            for dimension in PracticeDimensionScores.model_fields
+        },
+        summary="Clear answer",
+        strengths=[],
+        issues=[],
+        suggestions=[],
     )
 
 

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
 
 import procrastinate
 
@@ -10,8 +10,15 @@ class TaskSpec:
     queue: str
 
 
+class PracticeRunAction(StrEnum):
+    START = "start"
+    ANSWER = "answer"
+    FINISH = "finish"
+    RESTART = "restart"
+
+
 class Task(Enum):
-    RUN_PRACTICE = TaskSpec(name="practice.run", queue="ai")
+    RUN_PRACTICE_ROUND = TaskSpec(name="practice.run_round", queue="ai")
     EXTRACT_JD_TEXT = TaskSpec(name="roles.extract_jd_text", queue="ai")
     EXTRACT_CAREER_PROFILE_TEXT = TaskSpec(
         name="career_profile.extract_career_profile_text", queue="ai"

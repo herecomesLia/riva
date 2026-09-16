@@ -1,9 +1,9 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Literal, Self
+from typing import TYPE_CHECKING, Annotated, Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
@@ -18,7 +18,9 @@ from sqlalchemy.sql.sqltypes import Uuid
 
 from riva.db.base import Base
 from riva.db.types import PydanticJSONB
+from riva.models.career_profile import CareerProfileContent
 from riva.models.mixins import TaskStateMixin
+from riva.models.role import RoleContent
 from riva.models.types import NonBlankStr
 from riva.utils import utc_now
 
@@ -37,17 +39,6 @@ class PracticeQuestionType(StrEnum):
 class PracticeDifficulty(StrEnum):
     BASIC = "basic"
     HARD = "hard"
-
-
-class PracticeDimension(StrEnum):
-    RELEVANCE = "relevance"
-    STRUCTURE = "structure"
-    SPECIFICITY = "specificity"
-    CONTRIBUTION = "contribution"
-    EVIDENCE = "evidence"
-    ROLE_ALIGNMENT = "role_alignment"
-    COMMUNICATION = "communication"
-    RISK_AWARENESS = "risk_awareness"
 
 
 class PracticeGuidance(BaseModel):
@@ -90,17 +81,6 @@ type PracticeTurnContent = Annotated[
 
 
 class PracticeDimensionScore(BaseModel):
-    dimension: PracticeDimension = Field(
-        description="""Scoring dimension:
-- relevance: addresses the question's core requirements.
-- structure: connects context, actions, decisions and outcomes coherently.
-- specificity: provides concrete scenarios, technical details and precise descriptions.
-- contribution: distinguishes personal responsibility and actions from team work.
-- evidence: supports outcomes with facts, measurements, business value or verification.
-- role_alignment: demonstrates abilities relevant to the target role and JD.
-- communication: uses clear, natural language with useful information density (written answers only, not unobserved vocal delivery).
-- risk_awareness: considers relevant risks, failure cases and boundaries."""
-    )
     score: int = Field(
         strict=True,
         ge=0,
@@ -113,28 +93,41 @@ class PracticeDimensionScore(BaseModel):
             "0: entirely fails requirements or provides no relevant evidence."
         ),
     )
-    explanation: list[NonBlankStr] = Field(
+    explanation: NonBlankStr = Field(
         description="Specific reasons for the score, grounded in the candidate's actual answers and remaining gaps."
     )
 
 
-class PracticeEvaluation(BaseModel):
+class PracticeDimensionScores(BaseModel):
+    relevance: PracticeDimensionScore = Field(
+        description="addresses the question's core requirements."
+    )
+    structure: PracticeDimensionScore = Field(
+        description="connects context, actions, decisions and outcomes coherently."
+    )
+    specificity: PracticeDimensionScore = Field(
+        description="provides concrete scenarios, technical details and precise descriptions."
+    )
+    contribution: PracticeDimensionScore = Field(
+        description="distinguishes personal responsibility and actions from team work."
+    )
+    evidence: PracticeDimensionScore = Field(
+        description="supports outcomes with facts, measurements, business value or verification."
+    )
+    role_alignment: PracticeDimensionScore = Field(
+        description="demonstrates abilities relevant to the target role and JD."
+    )
+    communication: PracticeDimensionScore = Field(
+        description="uses clear, natural language with useful information density (written answers only, not unobserved vocal delivery)."
+    )
+    risk_awareness: PracticeDimensionScore = Field(
+        description="considers relevant risks, failure cases and boundaries."
+    )
+
+
+class PracticeResult(BaseModel):
     score: float = Field(ge=0, le=100, allow_inf_nan=False)
-    dimensions: list[PracticeDimensionScore]
-
-    @model_validator(mode="after")
-    def validate_dimensions(self) -> Self:
-        dimensions = [item.dimension for item in self.dimensions]
-        if len(dimensions) != len(PracticeDimension) or set(dimensions) != set(
-            PracticeDimension
-        ):
-            raise ValueError(
-                "Evaluation must contain each scoring dimension exactly once"
-            )
-        return self
-
-
-class PracticeReview(BaseModel):
+    dimension_scores: PracticeDimensionScores
     summary: NonBlankStr = Field(
         description="Overall assessment grounded in dimension scores, their explanations, actual answers and question criteria."
     )
@@ -149,12 +142,7 @@ class PracticeReview(BaseModel):
     )
 
 
-class PracticeResult(BaseModel):
-    evaluation: PracticeEvaluation
-    review: PracticeReview
-
-
-class PracticeSession(TaskStateMixin, Base):
+class PracticeSession(Base):
     __tablename__ = "practice_sessions"
     __table_args__ = (
         CheckConstraint(
@@ -175,6 +163,11 @@ class PracticeSession(TaskStateMixin, Base):
     role_title_snapshot: Mapped[str] = mapped_column(String)
     role_company_snapshot: Mapped[str | None] = mapped_column(String)
     role: Mapped[Role | None] = relationship(lazy="selectin")
+    # Immutable AI context, independent of the live role and display snapshots.
+    profile_snapshot: Mapped[CareerProfileContent] = mapped_column(
+        PydanticJSONB(CareerProfileContent)
+    )
+    role_snapshot: Mapped[RoleContent] = mapped_column(PydanticJSONB(RoleContent))
     question_type: Mapped[PracticeQuestionType] = mapped_column(
         Enum(
             PracticeQuestionType,
@@ -196,13 +189,42 @@ class PracticeSession(TaskStateMixin, Base):
         )
     )
     max_follow_ups: Mapped[int]
-    result: Mapped[PracticeResult | None] = mapped_column(PydanticJSONB(PracticeResult))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
+    rounds: Mapped[list[PracticeRound]] = relationship(
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="PracticeRound.sequence",
+    )
+
+
+class PracticeRound(TaskStateMixin, Base):
+    __tablename__ = "practice_rounds"
+    __table_args__ = (
+        # Replacement rounds briefly share a sequence while the main turn is moved.
+        UniqueConstraint(
+            "practice_id",
+            "sequence",
+            name="practice_round_sequence_unique",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        CheckConstraint("sequence >= 0", name="practice_round_sequence_nonnegative"),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=uuid4
+    )
+    practice_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("practice_sessions.id", ondelete="CASCADE")
+    )
+    sequence: Mapped[int]
+    result: Mapped[PracticeResult | None] = mapped_column(PydanticJSONB(PracticeResult))
     turns: Mapped[list[PracticeTurn]] = relationship(
         cascade="all, delete-orphan",
         lazy="selectin",
@@ -213,9 +235,7 @@ class PracticeSession(TaskStateMixin, Base):
 class PracticeTurn(Base):
     __tablename__ = "practice_turns"
     __table_args__ = (
-        UniqueConstraint(
-            "practice_id", "sequence", name="practice_turn_sequence_unique"
-        ),
+        UniqueConstraint("round_id", "sequence", name="practice_turn_sequence_unique"),
         CheckConstraint("sequence >= 0", name="practice_turn_sequence_nonnegative"),
         CheckConstraint(
             "length(btrim(content)) > 0", name="practice_turn_content_nonblank"
@@ -234,8 +254,8 @@ class PracticeTurn(Base):
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
-    practice_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("practice_sessions.id", ondelete="CASCADE")
+    round_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("practice_rounds.id", ondelete="CASCADE")
     )
     sequence: Mapped[int]
     role: Mapped[str] = mapped_column(

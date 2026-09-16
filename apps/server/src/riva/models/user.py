@@ -47,6 +47,15 @@ class User(Base):
         ),
         nullable=True,
     )
+    active_practice_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey(
+            "practice_sessions.id",
+            name="fk_users_active_practice_id_sessions",
+            ondelete="SET NULL",
+            use_alter=True,
+        ),
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,

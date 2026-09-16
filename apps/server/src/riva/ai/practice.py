@@ -20,21 +20,18 @@ from riva.models.practice import (
     PracticeAnswerTurn,
     PracticeCriterion,
     PracticeDifficulty,
-    PracticeDimension,
-    PracticeDimensionScore,
-    PracticeEvaluation,
+    PracticeDimensionScores,
     PracticeGuidance,
     PracticeQuestionTurn,
     PracticeQuestionType,
     PracticeResult,
-    PracticeReview,
     PracticeTurnContent,
 )
 from riva.models.role import RoleContent
 from riva.models.types import NonBlankStr
 
 
-class PracticeInput(BaseModel):
+class PracticeRoundInput(BaseModel):
     profile: CareerProfileContent
     role: RoleContent
     question_type: PracticeQuestionType
@@ -42,12 +39,12 @@ class PracticeInput(BaseModel):
     max_follow_ups: int = Field(strict=True, ge=0)
 
 
-class PracticeOutput(BaseModel):
+class PracticeRoundOutput(BaseModel):
     turns: list[PracticeTurnContent]
     result: PracticeResult | None = None
 
 
-class PracticeAgent:
+class PracticeRoundAgent:
     def __init__(self, client: LLMClient, checkpointer: BaseCheckpointSaver) -> None:
         self._question_model = self._structured_model(client, _GeneratedQuestion)
         self._next_model = self._structured_model(client, _NextStep)
@@ -62,17 +59,18 @@ class PracticeAgent:
         graph.add_node("evaluate_and_review", self._evaluate_and_review)
         graph.add_edge(START, "generate_question")
         graph.add_edge("generate_question", "wait_answer")
-        graph.add_edge("wait_answer", "plan_next")
         graph.add_edge("evaluate_and_review", END)
         self._graph = graph.compile(checkpointer=checkpointer)
 
-    async def start(self, practice_id: UUID, input: PracticeInput) -> PracticeOutput:
+    async def start(
+        self, round_id: UUID, input: PracticeRoundInput
+    ) -> PracticeRoundOutput:
         """Initialize once, or recover using the thread's existing context."""
-        config: RunnableConfig = {"configurable": {"thread_id": str(practice_id)}}
+        config: RunnableConfig = {"configurable": {"thread_id": str(round_id)}}
         snapshot = await self._graph.aget_state(config)
         if snapshot.created_at is None:
             state = _STATE_ADAPTER.validate_python(
-                {**input.model_dump(), "turns": [], "evaluation": None, "review": None}
+                {**input.model_dump(), "turns": [], "result": None}
             )
             await self._graph.ainvoke(
                 _STATE_ADAPTER.dump_python(state, mode="json"),
@@ -82,10 +80,10 @@ class PracticeAgent:
         return await self._run_until_boundary(config)
 
     async def answer(
-        self, practice_id: UUID, answer: PracticeAnswerTurn
-    ) -> PracticeOutput:
+        self, round_id: UUID, answer: PracticeAnswerTurn
+    ) -> PracticeRoundOutput:
         """Consume an immutable answer once, or recover its unfinished work."""
-        config: RunnableConfig = {"configurable": {"thread_id": str(practice_id)}}
+        config: RunnableConfig = {"configurable": {"thread_id": str(round_id)}}
         snapshot = await self._graph.aget_state(config)
         if snapshot.created_at is None:
             raise ValueError("Cannot answer a practice that has not started")
@@ -103,7 +101,51 @@ class PracticeAgent:
             )
         return await self._run_until_boundary(config)
 
-    async def _run_until_boundary(self, config: RunnableConfig) -> PracticeOutput:
+    async def finish(self, round_id: UUID) -> PracticeRoundOutput:
+        """Discard an unanswered follow-up and evaluate, recovering pending work."""
+        config: RunnableConfig = {"configurable": {"thread_id": str(round_id)}}
+        snapshot = await self._graph.aget_state(config)
+        if snapshot.created_at is None:
+            raise ValueError("Cannot finish a round that has not started")
+        state = _read_state(snapshot.values)
+        if snapshot.interrupts:
+            _require_answer_wait(snapshot, state)
+            if len(state["turns"]) < 3:
+                raise ValueError("The main question must be answered before finishing")
+            await self._graph.ainvoke(
+                Command(resume={"action": "finish"}), config, durability="sync"
+            )
+        elif snapshot.next != ("evaluate_and_review",) and state["result"] is None:
+            raise ValueError("Round is not waiting for a follow-up answer")
+        return await self._run_until_boundary(config)
+
+    async def restart(
+        self,
+        round_id: UUID,
+        input: PracticeRoundInput,
+        main_question: PracticeQuestionTurn,
+    ) -> PracticeRoundOutput:
+        """Seed a replacement round once with its preserved main question."""
+        config: RunnableConfig = {"configurable": {"thread_id": str(round_id)}}
+        snapshot = await self._graph.aget_state(config)
+        if snapshot.created_at is None:
+            state = _STATE_ADAPTER.validate_python(
+                {
+                    **input.model_dump(),
+                    "turns": [main_question],
+                    "result": None,
+                }
+            )
+            await self._graph.aupdate_state(
+                config,
+                _STATE_ADAPTER.dump_python(state, mode="json"),
+                as_node="generate_question",
+            )
+        elif _read_state(snapshot.values)["turns"][0] != main_question:
+            raise ValueError("Replacement round has a different main question")
+        return await self._run_until_boundary(config)
+
+    async def _run_until_boundary(self, config: RunnableConfig) -> PracticeRoundOutput:
         snapshot = await self._graph.aget_state(config)
         if snapshot.values:
             _read_state(snapshot.values)
@@ -113,22 +155,19 @@ class PracticeAgent:
         state = _read_state(snapshot.values)
         if snapshot.interrupts:
             _require_answer_wait(snapshot, state)
-            return PracticeOutput(turns=state["turns"])
+            return PracticeRoundOutput(turns=state["turns"])
         if (
             snapshot.next
             or not state["turns"]
             or not isinstance(state["turns"][-1], PracticeAnswerTurn)
-            or state["evaluation"] is None
-            or state["review"] is None
+            or state["result"] is None
         ):
             raise RuntimeError(
                 "Practice checkpoint is not at an answer wait or completion"
             )
-        return PracticeOutput(
+        return PracticeRoundOutput(
             turns=state["turns"],
-            result=PracticeResult(
-                evaluation=state["evaluation"], review=state["review"]
-            ),
+            result=state["result"],
         )
 
     @staticmethod
@@ -222,7 +261,9 @@ class PracticeAgent:
             "turns": [item.model_dump(mode="json") for item in [*state["turns"], turn]]
         }
 
-    async def _wait_answer(self, state: _PracticeState) -> dict[str, object]:
+    async def _wait_answer(
+        self, state: _PracticeState
+    ) -> Command[Literal["plan_next", "evaluate_and_review"]]:
         state = _read_state(state)
         if not state["turns"] or not isinstance(
             state["turns"][-1], PracticeQuestionTurn
@@ -230,14 +271,28 @@ class PracticeAgent:
             raise RuntimeError("wait_answer requires an unanswered question")
         question = state["turns"][-1]
         value = interrupt({"question_turn_id": str(question.id)})
+        if value == {"action": "finish"}:
+            if len(state["turns"]) < 3:
+                raise ValueError("The main question must be answered before finishing")
+            return Command(
+                update={
+                    "turns": [
+                        turn.model_dump(mode="json") for turn in state["turns"][:-1]
+                    ]
+                },
+                goto="evaluate_and_review",
+            )
         answer = PracticeAnswerTurn.model_validate(value)
         if any(turn.id == answer.id for turn in state["turns"]):
             raise ValueError("Answer ID is already present in the practice")
-        return {
-            "turns": [
-                turn.model_dump(mode="json") for turn in [*state["turns"], answer]
-            ]
-        }
+        return Command(
+            update={
+                "turns": [
+                    turn.model_dump(mode="json") for turn in [*state["turns"], answer]
+                ]
+            },
+            goto="plan_next",
+        )
 
     async def _plan_next(
         self, state: _PracticeState
@@ -278,7 +333,7 @@ class PracticeAgent:
             _parse_result,
             "practice.evaluate_and_review",
         )
-        return result.model_dump(mode="json")
+        return {"result": result.model_dump(mode="json")}
 
 
 class _PracticeState(TypedDict):
@@ -288,8 +343,7 @@ class _PracticeState(TypedDict):
     difficulty: PracticeDifficulty
     max_follow_ups: int
     turns: list[PracticeTurnContent]
-    evaluation: PracticeEvaluation | None
-    review: PracticeReview | None
+    result: PracticeResult | None
 
 
 class _GeneratedQuestion(BaseModel):
@@ -325,39 +379,45 @@ class _NextStep(BaseModel):
 
 
 class _EvaluationOutput(BaseModel):
-    dimensions: list[PracticeDimensionScore] = Field(
-        description="Evaluation of all eight scoring dimensions, each appearing exactly once."
+    dimension_scores: PracticeDimensionScores
+    summary: NonBlankStr = Field(
+        description=PracticeResult.model_fields["summary"].description
     )
-    review: PracticeReview = Field(
-        description="Review consistent with these dimension scores and explanations, grounded in actual answers and question criteria."
+    strengths: list[NonBlankStr] = Field(
+        description=PracticeResult.model_fields["strengths"].description
+    )
+    issues: list[NonBlankStr] = Field(
+        description=PracticeResult.model_fields["issues"].description
+    )
+    suggestions: list[NonBlankStr] = Field(
+        description=PracticeResult.model_fields["suggestions"].description
     )
 
 
 _STATE_ADAPTER = TypeAdapter(_PracticeState)
 
 _PRACTICE_DIMENSION_WEIGHTS = {
-    PracticeDimension.RELEVANCE: 15,
-    PracticeDimension.STRUCTURE: 15,
-    PracticeDimension.SPECIFICITY: 15,
-    PracticeDimension.CONTRIBUTION: 15,
-    PracticeDimension.EVIDENCE: 15,
-    PracticeDimension.ROLE_ALIGNMENT: 10,
-    PracticeDimension.COMMUNICATION: 10,
-    PracticeDimension.RISK_AWARENESS: 5,
+    "relevance": 15,
+    "structure": 15,
+    "specificity": 15,
+    "contribution": 15,
+    "evidence": 15,
+    "role_alignment": 10,
+    "communication": 10,
+    "risk_awareness": 5,
 }
 
 
 def _parse_result(value: object) -> PracticeResult:
     output = _EvaluationOutput.model_validate(value)
-    evaluation = PracticeEvaluation(
-        score=sum(
-            item.score * _PRACTICE_DIMENSION_WEIGHTS[item.dimension]
-            for item in output.dimensions
+    score = (
+        sum(
+            getattr(output.dimension_scores, dimension).score * weight
+            for dimension, weight in _PRACTICE_DIMENSION_WEIGHTS.items()
         )
-        / 100,
-        dimensions=output.dimensions,
+        / 100
     )
-    return PracticeResult(evaluation=evaluation, review=output.review)
+    return PracticeResult(score=score, **output.model_dump())
 
 
 def _read_state(value: object) -> _PracticeState:
@@ -382,15 +442,14 @@ def _require_answer_wait(snapshot: StateSnapshot, state: _PracticeState) -> None
         or not isinstance(state["turns"][-1], PracticeQuestionTurn)
         or snapshot.interrupts[0].value
         != {"question_turn_id": str(state["turns"][-1].id)}
-        or state["evaluation"] is not None
-        or state["review"] is not None
+        or state["result"] is not None
     ):
         raise ValueError("Practice is not waiting for an answer")
 
 
 def _practice_payload(state: _PracticeState) -> dict[str, object]:
     return {
-        **PracticeInput.model_validate(state).model_dump(mode="json"),
+        **PracticeRoundInput.model_validate(state).model_dump(mode="json"),
         "turns": [turn.model_dump(mode="json") for turn in state["turns"]],
     }
 
