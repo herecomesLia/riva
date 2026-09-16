@@ -5,7 +5,6 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 from sqlalchemy import (
-    CheckConstraint,
     DateTime,
     Enum,
     ForeignKey,
@@ -144,11 +143,6 @@ class PracticeResult(BaseModel):
 
 class PracticeSession(Base):
     __tablename__ = "practice_sessions"
-    __table_args__ = (
-        CheckConstraint(
-            "max_follow_ups >= 0", name="practice_max_follow_ups_nonnegative"
-        ),
-    )
 
     id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True), primary_key=True, default=uuid4
@@ -214,7 +208,6 @@ class PracticeRound(TaskStateMixin, Base):
             deferrable=True,
             initially="DEFERRED",
         ),
-        CheckConstraint("sequence >= 0", name="practice_round_sequence_nonnegative"),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -236,21 +229,6 @@ class PracticeTurn(Base):
     __tablename__ = "practice_turns"
     __table_args__ = (
         UniqueConstraint("round_id", "sequence", name="practice_turn_sequence_unique"),
-        CheckConstraint("sequence >= 0", name="practice_turn_sequence_nonnegative"),
-        CheckConstraint(
-            "length(btrim(content)) > 0", name="practice_turn_content_nonblank"
-        ),
-        CheckConstraint(
-            "jsonb_typeof(criteria) = 'array'", name="practice_turn_criteria_array"
-        ),
-        # PydanticJSONB encodes Python None as JSON null, while SQL writers may use NULL.
-        CheckConstraint(
-            "(role = 'user' AND (guidance IS NULL OR guidance = 'null'::jsonb) "
-            "AND criteria = '[]'::jsonb AND reference_answer IS NULL) OR "
-            "(role = 'assistant' AND guidance IS NOT NULL AND guidance <> 'null'::jsonb "
-            "AND reference_answer IS NOT NULL AND length(btrim(reference_answer)) > 0)",
-            name="practice_turn_question_metadata",
-        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
