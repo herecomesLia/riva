@@ -103,6 +103,13 @@ class JobDescriptionContent(BaseModel):
     )
 
 
+class RoleContent(BaseModel):
+    title: NonBlankStr
+    company: NonBlankStr | None = None
+    recruitment_track: RecruitmentTrack | None = None
+    jd: JobDescriptionContent
+
+
 class JobDescription(Base):
     __tablename__ = "job_descriptions"
 

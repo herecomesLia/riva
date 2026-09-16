@@ -9,6 +9,7 @@ from riva.models.role import (
     JobDescriptionContent,
     JobRequirements,
     RecruitmentTrack,
+    RoleContent,
     RoleMatchingResult,
 )
 from riva.models.types import NonBlankStr
@@ -57,10 +58,8 @@ class RoleMatchingResponse(ResponseModel):
     is_stale: bool
 
 
-class RoleResponse(ResponseModel):
+class RoleResponse(RoleContent, ResponseModel):
     id: UUID
-    title: str
-    company: str | None
     recruitment_track: RecruitmentTrack | None = Field(
         description="Campus or experienced hiring track, not employment type; null when unspecified."
     )

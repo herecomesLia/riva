@@ -590,16 +590,16 @@ export const getRoleMatchingResponseMock = (
 export const getRoleResponseMock = (
   overrideResponse: Partial<RoleResponse> = {},
 ): RoleResponse => ({
-  id: faker.string.uuid(),
-  title: faker.string.alpha({ length: { min: 10, max: 20 } }),
-  company: faker.helpers.arrayElement([faker.string.alpha({ length: { min: 10, max: 20 } }), null]),
+  title: faker.string.alpha({ length: { min: 1, max: 20 } }),
+  company: faker.helpers.arrayElement([faker.string.alpha({ length: { min: 1, max: 20 } }), null]),
   recruitmentTrack: faker.helpers.arrayElement([getRecruitmentTrackMock(), null]),
+  jd: { ...getJobDescriptionResponseMock() },
+  id: faker.string.uuid(),
   location: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     null,
   ]),
   isArchived: faker.datatype.boolean(),
-  jd: { ...getJobDescriptionResponseMock() },
   matching: { ...getRoleMatchingResponseMock() },
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   updatedAt: faker.date.past().toISOString().slice(0, 19) + "Z",

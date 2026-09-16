@@ -17,6 +17,7 @@ dependencies = [
   "typer>=0.20.0",
   "langchain-core>=1.6.1",
   "langchain-openai>=1.6.0",
+  "langgraph>=1.0,<2",
   "openai>=3.7.0",
   "procrastinate>=3.9.0,<3.10",
 ]
