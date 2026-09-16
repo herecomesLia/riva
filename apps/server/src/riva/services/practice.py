@@ -218,9 +218,11 @@ class PracticeService:
         await self.session.commit()
         return practice
 
-    async def end_session(self, user: User, practice_id: UUID) -> PracticeSession:
+    async def end_session(
+        self, user: User, practice_id: UUID, *, round_id: UUID
+    ) -> PracticeSession:
         practice = await self._lock(user, practice_id)
-        round = self._current(practice, practice.rounds[-1].id)
+        round = self._current(practice, round_id)
         self._require_ready(round)
         if round.result is None:
             raise ConflictError("Complete the current round before ending the session.")

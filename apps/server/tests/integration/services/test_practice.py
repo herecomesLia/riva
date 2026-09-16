@@ -354,8 +354,10 @@ async def test_concurrent_next_round_creates_one_successor(
         assert practice.rounds[0].result is not None
         assert len(practice.rounds[0].turns) == 2
         user = await session.get(User, practice.user_id)
-        with pytest.raises(ConflictError, match="unfinished work"):
-            await PracticeService(session).end_session(user, practice_id)
+        with pytest.raises(ConflictError, match="not the current round"):
+            await PracticeService(session).end_session(
+                user, practice_id, round_id=round_id
+            )
 
 
 async def test_end_session_releases_active_practice_and_freezes_history(
@@ -366,7 +368,7 @@ async def test_end_session_releases_active_practice_and_freezes_history(
         practice = await session.get(PracticeSession, practice_id)
         user = await session.get(User, practice.user_id)
         service = PracticeService(session)
-        await service.end_session(user, practice_id)
+        await service.end_session(user, practice_id, round_id=round_id)
         assert practice.ended_at is not None and user.active_practice_id is None
         with pytest.raises(ConflictError, match="ended"):
             await service.retry_round(user, practice_id, round_id=round_id)
