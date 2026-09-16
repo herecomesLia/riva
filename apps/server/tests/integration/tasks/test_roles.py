@@ -9,6 +9,7 @@ from procrastinate import JobContext
 from procrastinate.jobs import Job
 from sqlalchemy import text
 
+from riva.ai.practice import PracticeAgent
 from riva.db import Database
 from riva.llm import LLMClient
 from riva.llm.errors import LLMOutputError, LLMUnavailableError
@@ -57,7 +58,9 @@ def extract(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
 
 @pytest.fixture
 def resources(extraction_database: Database) -> TaskResources:
-    return TaskResources(extraction_database, MagicMock(spec=LLMClient))
+    return TaskResources(
+        extraction_database, MagicMock(spec=LLMClient), MagicMock(spec=PracticeAgent)
+    )
 
 
 @pytest.fixture

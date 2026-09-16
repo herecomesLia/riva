@@ -5,6 +5,7 @@ from typing import Annotated
 import typer
 from rich import print as rprint
 
+from riva.ai.checkpoints import setup_checkpoints
 from riva.core.config import load_settings
 from riva.db import Database
 from riva.tasks import reset_task_schema, setup_task_schema
@@ -56,6 +57,7 @@ def setup(
         async with Database(database_settings) as database:
             await database.create_tables()
             await setup_task_schema(database)
+            await setup_checkpoints(database_settings.url)
 
     try:
         asyncio.run(run())
@@ -103,6 +105,7 @@ def reset(
         async with Database(database_settings) as database:
             await database.reset()
             await reset_task_schema(database)
+            await setup_checkpoints(database_settings.url)
 
     try:
         asyncio.run(run())

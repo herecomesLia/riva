@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.memory import InMemorySaver
 
-from riva.ai.practice import PracticeEngine, PracticeInput
+from riva.ai.practice import PracticeAgent, PracticeInput
 from riva.llm import LLMClient
 from riva.models.career_profile import CareerProfileContent
 from riva.models.practice import PracticeAnswerTurn, PracticeReview
@@ -68,7 +68,7 @@ def _input(max_follow_ups: int = 1) -> PracticeInput:
 
 def _engine(
     *, next_steps: Sequence[object] = ()
-) -> tuple[PracticeEngine, dict[str, AsyncMock]]:
+) -> tuple[PracticeAgent, dict[str, AsyncMock]]:
     calls = {
         "_GeneratedQuestion": AsyncMock(
             side_effect=[_question("Describe your project.")]
@@ -92,7 +92,7 @@ def _engine(
 
     client = MagicMock(spec=LLMClient)
     client.chat_model.return_value.with_structured_output.side_effect = structured_model
-    return PracticeEngine(client, InMemorySaver()), calls
+    return PracticeAgent(client, InMemorySaver()), calls
 
 
 async def test_start_is_idempotent() -> None:

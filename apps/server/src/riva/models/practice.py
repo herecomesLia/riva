@@ -1,10 +1,29 @@
+from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Literal, Self
-from uuid import UUID
+from typing import TYPE_CHECKING, Annotated, Literal, Self
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Enum,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql.sqltypes import Uuid
 
+from riva.db.base import Base
+from riva.db.types import PydanticJSONB
+from riva.models.mixins import TaskStateMixin
 from riva.models.types import NonBlankStr
+from riva.utils import utc_now
+
+if TYPE_CHECKING:
+    from riva.models.role import Role
 
 
 class PracticeQuestionType(StrEnum):
@@ -64,7 +83,7 @@ class PracticeAnswerTurn(BaseModel):
     content: NonBlankStr
 
 
-type PracticeTurn = Annotated[
+type PracticeTurnContent = Annotated[
     PracticeQuestionTurn | PracticeAnswerTurn,
     Field(discriminator="role"),
 ]
@@ -133,3 +152,109 @@ class PracticeReview(BaseModel):
 class PracticeResult(BaseModel):
     evaluation: PracticeEvaluation
     review: PracticeReview
+
+
+class PracticeSession(TaskStateMixin, Base):
+    __tablename__ = "practice_sessions"
+    __table_args__ = (
+        CheckConstraint(
+            "max_follow_ups >= 0", name="practice_max_follow_ups_nonnegative"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), primary_key=True, default=uuid4
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    role_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("roles.id", ondelete="SET NULL"), index=True
+    )
+    # Captured at practice creation and refreshed immediately before role deletion.
+    role_title_snapshot: Mapped[str] = mapped_column(String)
+    role_company_snapshot: Mapped[str | None] = mapped_column(String)
+    role: Mapped[Role | None] = relationship(lazy="selectin")
+    question_type: Mapped[PracticeQuestionType] = mapped_column(
+        Enum(
+            PracticeQuestionType,
+            values_callable=lambda enum: [member.value for member in enum],
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            name="practice_question_type",
+        )
+    )
+    difficulty: Mapped[PracticeDifficulty] = mapped_column(
+        Enum(
+            PracticeDifficulty,
+            values_callable=lambda enum: [member.value for member in enum],
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            name="practice_difficulty",
+        )
+    )
+    max_follow_ups: Mapped[int]
+    result: Mapped[PracticeResult | None] = mapped_column(PydanticJSONB(PracticeResult))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+    turns: Mapped[list[PracticeTurn]] = relationship(
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="PracticeTurn.sequence",
+    )
+
+
+class PracticeTurn(Base):
+    __tablename__ = "practice_turns"
+    __table_args__ = (
+        UniqueConstraint(
+            "practice_id", "sequence", name="practice_turn_sequence_unique"
+        ),
+        CheckConstraint("sequence >= 0", name="practice_turn_sequence_nonnegative"),
+        CheckConstraint(
+            "length(btrim(content)) > 0", name="practice_turn_content_nonblank"
+        ),
+        CheckConstraint(
+            "jsonb_typeof(criteria) = 'array'", name="practice_turn_criteria_array"
+        ),
+        # PydanticJSONB encodes Python None as JSON null, while SQL writers may use NULL.
+        CheckConstraint(
+            "(role = 'user' AND (guidance IS NULL OR guidance = 'null'::jsonb) "
+            "AND criteria = '[]'::jsonb AND reference_answer IS NULL) OR "
+            "(role = 'assistant' AND guidance IS NOT NULL AND guidance <> 'null'::jsonb "
+            "AND reference_answer IS NOT NULL AND length(btrim(reference_answer)) > 0)",
+            name="practice_turn_question_metadata",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    practice_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("practice_sessions.id", ondelete="CASCADE")
+    )
+    sequence: Mapped[int]
+    role: Mapped[str] = mapped_column(
+        Enum(
+            "assistant",
+            "user",
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            name="practice_turn_role",
+        )
+    )
+    content: Mapped[str] = mapped_column(String)
+    guidance: Mapped[PracticeGuidance | None] = mapped_column(
+        PydanticJSONB(PracticeGuidance)
+    )
+    criteria: Mapped[list[PracticeCriterion]] = mapped_column(
+        PydanticJSONB(list[PracticeCriterion]),
+        default=list,
+        server_default=text("'[]'::jsonb"),
+    )
+    reference_answer: Mapped[str | None] = mapped_column(String)

@@ -47,6 +47,7 @@ def database_calls(
     monkeypatch.setattr(db_commands, "Database", database_factory)
     monkeypatch.setattr(db_commands, "setup_task_schema", setup_task_schema)
     monkeypatch.setattr(db_commands, "reset_task_schema", reset_task_schema)
+    monkeypatch.setattr(db_commands, "setup_checkpoints", AsyncMock())
     return database_factory, database, setup_task_schema, reset_task_schema
 
 
@@ -62,6 +63,7 @@ def test_database_command_cancellation_does_not_open_database(
     database_factory.assert_not_called()
     setup_task_schema.assert_not_awaited()
     reset_task_schema.assert_not_awaited()
+    db_commands.setup_checkpoints.assert_not_awaited()
 
 
 @pytest.mark.parametrize(
@@ -81,6 +83,7 @@ def test_database_command_yes_executes_requested_operation(
     database.__aenter__.assert_awaited_once_with()
     database.__aexit__.assert_awaited_once()
     getattr(database, operation).assert_awaited_once_with()
+    db_commands.setup_checkpoints.assert_awaited_once_with(DATABASE_URL)
     if command == "setup":
         setup_task_schema.assert_awaited_once_with(database)
         reset_task_schema.assert_not_awaited()
@@ -107,3 +110,4 @@ def test_database_command_failure_returns_nonzero_exit(
     getattr(database, operation).assert_awaited_once_with()
     database.__aexit__.assert_awaited_once()
     assert "Failed" in result.output
+    db_commands.setup_checkpoints.assert_not_awaited()

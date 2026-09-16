@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterator, Iterator
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import psycopg
 import pytest
@@ -18,6 +18,12 @@ from riva.core.config import DatabaseSettings, Settings
 from riva.db import Database
 from riva.db.base import Base
 from riva.models import CareerProfileExtraction, User
+from riva.models.career_profile import CareerProfile
+from riva.models.practice import (
+    PracticeDifficulty,
+    PracticeQuestionTurn,
+    PracticeQuestionType,
+)
 from riva.models.role import (
     JobDescription,
     JobDescriptionExtraction,
@@ -25,6 +31,7 @@ from riva.models.role import (
     RoleMatching,
     RoleMatchingAnalysis,
 )
+from riva.services.practice import PracticeService
 from riva.services.users import UserService
 from riva.tasks import setup_task_schema
 from tests.support.clock import Clock
@@ -177,6 +184,38 @@ async def extraction_role(extraction_database: Database) -> UUID:
 @pytest.fixture
 def settings(test_database_url: str) -> Settings:
     return make_test_settings(database=DatabaseSettings(url=test_database_url))
+
+
+@pytest.fixture
+async def practice_id(extraction_database: Database, extraction_role: UUID) -> UUID:
+    async with extraction_database.sessionmaker() as session:
+        role = await session.get(Role, extraction_role)
+        role.company = "Original company"
+        user = await session.get(User, role.user_id)
+        session.add(CareerProfile(user_id=user.id, skills=["Python"]))
+        await session.commit()
+        practice = await PracticeService(session).create(
+            user,
+            role=role,
+            question_type=PracticeQuestionType.PROJECT,
+            difficulty=PracticeDifficulty.HARD,
+            max_follow_ups=1,
+        )
+        return practice.id
+
+
+@pytest.fixture
+def practice_question() -> PracticeQuestionTurn:
+    return PracticeQuestionTurn(
+        id=uuid4(),
+        content="Describe your project.",
+        guidance={
+            "hints": ["Explain your contribution"],
+            "framework": ["Context", "Result"],
+        },
+        criteria=[{"dimension": "Ownership", "expectation": "Identify your work"}],
+        reference_answer="Describe the work you personally completed.",
+    )
 
 
 @pytest.fixture

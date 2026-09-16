@@ -75,6 +75,8 @@ async def test_real_worker_acknowledges_atomic_failure_without_overwriting_retry
                 id=context.job.id,
             )
 
+    # Load production tasks before isolating the temporary test registration.
+    app.perform_import_paths()
     monkeypatch.setattr(app, "tasks", app.tasks.copy())
     task = app.task(name=task_name, queue="atomic", pass_context=True, retry=False)(run)
     job_id = await task.defer_async()

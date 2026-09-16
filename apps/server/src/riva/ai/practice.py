@@ -28,7 +28,7 @@ from riva.models.practice import (
     PracticeQuestionType,
     PracticeResult,
     PracticeReview,
-    PracticeTurn,
+    PracticeTurnContent,
 )
 from riva.models.role import RoleContent
 from riva.models.types import NonBlankStr
@@ -43,11 +43,11 @@ class PracticeInput(BaseModel):
 
 
 class PracticeOutput(BaseModel):
-    turns: list[PracticeTurn]
+    turns: list[PracticeTurnContent]
     result: PracticeResult | None = None
 
 
-class PracticeEngine:
+class PracticeAgent:
     def __init__(self, client: LLMClient, checkpointer: BaseCheckpointSaver) -> None:
         self._question_model = self._structured_model(client, _GeneratedQuestion)
         self._next_model = self._structured_model(client, _NextStep)
@@ -287,7 +287,7 @@ class _PracticeState(TypedDict):
     question_type: PracticeQuestionType
     difficulty: PracticeDifficulty
     max_follow_ups: int
-    turns: list[PracticeTurn]
+    turns: list[PracticeTurnContent]
     evaluation: PracticeEvaluation | None
     review: PracticeReview | None
 

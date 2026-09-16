@@ -1,10 +1,11 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from riva.models.career_profile import CareerProfile
+from riva.models.practice import PracticeSession
 from riva.models.role import (
     JobDescription,
     JobDescriptionExtraction,
@@ -134,6 +135,16 @@ class RoleService:
         analysis = await self._lock_matching_analysis(role)
         if await self.tasks.is_active(analysis.job_id):
             await self.tasks.abort(analysis.job_id)
+        # Read the latest display values and exclude concurrent edits/creation
+        # until their snapshots and the role deletion commit together.
+        await self.session.refresh(
+            role, attribute_names=["title", "company"], with_for_update=True
+        )
+        await self.session.execute(
+            update(PracticeSession)
+            .where(PracticeSession.role_id == role.id)
+            .values(role_title_snapshot=role.title, role_company_snapshot=role.company)
+        )
         if user.active_role_id == role.id:
             user.active_role_id = None
         await self.session.delete(role)

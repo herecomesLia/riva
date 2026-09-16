@@ -4,6 +4,7 @@ from riva.models.career_profile import (
     CareerProfileContent,
     CareerProfileExtraction,
 )
+from riva.models.practice import PracticeSession, PracticeTurn
 from riva.models.role import (
     HardSkills,
     JobDescription,
@@ -29,6 +30,8 @@ __all__ = [
     "JobDescriptionContent",
     "JobDescriptionExtraction",
     "JobRequirements",
+    "PracticeSession",
+    "PracticeTurn",
     "RecruitmentTrack",
     "Role",
     "RoleMatching",

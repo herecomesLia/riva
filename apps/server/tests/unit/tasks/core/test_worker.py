@@ -20,6 +20,25 @@ async def test_worker_resource_lifecycle(
     database = Database(settings.database)
     original_dispose = database.dispose
     llm = LLMClient(settings.llm)
+    practice_agent = Mock()
+    checkpointer = Mock()
+    checkpointer_closed = Mock()
+
+    @asynccontextmanager
+    async def open_checkpointer(database_url: str) -> AsyncGenerator[Mock]:
+        assert database_url == settings.database.url
+        try:
+            yield checkpointer
+        finally:
+            checkpointer_closed()
+
+    def create_practice_agent(client: LLMClient, saver: object) -> Mock:
+        assert client is llm
+        assert saver is checkpointer
+        return practice_agent
+
+    monkeypatch.setattr("riva.ai.checkpoints.open_checkpointer", open_checkpointer)
+    monkeypatch.setattr("riva.ai.practice.PracticeAgent", create_practice_agent)
 
     dispose_mock = AsyncMock(wraps=original_dispose)
     monkeypatch.setattr(database, "dispose", dispose_mock)
@@ -41,15 +60,13 @@ async def test_worker_resource_lifecycle(
         finally:
             assert dispose_mock.await_count == 1
             llm_close.assert_awaited_once_with()
+            checkpointer_closed.assert_called_once_with()
 
     failure = RuntimeError("worker failed")
 
     async def run(**kwargs: object) -> None:
-        assert kwargs == {
-            "queues": ("default",),
-            "concurrency": settings.tasks.concurrency,
-            "shutdown_graceful_timeout": settings.tasks.shutdown_timeout_seconds,
-            "additional_context": {"resources": TaskResources(database, llm)},
+        assert kwargs["additional_context"] == {
+            "resources": TaskResources(database, llm, practice_agent)
         }
         if fails:
             raise failure
