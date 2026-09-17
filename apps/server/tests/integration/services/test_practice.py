@@ -112,7 +112,8 @@ async def test_create_claims_active_session_and_captures_context(extraction_data
             difficulty="hard",
             max_follow_ups=1,
         )
-        practice_id = practice.id
+        practice_id = practice.practice_id
+        created_round_id = practice.round_id
     async with db.sessionmaker() as session:
         practice = await session.get(PracticeSession, practice_id)
         assert (await session.get(User, user_id)).active_practice_id == practice_id
@@ -125,12 +126,83 @@ async def test_create_claims_active_session_and_captures_context(extraction_data
             role_context.company,
         )
         assert len(practice.rounds) == 1 and practice.rounds[0].sequence == 0
+        assert practice.rounds[0].id == created_round_id
         round_id, job_id = practice.rounds[0].id, practice.rounds[0].job_id
     assert (await read_job(db, job_id))["args"] == {
         "round_id": str(round_id),
         "action": "start",
         "answer_turn_id": None,
     }
+
+
+@pytest.mark.parametrize("termination", ["end", "delete"])
+async def test_active_practice_follows_session_lifecycle(
+    extraction_database, termination
+):
+    db = extraction_database
+    user_id, role_id = await _seed_context(db)
+    async with db.sessionmaker() as session:
+        user, role = await session.get(User, user_id), await session.get(Role, role_id)
+        service = PracticeService(session)
+        assert user.active_practice is None
+        created = await service.create(
+            user,
+            role=role,
+            question_type="project",
+            difficulty="hard",
+            max_follow_ups=1,
+        )
+        assert user.active_practice.id == created.practice_id
+        round = await service.get_round(user, created.practice_id, created.round_id)
+        if termination == "end":
+            await service.tasks.abort(round.job_id)
+            round.job_id = None
+            round.turns.extend(
+                PracticeTurn(sequence=i, **turn.model_dump())
+                for i, turn in enumerate([make_question(), make_answer()])
+            )
+            round.result = make_result()
+            await session.commit()
+            await service.end_session(
+                user, created.practice_id, round_id=created.round_id
+            )
+        else:
+            await service.delete(user, created.practice_id)
+    async with db.sessionmaker() as session:
+        assert (await session.get(User, user_id)).active_practice is None
+
+
+async def test_get_round_enforces_user_and_practice_ownership(extraction_database):
+    db, question = extraction_database, make_question()
+    user_id, practice_id, round_id = await _seed_practice(db, turns=[question])
+    async with db.sessionmaker() as session:
+        user = await session.get(User, user_id)
+        other = User(username="Other", display_name="Other", password_hash="unused")
+        # A real second Practice distinguishes a wrong parent from a missing parent.
+        practice = await session.get(PracticeSession, practice_id)
+        second = PracticeSession(
+            id=uuid4(),
+            user_id=user_id,
+            role_id=practice.role_id,
+            profile_snapshot=practice.profile_snapshot,
+            role_snapshot=practice.role_snapshot,
+            role_title_snapshot=practice.role_title_snapshot,
+            role_company_snapshot=practice.role_company_snapshot,
+            question_type=practice.question_type,
+            difficulty=practice.difficulty,
+            max_follow_ups=practice.max_follow_ups,
+            rounds=[],
+        )
+        session.add_all([other, second])
+        await session.commit()
+        service = PracticeService(session)
+        round = await service.get_round(user, practice_id, round_id)
+        assert [turn.id for turn in round.turns] == [question.id]
+        for owner, parent in [(other, practice_id), (user, second.id)]:
+            with pytest.raises(NotFoundError, match="Practice round"):
+                await service.get_round(owner, parent, round_id)
+            with pytest.raises(NotFoundError, match="Practice round"):
+                await service.get_round_task_state(owner, parent, round_id=round_id)
 
 
 async def test_concurrent_create_allows_only_one_active_session(extraction_database):
@@ -154,7 +226,7 @@ async def test_concurrent_create_allows_only_one_active_session(extraction_datab
                         difficulty="hard",
                         max_follow_ups=1,
                     )
-                ).id
+                ).practice_id
             except ConflictError:
                 return None
 
@@ -202,14 +274,16 @@ async def test_concurrent_identical_answers_persist_and_enqueue_once(
         async with db.sessionmaker() as session:
             user = await session.get(User, user_id)
             await barrier.wait()
-            practice = await PracticeService(session).answer(
+            await PracticeService(session).answer(
                 user,
                 practice_id,
                 round_id=round_id,
                 question_id=question.id,
                 content="Same answer",
             )
-            round = practice.rounds[-1]
+            round = await PracticeService(session).get_round(
+                user, practice_id, round_id
+            )
             return round.job_id, [turn.id for turn in round.turns]
 
     first, repeated = await asyncio.gather(answer(), answer())
@@ -268,10 +342,13 @@ async def test_skip_round_replaces_unanswered_round(extraction_database):
     )
     async with db.sessionmaker() as session:
         user = await session.get(User, user_id)
-        await PracticeService(session).skip_round(user, practice_id, round_id=round_id)
+        replacement_id = await PracticeService(session).skip_round(
+            user, practice_id, round_id=round_id
+        )
     async with db.sessionmaker() as session:
         practice = await session.get(PracticeSession, practice_id)
         replacement = practice.rounds[-1]
+        assert replacement.id == replacement_id
         assert (
             len(practice.rounds) == 1
             and replacement.id != round_id
@@ -289,7 +366,7 @@ async def test_skip_round_replaces_unanswered_round(extraction_database):
     assert (await read_job(db, job_id))["args"]["action"] == "start"
 
 
-async def test_end_round_removes_pending_followup_and_dispatches_finish(
+async def test_finish_round_removes_pending_followup_and_dispatches_finish(
     extraction_database,
 ):
     db = extraction_database
@@ -298,7 +375,7 @@ async def test_end_round_removes_pending_followup_and_dispatches_finish(
         db, turns=[question, answer, followup]
     )
     async with db.sessionmaker() as session:
-        await PracticeService(session).end_round(
+        await PracticeService(session).finish_round(
             await session.get(User, user_id), practice_id, round_id=round_id
         )
     async with db.sessionmaker() as session:
@@ -313,7 +390,7 @@ async def test_end_round_removes_pending_followup_and_dispatches_finish(
     }
 
 
-async def test_retry_round_replaces_round_and_preserves_main_question(
+async def test_restart_round_replaces_round_and_preserves_main_question(
     extraction_database,
 ):
     db = extraction_database
@@ -323,12 +400,13 @@ async def test_retry_round_replaces_round_and_preserves_main_question(
         db, turns=turns, result=make_result(), sequence=2
     )
     async with db.sessionmaker() as session:
-        await PracticeService(session).retry_round(
+        replacement_id = await PracticeService(session).restart_round(
             await session.get(User, user_id), practice_id, round_id=round_id
         )
     async with db.sessionmaker() as session:
         practice = await session.get(PracticeSession, practice_id)
         replacement = practice.rounds[-1]
+        assert replacement.id == replacement_id
         assert (
             len(practice.rounds) == 1
             and replacement.id != round_id
@@ -362,14 +440,14 @@ async def test_concurrent_next_round_creates_one_successor(extraction_database):
             user = await session.get(User, user_id)
             await barrier.wait()
             try:
-                await PracticeService(session).next_round(
+                return await PracticeService(session).next_round(
                     user, practice_id, round_id=round_id
                 )
-                return True
             except ConflictError:
-                return False
+                return None
 
-    assert sorted(await asyncio.gather(next_round(), next_round())) == [False, True]
+    ids = await asyncio.gather(next_round(), next_round())
+    assert ids.count(None) == 1
     async with db.sessionmaker() as session:
         practice = await session.get(PracticeSession, practice_id)
         assert [round.sequence for round in practice.rounds] == [0, 1]
@@ -377,6 +455,7 @@ async def test_concurrent_next_round_creates_one_successor(extraction_database):
             turn.id for turn in turns
         ]
         assert practice.rounds[0].result == make_result()
+        assert practice.rounds[1].id == next(id for id in ids if id is not None)
         assert practice.rounds[1].job_id is not None
 
 
@@ -402,7 +481,10 @@ async def test_end_session_releases_active_practice(extraction_database):
             difficulty="hard",
             max_follow_ups=1,
         )
-        assert new.id != practice_id and user.active_practice_id == new.id
+        assert (
+            new.practice_id != practice_id
+            and user.active_practice_id == new.practice_id
+        )
 
 
 async def test_end_session_rejects_stale_round(extraction_database):
@@ -470,7 +552,7 @@ async def test_delete_aborts_active_work_and_releases_active_session(
     assert (await read_job(db, job_id))["status"] == "cancelled"
 
 
-@pytest.mark.parametrize("operation", ["create", "retry_round"])
+@pytest.mark.parametrize("operation", ["create", "restart_round"])
 async def test_dispatch_failure_rolls_back_business_mutation(
     extraction_database, monkeypatch, operation
 ):
@@ -507,7 +589,7 @@ async def test_dispatch_failure_rolls_back_business_mutation(
                     max_follow_ups=1,
                 )
             else:
-                await service.retry_round(user, practice_id, round_id=round_id)
+                await service.restart_round(user, practice_id, round_id=round_id)
         await session.rollback()
     async with db.sessionmaker() as session:
         assert (

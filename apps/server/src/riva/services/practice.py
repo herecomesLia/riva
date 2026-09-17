@@ -1,8 +1,10 @@
+from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import raiseload, selectinload
 
 from riva.ai.checkpoints import delete_checkpoints
 from riva.ai.practice import PracticeRoundInput
@@ -24,6 +26,12 @@ from riva.tasks.registry import PracticeRunAction
 from riva.utils import utc_now
 
 
+@dataclass(frozen=True, slots=True)
+class PracticeCreated:
+    practice_id: UUID
+    round_id: UUID
+
+
 class PracticeService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -34,19 +42,38 @@ class PracticeService:
             await self.session.scalars(
                 select(PracticeSession)
                 .where(PracticeSession.user_id == user.id)
+                .options(
+                    selectinload(PracticeSession.rounds).raiseload(PracticeRound.turns)
+                )
                 .order_by(PracticeSession.created_at.desc(), PracticeSession.id.desc())
             )
         )
 
     async def get(self, user: User, practice_id: UUID) -> PracticeSession:
         practice = await self.session.scalar(
-            select(PracticeSession).where(
+            select(PracticeSession)
+            .where(
                 PracticeSession.id == practice_id, PracticeSession.user_id == user.id
+            )
+            .options(
+                selectinload(PracticeSession.rounds).selectinload(PracticeRound.turns)
             )
         )
         if practice is None:
             raise NotFoundError("Practice session was not found.")
         return practice
+
+    async def get_round(
+        self, user: User, practice_id: UUID, round_id: UUID
+    ) -> PracticeRound:
+        round = await self.session.scalar(
+            _round_query(user, practice_id, round_id).options(
+                selectinload(PracticeRound.turns)
+            )
+        )
+        if round is None:
+            raise NotFoundError("Practice round was not found.")
+        return round
 
     async def create(
         self,
@@ -56,7 +83,7 @@ class PracticeService:
         question_type: PracticeQuestionType,
         difficulty: PracticeDifficulty,
         max_follow_ups: int,
-    ) -> PracticeSession:
+    ) -> PracticeCreated:
         user = await self._lock_user(user)
         if user.active_practice_id is not None:
             raise ConflictError("An active practice session already exists.")
@@ -102,10 +129,10 @@ class PracticeService:
             rounds=[],
         )
         self.session.add(practice)
-        await self._new_round(practice, sequence=0)
-        user.active_practice_id = practice.id
+        round = await self._new_round(practice, sequence=0)
+        user.active_practice = practice
         await self.session.commit()
-        return practice
+        return PracticeCreated(practice_id=practice.id, round_id=round.id)
 
     async def answer(
         self,
@@ -115,7 +142,7 @@ class PracticeService:
         round_id: UUID,
         question_id: UUID,
         content: str,
-    ) -> PracticeSession:
+    ) -> None:
         practice = await self._lock(user, practice_id)
         round = self._current(practice, round_id)
         try:
@@ -128,7 +155,7 @@ class PracticeService:
                     existing = round.turns[index + 1]
                     if existing.role == "user" and existing.content == answer.content:
                         await self.session.commit()
-                        return practice
+                        return
                     raise ConflictError("This question already has a different answer.")
                 break
         else:
@@ -143,11 +170,10 @@ class PracticeService:
         )
         await self._enqueue(practice, round, PracticeRunAction.ANSWER, answer.id)
         await self.session.commit()
-        return practice
 
     async def skip_round(
         self, user: User, practice_id: UUID, *, round_id: UUID
-    ) -> PracticeSession:
+    ) -> UUID:
         practice = await self._lock(user, practice_id)
         round = self._current(practice, round_id)
         self._require_ready(round)
@@ -156,14 +182,14 @@ class PracticeService:
         sequence = round.sequence
         practice.rounds.remove(round)
         await self.session.flush()
-        await self._new_round(practice, sequence=sequence)
+        new_round = await self._new_round(practice, sequence=sequence)
         await self.session.commit()
         await self._delete_checkpoints([round_id])
-        return practice
+        return new_round.id
 
-    async def end_round(
+    async def finish_round(
         self, user: User, practice_id: UUID, *, round_id: UUID
-    ) -> PracticeSession:
+    ) -> None:
         practice = await self._lock(user, practice_id)
         round = self._current(practice, round_id)
         self._require_ready(round)
@@ -176,15 +202,14 @@ class PracticeService:
         round.turns.pop()
         await self._enqueue(practice, round, PracticeRunAction.FINISH)
         await self.session.commit()
-        return practice
 
-    async def retry_round(
+    async def restart_round(
         self,
         user: User,
         practice_id: UUID,
         *,
         round_id: UUID,
-    ) -> PracticeSession:
+    ) -> UUID:
         practice = await self._lock(user, practice_id)
         round = self._current(practice, round_id)
         self._require_ready(round)
@@ -202,11 +227,11 @@ class PracticeService:
         await self._enqueue(practice, replacement, PracticeRunAction.RESTART)
         await self.session.commit()
         await self._delete_checkpoints([round_id])
-        return practice
+        return replacement.id
 
     async def next_round(
         self, user: User, practice_id: UUID, *, round_id: UUID
-    ) -> PracticeSession:
+    ) -> UUID:
         practice = await self._lock(user, practice_id)
         round = self._current(practice, round_id)
         self._require_ready(round)
@@ -214,13 +239,13 @@ class PracticeService:
             raise ConflictError(
                 "Round must be completed before starting the next round."
             )
-        await self._new_round(practice, sequence=round.sequence + 1)
+        new_round = await self._new_round(practice, sequence=round.sequence + 1)
         await self.session.commit()
-        return practice
+        return new_round.id
 
     async def end_session(
         self, user: User, practice_id: UUID, *, round_id: UUID
-    ) -> PracticeSession:
+    ) -> None:
         practice = await self._lock(user, practice_id)
         round = self._current(practice, round_id)
         self._require_ready(round)
@@ -228,15 +253,17 @@ class PracticeService:
             raise ConflictError("Complete the current round before ending the session.")
         practice.ended_at = utc_now()
         user = await self.session.get(User, practice.user_id)
-        user.active_practice_id = None
+        user.active_practice = None
         await self.session.commit()
-        return practice
 
     async def get_round_task_state(
         self, user: User, practice_id: UUID, *, round_id: UUID
     ) -> TaskState:
-        practice = await self.get(user, practice_id)
-        round = next((item for item in practice.rounds if item.id == round_id), None)
+        round = await self.session.scalar(
+            _round_query(user, practice_id, round_id).options(
+                raiseload(PracticeRound.turns)
+            )
+        )
         if round is None:
             raise NotFoundError("Practice round was not found.")
         status = await self.tasks.get_status(round.job_id)
@@ -264,17 +291,20 @@ class PracticeService:
             if await self.tasks.is_active(round.job_id):
                 await self.tasks.abort(round.job_id)
         if user.active_practice_id == practice.id:
-            user.active_practice_id = None
+            user.active_practice = None
         await self.session.delete(practice)
         await self.session.commit()
         await self._delete_checkpoints(round_ids)
 
-    async def _new_round(self, practice: PracticeSession, *, sequence: int) -> None:
+    async def _new_round(
+        self, practice: PracticeSession, *, sequence: int
+    ) -> PracticeRound:
         round = PracticeRound(
             id=uuid4(), practice_id=practice.id, sequence=sequence, turns=[]
         )
         practice.rounds.append(round)
         await self._enqueue(practice, round, PracticeRunAction.START)
+        return round
 
     async def _enqueue(
         self,
@@ -343,3 +373,17 @@ class PracticeService:
     async def _delete_checkpoints(self, round_ids: list[UUID]) -> None:
         url = self.session.get_bind().engine.url.render_as_string(hide_password=False)
         await delete_checkpoints(url, round_ids)
+
+
+def _round_query(
+    user: User, practice_id: UUID, round_id: UUID
+) -> Select[tuple[PracticeRound]]:
+    return (
+        select(PracticeRound)
+        .join(PracticeSession)
+        .where(
+            PracticeRound.id == round_id,
+            PracticeRound.practice_id == practice_id,
+            PracticeSession.user_id == user.id,
+        )
+    )

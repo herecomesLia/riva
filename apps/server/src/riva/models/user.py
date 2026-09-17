@@ -13,6 +13,7 @@ from riva.utils import utc_now
 if TYPE_CHECKING:
     from riva.models.auth import AuthSession
     from riva.models.career_profile import CareerProfile, CareerProfileExtraction
+    from riva.models.practice import PracticeSession
     from riva.models.role import Role
 
 
@@ -112,6 +113,20 @@ class User(Base):
     active_role: Mapped[Role | None] = relationship(
         "Role",
         foreign_keys=[active_role_id],
+        lazy="selectin",
+        post_update=True,
+    )
+
+    practices: Mapped[list[PracticeSession]] = relationship(
+        "PracticeSession",
+        cascade="all, delete-orphan",
+        foreign_keys="PracticeSession.user_id",
+        lazy="raise",
+    )
+
+    active_practice: Mapped[PracticeSession | None] = relationship(
+        "PracticeSession",
+        foreign_keys=[active_practice_id],
         lazy="selectin",
         post_update=True,
     )

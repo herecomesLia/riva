@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from riva.core.config import Settings
 from riva.models import AuthSession
 from riva.models.career_profile import CareerProfileExtraction
+from riva.models.practice import PracticeRound, PracticeSession
 from riva.models.user import User, normalize_username
 from riva.services.errors import (
     InvalidCredentialsError,
@@ -159,7 +160,12 @@ class UserService:
         token_digest = _digest_session_token(token, self.settings.session.digest_key)
         result = await self.session.execute(
             select(AuthSession)
-            .options(selectinload(AuthSession.user))
+            .options(
+                selectinload(AuthSession.user)
+                .selectinload(User.active_practice)
+                .selectinload(PracticeSession.rounds)
+                .raiseload(PracticeRound.turns)
+            )
             .where(AuthSession.token_digest == token_digest)
         )
         return result.scalar_one_or_none()
