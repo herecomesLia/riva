@@ -13,6 +13,7 @@ from riva.llm import LLMClient
 from riva.models import User
 from riva.services.career_profiles import CareerProfileService
 from riva.services.job_descriptions import JobDescriptionService
+from riva.services.practice import PracticeService
 from riva.services.roles import RoleService
 from riva.services.users import UserService
 
@@ -109,3 +110,10 @@ JobDescriptionServiceDep = Annotated[
     JobDescriptionService,
     Depends(get_job_description_service),
 ]
+
+
+async def get_practice_service(session: DbSessionDep) -> PracticeService:
+    return PracticeService(session)
+
+
+PracticeServiceDep = Annotated[PracticeService, Depends(get_practice_service)]

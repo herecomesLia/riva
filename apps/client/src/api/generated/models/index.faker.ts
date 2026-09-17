@@ -10,6 +10,8 @@ import type {
   CareerProfileResponse,
   CareerProfileTextExtractionRequest,
   CreateCareerProfileRequest,
+  CreatePracticeRequest,
+  CreatePracticeResponse,
   CreateRoleRequest,
   EducationEntryRequest,
   EducationEntryResponse,
@@ -27,6 +29,22 @@ import type {
   JobRequirementsRequest,
   JobRequirementsResponse,
   LoginCredentials,
+  PracticeAnswerTurnResponse,
+  PracticeCriterion,
+  PracticeDifficulty,
+  PracticeDimensionScore,
+  PracticeDimensionScoresResponse,
+  PracticeGuidance,
+  PracticeListResponse,
+  PracticeQuestionTurnResponse,
+  PracticeQuestionType,
+  PracticeResponse,
+  PracticeResultResponse,
+  PracticeRoleResponse,
+  PracticeRoundResponse,
+  PracticeRoundStartedResponse,
+  PracticeSummaryResponse,
+  PracticeTurnResponse,
   ProjectEntryRequest,
   ProjectEntryResponse,
   RecruitmentTrack,
@@ -37,6 +55,7 @@ import type {
   RoleResponse,
   ServiceHealthStatus,
   SetActiveRoleRequest,
+  SubmitPracticeAnswerRequest,
   TaskErrorBody,
   TaskErrorCode,
   TaskFailureResponse,
@@ -273,6 +292,36 @@ export const getCreateCareerProfileRequestMock = (
     ),
     undefined,
   ]),
+  ...overrideResponse,
+})
+
+export const getPracticeQuestionTypeMock = (): PracticeQuestionType =>
+  faker.helpers.arrayElement([
+    "project",
+    "behavioral",
+    "business_understanding",
+    "motivation",
+    "technical_basics",
+  ] as const)
+
+export const getPracticeDifficultyMock = (): PracticeDifficulty =>
+  faker.helpers.arrayElement(["basic", "hard"] as const)
+
+export const getCreatePracticeRequestMock = (
+  overrideResponse: Partial<CreatePracticeRequest> = {},
+): CreatePracticeRequest => ({
+  roleId: faker.string.uuid(),
+  questionType: getPracticeQuestionTypeMock(),
+  difficulty: getPracticeDifficultyMock(),
+  maxFollowUps: faker.number.int({ min: 0 }),
+  ...overrideResponse,
+})
+
+export const getCreatePracticeResponseMock = (
+  overrideResponse: Partial<CreatePracticeResponse> = {},
+): CreatePracticeResponse => ({
+  id: faker.string.uuid(),
+  roundId: faker.string.uuid(),
   ...overrideResponse,
 })
 
@@ -544,6 +593,161 @@ export const getLoginCredentialsMock = (
   ...overrideResponse,
 })
 
+export const getPracticeAnswerTurnResponseMock = (
+  overrideResponse: Partial<PracticeAnswerTurnResponse> = {},
+): PracticeAnswerTurnResponse => ({
+  id: faker.string.uuid(),
+  role: faker.helpers.arrayElement(["user"] as const),
+  content: faker.string.alpha({ length: { min: 1, max: 20 } }),
+  ...overrideResponse,
+})
+
+export const getPracticeCriterionMock = (
+  overrideResponse: Partial<PracticeCriterion> = {},
+): PracticeCriterion => ({
+  dimension: faker.string.alpha({ length: { min: 1, max: 20 } }),
+  expectation: faker.string.alpha({ length: { min: 1, max: 20 } }),
+  ...overrideResponse,
+})
+
+export const getPracticeDimensionScoreMock = (
+  overrideResponse: Partial<PracticeDimensionScore> = {},
+): PracticeDimensionScore => ({
+  score: faker.number.int({ min: 0, max: 100 }),
+  explanation: faker.string.alpha({ length: { min: 1, max: 20 } }),
+  ...overrideResponse,
+})
+
+export const getPracticeDimensionScoresResponseMock = (
+  overrideResponse: Partial<PracticeDimensionScoresResponse> = {},
+): PracticeDimensionScoresResponse => ({
+  relevance: { ...getPracticeDimensionScoreMock() },
+  structure: { ...getPracticeDimensionScoreMock() },
+  specificity: { ...getPracticeDimensionScoreMock() },
+  contribution: { ...getPracticeDimensionScoreMock() },
+  evidence: { ...getPracticeDimensionScoreMock() },
+  roleAlignment: { ...getPracticeDimensionScoreMock() },
+  communication: { ...getPracticeDimensionScoreMock() },
+  riskAwareness: { ...getPracticeDimensionScoreMock() },
+  ...overrideResponse,
+})
+
+export const getPracticeGuidanceMock = (
+  overrideResponse: Partial<PracticeGuidance> = {},
+): PracticeGuidance => ({
+  hints: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
+    faker.string.alpha({ length: { min: 1, max: 20 } }),
+  ),
+  framework: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+    () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+  ),
+  ...overrideResponse,
+})
+
+export const getPracticeRoleResponseMock = (
+  overrideResponse: Partial<PracticeRoleResponse> = {},
+): PracticeRoleResponse => ({
+  id: faker.helpers.arrayElement([faker.string.uuid(), null]),
+  title: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  company: faker.helpers.arrayElement([faker.string.alpha({ length: { min: 10, max: 20 } }), null]),
+  ...overrideResponse,
+})
+
+export const getPracticeSummaryResponseMock = (
+  overrideResponse: Partial<PracticeSummaryResponse> = {},
+): PracticeSummaryResponse => ({
+  id: faker.string.uuid(),
+  role: { ...getPracticeRoleResponseMock() },
+  questionType: getPracticeQuestionTypeMock(),
+  difficulty: getPracticeDifficultyMock(),
+  roundCount: faker.number.int(),
+  completedRoundCount: faker.number.int(),
+  averageScore: faker.helpers.arrayElement([faker.number.float({ fractionDigits: 2 }), null]),
+  endedAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + "Z", null]),
+  createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
+  ...overrideResponse,
+})
+
+export const getPracticeListResponseMock = (
+  overrideResponse: Partial<PracticeListResponse> = {},
+): PracticeListResponse => ({
+  practices: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+    () => ({ ...getPracticeSummaryResponseMock() }),
+  ),
+  activePracticeId: faker.helpers.arrayElement([faker.string.uuid(), null]),
+  ...overrideResponse,
+})
+
+export const getPracticeQuestionTurnResponseMock = (
+  overrideResponse: Partial<PracticeQuestionTurnResponse> = {},
+): PracticeQuestionTurnResponse => ({
+  content: faker.string.alpha({ length: { min: 1, max: 20 } }),
+  guidance: { ...getPracticeGuidanceMock() },
+  criteria: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+    () => ({ ...getPracticeCriterionMock() }),
+  ),
+  referenceAnswer: faker.string.alpha({ length: { min: 1, max: 20 } }),
+  id: faker.string.uuid(),
+  role: faker.helpers.arrayElement(["assistant"] as const),
+  ...overrideResponse,
+})
+
+export const getPracticeTurnResponseMock = (): PracticeTurnResponse =>
+  faker.helpers.arrayElement([
+    { ...getPracticeQuestionTurnResponseMock() },
+    { ...getPracticeAnswerTurnResponseMock() },
+  ])
+
+export const getPracticeResultResponseMock = (
+  overrideResponse: Partial<PracticeResultResponse> = {},
+): PracticeResultResponse => ({
+  score: faker.number.float({ min: 0, max: 100, fractionDigits: 2 }),
+  dimensionScores: { ...getPracticeDimensionScoresResponseMock() },
+  summary: faker.string.alpha({ length: { min: 1, max: 20 } }),
+  strengths: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+    () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+  ),
+  issues: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() =>
+    faker.string.alpha({ length: { min: 1, max: 20 } }),
+  ),
+  suggestions: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+    () => faker.string.alpha({ length: { min: 1, max: 20 } }),
+  ),
+  ...overrideResponse,
+})
+
+export const getPracticeRoundResponseMock = (
+  overrideResponse: Partial<PracticeRoundResponse> = {},
+): PracticeRoundResponse => ({
+  id: faker.string.uuid(),
+  sequence: faker.number.int(),
+  turns: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(() => ({
+    ...getPracticeTurnResponseMock(),
+  })),
+  result: faker.helpers.arrayElement([{ ...getPracticeResultResponseMock() }, null]),
+  ...overrideResponse,
+})
+
+export const getPracticeResponseMock = (
+  overrideResponse: Partial<PracticeResponse> = {},
+): PracticeResponse => ({
+  id: faker.string.uuid(),
+  role: { ...getPracticeRoleResponseMock() },
+  questionType: getPracticeQuestionTypeMock(),
+  difficulty: getPracticeDifficultyMock(),
+  maxFollowUps: faker.number.int(),
+  rounds: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
+    () => ({ ...getPracticeRoundResponseMock() }),
+  ),
+  endedAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + "Z", null]),
+  createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
+  ...overrideResponse,
+})
+
+export const getPracticeRoundStartedResponseMock = (
+  overrideResponse: Partial<PracticeRoundStartedResponse> = {},
+): PracticeRoundStartedResponse => ({ roundId: faker.string.uuid(), ...overrideResponse })
+
 export const getRegisterCredentialsMock = (
   overrideResponse: Partial<RegisterCredentials> = {},
 ): RegisterCredentials => ({
@@ -619,6 +823,14 @@ export const getRoleListResponseMock = (
 export const getSetActiveRoleRequestMock = (
   overrideResponse: Partial<SetActiveRoleRequest> = {},
 ): SetActiveRoleRequest => ({ roleId: faker.string.uuid(), ...overrideResponse })
+
+export const getSubmitPracticeAnswerRequestMock = (
+  overrideResponse: Partial<SubmitPracticeAnswerRequest> = {},
+): SubmitPracticeAnswerRequest => ({
+  questionId: faker.string.uuid(),
+  content: faker.string.alpha({ length: { min: 1, max: 20 } }),
+  ...overrideResponse,
+})
 
 export const getTaskErrorCodeMock = (): TaskErrorCode =>
   faker.helpers.arrayElement([

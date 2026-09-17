@@ -1,5 +1,6 @@
 export * from "./auth/auth"
 export * from "./career-profile/career-profile"
 export * from "./health/health"
+export * from "./practices/practices"
 export * from "./roles/roles"
 export * from "./users/users"
