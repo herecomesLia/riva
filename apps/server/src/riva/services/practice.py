@@ -291,7 +291,6 @@ class PracticeService:
             answer_turn_id=str(answer_turn_id) if answer_turn_id is not None else None,
         )
         round.error_code = None
-        practice.updated_at = utc_now()
 
     async def _lock_user(self, user: User) -> User:
         locked = await self.session.scalar(

@@ -16,7 +16,6 @@ from riva.models.practice import (
 from riva.tasks import Task, TaskAttempt, TaskErrorCode, app, get_task_resources
 from riva.tasks.errors import TaskError
 from riva.tasks.registry import PracticeRunAction
-from riva.utils import utc_now
 
 _TURN_ADAPTER = TypeAdapter(PracticeTurnContent)
 
@@ -119,7 +118,6 @@ async def run_practice_round(
             round.result = output.result
             round.job_id = None
             round.error_code = None
-            practice.updated_at = utc_now()
             await attempt.finish(session)
             await session.commit()
     except Exception as exc:
