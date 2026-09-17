@@ -18,10 +18,9 @@ from riva.llm.errors import LLMOutputError
 from riva.models.career_profile import CareerProfileContent
 from riva.models.practice import (
     PracticeAnswerTurn,
-    PracticeCriterion,
     PracticeDifficulty,
     PracticeDimensionScores,
-    PracticeGuidance,
+    PracticeQuestionContent,
     PracticeQuestionTurn,
     PracticeQuestionType,
     PracticeResult,
@@ -348,19 +347,8 @@ class _PracticeRoundState(TypedDict):
     result: PracticeResult | None
 
 
-class _GeneratedQuestion(BaseModel):
-    content: NonBlankStr = Field(
-        description="One focused interview question; do not disclose hints, frameworks, assessment criteria or the reference answer."
-    )
-    guidance: PracticeGuidance = Field(
-        description="Coaching hints and an answer framework, separate from the question content."
-    )
-    criteria: list[PracticeCriterion] = Field(
-        description="Question-specific assessment criteria used for evaluation and review."
-    )
-    reference_answer: NonBlankStr = Field(
-        description="Illustrative answer, not the only correct solution; use conditional wording for facts absent from the profile."
-    )
+class _GeneratedQuestion(PracticeQuestionContent):
+    pass
 
 
 class _NextStep(BaseModel):

@@ -58,13 +58,24 @@ class PracticeCriterion(BaseModel):
     )
 
 
-class PracticeQuestionTurn(BaseModel):
+class PracticeQuestionContent(BaseModel):
+    content: NonBlankStr = Field(
+        description="One focused interview question; do not disclose hints, frameworks, assessment criteria or the reference answer."
+    )
+    guidance: PracticeGuidance = Field(
+        description="Coaching hints and an answer framework, separate from the question content."
+    )
+    criteria: list[PracticeCriterion] = Field(
+        description="Question-specific assessment criteria used for evaluation and review."
+    )
+    reference_answer: NonBlankStr = Field(
+        description="Illustrative answer, not the only correct solution; use conditional wording for facts absent from the profile."
+    )
+
+
+class PracticeQuestionTurn(PracticeQuestionContent):
     id: UUID
     role: Literal["assistant"] = "assistant"
-    content: NonBlankStr
-    guidance: PracticeGuidance
-    criteria: list[PracticeCriterion]
-    reference_answer: NonBlankStr
 
 
 class PracticeAnswerTurn(BaseModel):
