@@ -3,7 +3,7 @@ import { practiceFixture } from "@/mocks/fixtures/practice"
 import { expect, fn, screen, waitFor, within } from "storybook/test"
 
 import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
-import type { ReviewSession, PracticeReferenceAnswer } from "@/models/practice-workflow"
+import type { ReviewSession } from "@/models/practice-workflow"
 
 export type PracticeReviewStoryVariant =
   | "balanced"
@@ -105,9 +105,6 @@ export function createPracticeReviewStoryFixture(
 export function createPracticeViewArgs(scenario: Parameters<typeof createPracticeScenario>[0]) {
   return {
     answeringActions: {
-      onRequestFramework: fn(async () => "executed" as const),
-      onRequestHint: fn(async () => "executed" as const),
-      onRequestReferenceAnswer: fn(async () => "executed" as const),
       onSetSaved: fn(async () => "executed" as const),
       onSetWeak: fn(async () => "executed" as const),
       onSkip: fn(async () => "executed" as const),
@@ -118,9 +115,6 @@ export function createPracticeViewArgs(scenario: Parameters<typeof createPractic
     },
     completedPending: false,
     answeringPending: {
-      framework: false,
-      hint: false,
-      referenceAnswer: false,
       interactionLocked: false,
       saved: false,
       skip: false,
@@ -129,17 +123,11 @@ export function createPracticeViewArgs(scenario: Parameters<typeof createPractic
     },
     followUpActions: {
       onEndFollowUps: fn(async () => "executed" as const),
-      onRequestFramework: fn(async () => "executed" as const),
-      onRequestHint: fn(async () => "executed" as const),
-      onRequestReferenceAnswer: fn(async () => "executed" as const),
       onSubmitFollowUp: fn(async () => "executed" as const),
     },
     followUpPending: {
       end: false,
-      framework: false,
-      hint: false,
       interactionLocked: false,
-      referenceAnswer: false,
       submit: false,
     },
     reviewActions: {
@@ -187,55 +175,35 @@ export async function getVisiblePracticeEndDialog() {
 
 const referenceExamples = {
   personalized: {
-    kind: "personalizedExample",
     answer:
       "我会选用推荐材料中的“全球电商结算页性能优化项目”来回答。项目目标是改善结算页在中低端设备上的交互体验，我负责定位前端瓶颈并推动方案落地。我先按设备与网络条件拆分性能数据，结合性能监控和调用链确认主要耗时来自首屏包体与非关键请求竞争。评估整包重构和渐进优化后，我选择先拆分非关键模块、调整请求优先级，并与产品和服务端共同确定灰度范围。上线时按设备分层观察 P75 可交互时间、退出率和异常率，用灰度组与对照组验证变化；结果以项目已有监控数据为准。复盘时我会补充说明方案的适用边界、回滚信号，以及后续如何把一次优化沉淀成持续监控机制。",
   },
   react: {
-    kind: "technicalReference",
     answer:
       "React 重复渲染首先要区分“组件函数再次执行”和“浏览器产生多余绘制”。常见原因包括父组件更新向下传播、Context value 或对象/函数引用不稳定、订阅粒度过粗，以及 effect 更新状态形成额外渲染；开发环境下 Strict Mode 的重复调用也不能直接当作生产问题。排查时先用 React DevTools Profiler 记录交互，确认触发源、提交次数和耗时，再检查 props 引用、Context 更新与 effect 依赖。优化应从缩小状态与订阅范围开始，只有在渲染成本确实较高且输入可稳定时再使用 memo、useMemo 或 useCallback，因为缓存本身有复杂度和比较成本。边界上要避免为消除所有函数执行而牺牲正确性，也要分别验证开发与生产构建。最终用相同场景下的 Profiler commit、交互耗时和浏览器性能数据对比，并通过功能测试确认没有引入陈旧闭包或状态不同步。",
   },
   requestLayer: {
-    kind: "technicalReference",
     answer:
       "长期演进的数据请求层应先建立端到端类型安全：以服务契约或 schema 生成请求参数、响应和错误类型，在运行时对不可信响应做校验，避免只靠 TypeScript 断言。缓存 key 必须由资源身份和所有影响结果的参数稳定组成；失效策略按数据新鲜度选择主动失效、基于时间的过期或服务端事件同步，并明确 mutation 后如何更新或失效相关查询。并发方面要处理请求去重、取消、乱序响应和乐观更新回滚，用请求版本或库提供的 mutation 上下文防止旧响应覆盖新状态。错误应区分网络、认证、限流、业务校验和未知服务错误，由请求层标准化，再由页面错误边界决定局部提示或整体恢复。重试只用于幂等且可能瞬时恢复的错误，采用有限次数与退避，不能重试业务错误或无幂等保障的写操作。状态一致性上明确服务端状态与本地草稿的所有权，避免多份缓存成为事实来源。接口通过传入 transport、时钟等依赖保持可测试，并用契约测试、竞态测试和缓存失效测试验证。方案取舍上，通用封装应覆盖稳定的横切能力，业务策略留在领域层，避免把请求层做成无法演进的万能抽象。",
   },
-} satisfies Record<string, PracticeReferenceAnswer>
+} satisfies Record<string, { answer: string }>
 
 export function withReferenceAnswer(
   scenario: "answeringQuestion" | "reviewBalanced",
   questionType: PracticeQuestionType,
   ordinal: 1 | 2,
-  viewedBeforeSubmission: boolean,
-  origin: "initial" | "retry" | "nextQuestion" = "initial",
 ) {
   const args = createPracticeViewArgs(scenario)
   const response = structuredClone(args.content.data)
   if (!("question" in response.session)) throw new Error("Question fixture required.")
   response.session.selection.questionType = questionType
   response.session.question = structuredClone(practiceFixture.question)
-  if (response.session.status === "review") {
-    response.session.question.hints = {
-      status: "revealed",
-      content: structuredClone(practiceFixture.questionHelp.hints),
-    }
-    response.session.question.framework = {
-      status: "revealed",
-      content: structuredClone(practiceFixture.questionHelp.framework),
-    }
-  }
-  response.session.question.referenceAnswer = {
-    status: "revealed",
-    content: structuredClone(
-      questionType === "technical_basics"
-        ? ordinal === 1
-          ? referenceExamples.react
-          : referenceExamples.requestLayer
-        : referenceExamples.personalized,
-    ),
-    viewedBeforeSubmission,
-  }
-  if (response.session.status === "answering") response.session.assistedRetry = origin === "retry"
+  response.session.question.referenceAnswer = (
+    questionType === "technical_basics"
+      ? ordinal === 1
+        ? referenceExamples.react
+        : referenceExamples.requestLayer
+      : referenceExamples.personalized
+  ).answer
   return { ...args, content: { data: response, status: "ready" as const } }
 }

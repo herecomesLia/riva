@@ -1,5 +1,5 @@
 import { practiceFixture } from "@/mocks/fixtures/practice"
-import type { ActiveSelection, PracticeFollowUp, PracticeSession } from "@/models/practice-workflow"
+import type { ActiveSelection, PracticeSession } from "@/models/practice-workflow"
 
 export function createPracticeFaker() {
   let session: PracticeSession = {
@@ -20,49 +20,6 @@ export function createPracticeFaker() {
       return update({
         status: "generatingQuestion",
         selection,
-      })
-    },
-
-    async hint() {
-      if (session.status !== "answering") return structuredClone(session)
-
-      const help = practiceFixture.questionHelp
-      return update({
-        ...session,
-        question: {
-          ...session.question,
-          hints: { status: "revealed", content: help.hints },
-        },
-      })
-    },
-
-    async framework() {
-      if (session.status !== "answering") return structuredClone(session)
-
-      const help = practiceFixture.questionHelp
-      return update({
-        ...session,
-        question: {
-          ...session.question,
-          framework: { status: "revealed", content: help.framework },
-        },
-      })
-    },
-
-    async reference() {
-      if (session.status !== "answering") return structuredClone(session)
-
-      const help = practiceFixture.questionHelp
-      return update({
-        ...session,
-        question: {
-          ...session.question,
-          referenceAnswer: {
-            status: "revealed",
-            content: help.reference,
-            viewedBeforeSubmission: true,
-          },
-        },
       })
     },
 
@@ -91,49 +48,6 @@ export function createPracticeFaker() {
         mainAnswer,
         followUps: [],
         followUpCompletion: { status: "completed" },
-      })
-    },
-
-    async followHint() {
-      if (session.status !== "answeringFollowUp") return structuredClone(session)
-
-      const help = practiceFixture.followUp
-      return update({
-        ...session,
-        currentFollowUp: {
-          ...session.currentFollowUp,
-          hints: { status: "revealed", content: help.hints },
-        },
-      })
-    },
-
-    async followFramework() {
-      if (session.status !== "answeringFollowUp") return structuredClone(session)
-
-      const help = practiceFixture.followUp
-      return update({
-        ...session,
-        currentFollowUp: {
-          ...session.currentFollowUp,
-          framework: { status: "revealed", content: help.framework },
-        },
-      })
-    },
-
-    async followReference() {
-      if (session.status !== "answeringFollowUp") return structuredClone(session)
-
-      const help = practiceFixture.followUp
-      return update({
-        ...session,
-        currentFollowUp: {
-          ...session.currentFollowUp,
-          referenceAnswer: {
-            status: "revealed",
-            content: help.reference,
-            viewedBeforeSubmission: true,
-          },
-        },
       })
     },
 
@@ -177,7 +91,6 @@ export function createPracticeFaker() {
       if (session.status === "generatingQuestion") {
         return update({
           status: "answering",
-          assistedRetry: false,
           selection: session.selection,
           question: practiceFixture.question,
         })
@@ -195,56 +108,9 @@ export function createPracticeFaker() {
         })
       }
 
-      const questionHelp = practiceFixture.questionHelp
-      const question = structuredClone(session.question)
-      if (question.hints.status === "notRequested") {
-        question.hints = { status: "revealed", content: questionHelp.hints }
-      }
-      if (question.framework.status === "notRequested") {
-        question.framework = { status: "revealed", content: questionHelp.framework }
-      }
-      question.referenceAnswer = {
-        status: "revealed",
-        content: questionHelp.reference,
-        viewedBeforeSubmission:
-          question.referenceAnswer.status === "revealed" &&
-          question.referenceAnswer.viewedBeforeSubmission,
-      }
-
-      const revealFollowUp = (followUp: PracticeFollowUp): PracticeFollowUp => ({
-        ...followUp,
-        hints:
-          followUp.hints.status === "notRequested"
-            ? { status: "revealed", content: practiceFixture.followUp.hints }
-            : followUp.hints,
-        framework:
-          followUp.framework.status === "notRequested"
-            ? { status: "revealed", content: practiceFixture.followUp.framework }
-            : followUp.framework,
-        referenceAnswer: {
-          status: "revealed",
-          content: practiceFixture.followUp.reference,
-          viewedBeforeSubmission:
-            followUp.referenceAnswer.status === "revealed" &&
-            followUp.referenceAnswer.viewedBeforeSubmission,
-        },
-      })
-
       return update({
         ...session,
         status: "review",
-        question,
-        followUps: session.followUps.map((followUp) => ({
-          ...followUp,
-          question: revealFollowUp(followUp.question),
-        })),
-        followUpCompletion:
-          session.followUpCompletion.status === "endedEarly"
-            ? {
-                status: "endedEarly",
-                unanswered: revealFollowUp(session.followUpCompletion.unanswered),
-              }
-            : session.followUpCompletion,
         evaluation: practiceFixture.evaluation,
         review: practiceFixture.review,
       })
@@ -253,15 +119,10 @@ export function createPracticeFaker() {
     async retryQuestion() {
       if (session.status !== "review") return structuredClone(session)
 
-      const question = structuredClone(session.question)
-      if (question.referenceAnswer.status === "revealed") {
-        question.referenceAnswer.viewedBeforeSubmission = true
-      }
       return update({
         status: "answering",
-        assistedRetry: true,
         selection: session.selection,
-        question,
+        question: session.question,
       })
     },
 

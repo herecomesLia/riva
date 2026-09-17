@@ -1,4 +1,3 @@
-import { practiceFixture } from "@/mocks/fixtures/practice"
 import * as testing from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
@@ -10,51 +9,6 @@ import * as api from "./practice-page-test-api"
 import * as context from "./practice-page-test-utils"
 
 describe("PracticePage: answering", () => {
-  it("confirms, locks, preserves the draft, and applies the reference-answer snapshot", async () => {
-    const initial = api.createPracticeScenario("answeringQuestion")
-    if (initial.session.status !== "answering") throw new Error("Answering fixture required.")
-    const revealed = structuredClone(initial)
-    if (revealed.session.status !== "answering") throw new Error("Answering fixture required.")
-    const revealedSession = revealed.session
-
-    revealedSession.question.referenceAnswer = {
-      status: "revealed",
-      content: structuredClone(practiceFixture.questionHelp.reference),
-      viewedBeforeSubmission: true,
-    }
-    const request = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
-    vi.mocked(api.getPracticePage).mockResolvedValue(initial)
-    vi.mocked(api.requestPracticeReferenceAnswer).mockReturnValue(request.promise)
-    const user = userEvent.setup()
-    context.renderPracticePage()
-
-    const textbox = await testing.screen.findByRole("textbox")
-    const submitButton = testing.screen.getByRole("button", {
-      name: i18n.t("practice.answer.submit"),
-    })
-    await user.type(textbox, "保留这份草稿")
-    expect(
-      testing.screen.queryByText(revealedSession.question.referenceAnswer.content.answer),
-    ).toBeNull()
-    await user.click(
-      testing.screen.getByRole("button", { name: i18n.t("practice.referenceAnswer.request") }),
-    )
-    expect(api.requestPracticeReferenceAnswer).not.toHaveBeenCalled()
-    const dialog = testing.screen.getByRole("alertdialog")
-    const confirm = testing.within(dialog).getByRole("button", {
-      name: i18n.t("practice.referenceAnswer.confirm"),
-    })
-    await user.click(confirm)
-    expect(api.requestPracticeReferenceAnswer).toHaveBeenCalledTimes(1)
-    expect(submitButton).toBeDisabled()
-
-    request.resolve(revealed.session)
-    expect(
-      await testing.screen.findByText(revealedSession.question.referenceAnswer.content.answer),
-    ).toBeVisible()
-    expect(textbox).toHaveValue("保留这份草稿")
-  })
-
   it("updates review saved state only from the returned service snapshot", async () => {
     const user = userEvent.setup()
     const review = api.createPracticeScenario("reviewBalanced")
@@ -128,12 +82,6 @@ describe("PracticePage: answering", () => {
     expect(pendingButton).toBeDisabled()
     expect(testing.screen.getByLabelText(i18n.t("practice.answer.label"))).toBeDisabled()
     expect(
-      testing.screen.getByRole("button", { name: i18n.t("practice.guidance.requestHint") }),
-    ).toBeDisabled()
-    expect(
-      testing.screen.getByRole("button", { name: i18n.t("practice.guidance.requestFramework") }),
-    ).toBeDisabled()
-    expect(
       testing.screen.getByRole("button", { name: i18n.t("practice.questionActions.save") }),
     ).toBeDisabled()
     expect(
@@ -147,8 +95,6 @@ describe("PracticePage: answering", () => {
     ).toBeNull()
     await user.click(pendingButton)
     expect(api.submitPrimaryAnswer).toHaveBeenCalledTimes(1)
-    expect(api.requestPracticeHint).not.toHaveBeenCalled()
-    expect(api.requestAnswerFramework).not.toHaveBeenCalled()
     expect(api.setQuestionSaved).not.toHaveBeenCalled()
     expect(api.setQuestionWeak).not.toHaveBeenCalled()
     expect(api.skipPracticeQuestion).not.toHaveBeenCalled()
@@ -172,59 +118,6 @@ describe("PracticePage: answering", () => {
     expect(
       await testing.screen.findByTestId("practice-answering-follow-up-state"),
     ).toBeInTheDocument()
-  })
-
-  it("locks every action while a hint request is pending", async () => {
-    const user = userEvent.setup()
-    const answering = api.createPracticeScenario("answeringQuestion")
-    const hinted = api.createPracticeScenario("answeringHintRevealed")
-    if (answering.session.status !== "answering" || hinted.session.status !== "answering") {
-      throw new Error("Answering fixtures are required.")
-    }
-
-    const request = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
-    vi.mocked(api.getPracticePage).mockResolvedValue(answering)
-    vi.mocked(api.requestPracticeHint).mockReturnValue(request.promise)
-
-    context.renderPracticePage()
-
-    const textarea = await testing.screen.findByLabelText(i18n.t("practice.answer.label"))
-    await user.type(textarea, "我先说明背景。")
-    await user.click(
-      testing.screen.getByRole("button", { name: i18n.t("practice.guidance.requestHint") }),
-    )
-
-    expect(
-      await testing.screen.findByRole("button", { name: i18n.t("practice.guidance.requestHint") }),
-    ).toBeDisabled()
-    const lockedButtonNames = [
-      i18n.t("practice.guidance.requestFramework"),
-      i18n.t("practice.questionActions.save"),
-      i18n.t("practice.questionActions.markWeak"),
-      i18n.t("practice.questionActions.skip"),
-      i18n.t("practice.answer.submit"),
-    ]
-    for (const name of lockedButtonNames) {
-      expect(testing.screen.getByRole("button", { name })).toBeDisabled()
-    }
-    expect(textarea).toBeEnabled()
-    await user.type(textarea, "我仍可继续编辑。")
-    expect(textarea).toHaveValue("我先说明背景。我仍可继续编辑。")
-
-    await testing.act(async () => {
-      request.resolve(hinted.session)
-      await request.promise
-    })
-
-    expect(
-      await testing.screen.findByText(hinted.session.question.hints.content?.[0] ?? ""),
-    ).toBeVisible()
-    for (const name of lockedButtonNames.slice(0, -1)) {
-      expect(testing.screen.getByRole("button", { name })).toBeEnabled()
-    }
-    expect(
-      testing.screen.getByRole("button", { name: i18n.t("practice.answer.submit") }),
-    ).toBeEnabled()
   })
 
   it("does not start a weak mutation while saving is pending", async () => {
@@ -382,49 +275,6 @@ describe("PracticePage: answering", () => {
         name: i18n.t("practice.questionActions.unmarkWeak"),
       }),
     ).toHaveAttribute("aria-pressed", "true")
-  })
-
-  it("synchronously locks duplicate follow-up assistance and preserves the draft on cache sync", async () => {
-    const initial = api.createPracticeScenario("answeringSingleFollowUp")
-    if (initial.session.status !== "answeringFollowUp") {
-      throw new Error("Follow-up fixture required.")
-    }
-    const revealed = structuredClone(initial)
-    if (revealed.session.status !== "answeringFollowUp") {
-      throw new Error("Follow-up fixture required.")
-    }
-
-    const template = practiceFixture.followUp
-    revealed.session.currentFollowUp.hints = {
-      status: "revealed",
-      content: [...template.hints],
-    }
-    const request = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
-    vi.mocked(api.getPracticePage).mockResolvedValue(initial)
-    vi.mocked(api.requestPracticeFollowUpHint).mockReturnValue(request.promise)
-    const user = userEvent.setup()
-    context.renderPracticePage()
-    const textbox = await testing.screen.findByLabelText(i18n.t("practice.followUp.answerLabel"))
-    await user.type(textbox, "辅助请求期间继续保留并编辑的草稿")
-    const hint = testing.screen.getByRole("button", {
-      name: i18n.t("practice.followUpAssistance.viewHint"),
-    })
-
-    testing.fireEvent.click(hint)
-    testing.fireEvent.click(hint)
-    await testing.waitFor(() => expect(api.requestPracticeFollowUpHint).toHaveBeenCalledTimes(1))
-    expect(textbox).toBeEnabled()
-    expect(textbox).toHaveValue("辅助请求期间继续保留并编辑的草稿")
-    expect(
-      testing.screen.getByRole("button", { name: i18n.t("practice.followUp.submit") }),
-    ).toBeDisabled()
-    expect(
-      testing.screen.getByRole("button", { name: i18n.t("practice.followUp.endAnswering") }),
-    ).toBeDisabled()
-
-    await testing.act(async () => request.resolve(revealed.session))
-    expect(await testing.screen.findByText(template.hints[0]!)).toBeVisible()
-    expect(textbox).toHaveValue("辅助请求期间继续保留并编辑的草稿")
   })
 
   it("submits a follow-up once, keeps the failed draft, and keeps route blocking active", async () => {

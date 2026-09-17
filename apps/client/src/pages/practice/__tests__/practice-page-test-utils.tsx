@@ -9,13 +9,7 @@ import {
   getPracticePage,
   getPracticeTaskStatus,
   retryPracticeTask,
-  requestAnswerFramework,
   endPracticeSession,
-  requestPracticeHint,
-  requestPracticeReferenceAnswer,
-  requestPracticeFollowUpFramework,
-  requestPracticeFollowUpHint,
-  requestPracticeFollowUpReferenceAnswer,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
   prepareNextPracticeSession,
@@ -51,13 +45,7 @@ beforeEach(async () => {
   vi.mocked(getPracticeTaskStatus).mockReset()
   vi.mocked(retryPracticeTask).mockReset()
   vi.mocked(endPracticeFollowUps).mockReset()
-  vi.mocked(requestAnswerFramework).mockReset()
   vi.mocked(endPracticeSession).mockReset()
-  vi.mocked(requestPracticeHint).mockReset()
-  vi.mocked(requestPracticeReferenceAnswer).mockReset()
-  vi.mocked(requestPracticeFollowUpFramework).mockReset()
-  vi.mocked(requestPracticeFollowUpHint).mockReset()
-  vi.mocked(requestPracticeFollowUpReferenceAnswer).mockReset()
   vi.mocked(retryCurrentPracticeQuestion).mockReset()
   vi.mocked(continueToNextPracticeQuestion).mockReset()
   vi.mocked(prepareNextPracticeSession).mockReset()
@@ -76,13 +64,7 @@ export {
   getPracticeTaskStatus,
   retryPracticeTask,
   endPracticeFollowUps,
-  requestAnswerFramework,
   endPracticeSession,
-  requestPracticeHint,
-  requestPracticeReferenceAnswer,
-  requestPracticeFollowUpFramework,
-  requestPracticeFollowUpHint,
-  requestPracticeFollowUpReferenceAnswer,
   retryCurrentPracticeQuestion,
   continueToNextPracticeQuestion,
   prepareNextPracticeSession,

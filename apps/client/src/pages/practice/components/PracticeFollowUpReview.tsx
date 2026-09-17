@@ -7,7 +7,7 @@ import type {
   PracticeFollowUp,
 } from "@/models/practice-workflow"
 
-import { PracticeReviewReferenceSections } from "./PracticeReferenceAnswer"
+import { PracticeReviewReferenceSections } from "./PracticeReviewReferenceSections"
 
 type Props = {
   exchanges: ProcessingSession["followUps"]
@@ -40,7 +40,6 @@ function FollowUpReviewItem({
   unanswered?: boolean
 }) {
   const { t } = useTranslation()
-  const reference = question.referenceAnswer
 
   return (
     <article
@@ -52,20 +51,8 @@ function FollowUpReviewItem({
         <h3 className="min-w-0 font-heading font-medium">
           {t("practice.followUpReview.followUpNumber", { count: order })}
         </h3>
-        {reference.status === "revealed" && (
-          <Badge className="shrink-0" variant="outline">
-            {reference.viewedBeforeSubmission
-              ? t("practice.referenceAnswer.viewedBeforeSubmission")
-              : t("practice.referenceAnswer.notViewedBeforeSubmission")}
-          </Badge>
-        )}
       </div>
       {unanswered && <Badge variant="outline">{t("practice.followUpAssistance.unanswered")}</Badge>}
-      {reference.status === "revealed" && reference.content.kind === "technicalReference" && (
-        <Badge className="self-start" variant="secondary">
-          {t("practice.followUpAssistance.kind.technicalReference")}
-        </Badge>
-      )}
       <PracticeReviewReferenceSections question={question} />
     </article>
   )

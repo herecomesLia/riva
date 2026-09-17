@@ -1,4 +1,8 @@
-import type { PracticeDifficulty, PracticeQuestionType } from "@/api/generated/models"
+import type {
+  PracticeDifficulty,
+  PracticeGuidance,
+  PracticeQuestionType,
+} from "@/api/generated/models"
 
 export type QuestionSource = "personalized" | "saved" | "history"
 
@@ -14,40 +18,12 @@ export type ActiveSelection = PracticeSelection & {
   roleId: string
 }
 
-export type Guidance<T> =
-  | { status: "notRequested"; content: null }
-  | { status: "revealed"; content: T }
-  | { status: "unavailable"; content: null }
-
-export type PracticeReferenceAnswer = {
-  kind: "personalizedExample" | "technicalReference"
-  answer: string
-}
-
-export type ReferenceAnswerState =
-  | {
-      status: "notRequested"
-      content: null
-      viewedBeforeSubmission: false
-    }
-  | {
-      status: "revealed"
-      content: PracticeReferenceAnswer
-      viewedBeforeSubmission: boolean
-    }
-  | {
-      status: "unavailable"
-      content: null
-      viewedBeforeSubmission: false
-    }
-
 export type PracticeQuestion = {
   prompt: string
   assessedCapabilities: string[]
   recommendedMaterials: string[]
-  hints: Guidance<string[]>
-  framework: Guidance<string[]>
-  referenceAnswer: ReferenceAnswerState
+  guidance: PracticeGuidance
+  referenceAnswer: string
   isSaved: boolean
   isWeak: boolean
 }
@@ -56,35 +32,7 @@ export type PracticeAnswer = {
   content: string
 }
 
-export type FollowUpReferenceAnswer = {
-  kind: "personalizedSupplement" | "technicalReference"
-  addressedGap: string
-  answer: string
-}
-
-export type FollowUpReferenceState =
-  | {
-      status: "notRequested"
-      content: null
-      viewedBeforeSubmission: false
-    }
-  | {
-      status: "revealed"
-      content: FollowUpReferenceAnswer
-      viewedBeforeSubmission: boolean
-    }
-  | {
-      status: "unavailable"
-      content: null
-      viewedBeforeSubmission: false
-    }
-
-export type PracticeFollowUp = {
-  prompt: string
-  hints: Guidance<string[]>
-  framework: Guidance<string[]>
-  referenceAnswer: FollowUpReferenceState
-}
+export type PracticeFollowUp = Pick<PracticeQuestion, "prompt" | "guidance" | "referenceAnswer">
 
 export type SetupSession = {
   status: "setup"
@@ -98,7 +46,6 @@ export type GeneratingSession = {
 
 export type AnsweringSession = {
   status: "answering"
-  assistedRetry: boolean
   selection: ActiveSelection
   question: PracticeQuestion
 }

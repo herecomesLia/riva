@@ -20,7 +20,7 @@ export const AnsweringDefault = meta.story({
     await expect(actionBar).toHaveClass("fixed", "bottom-0", "z-40")
     await expect(
       canvas
-        .getByRole("button", { name: /RIVA 示例回答|RIVA example answer/i })
+        .getByRole("button", { name: /查看参考答案|view reference answer/i })
         .querySelector(".lucide-sparkles"),
     ).toBeVisible()
   },
@@ -31,21 +31,18 @@ export const AnsweringActionsLocked = meta.story({
     ...createPracticeViewArgs("answeringQuestion"),
     answeringPending: {
       ...createPracticeViewArgs("answeringQuestion").answeringPending,
-      hint: true,
+      saved: true,
       interactionLocked: true,
     },
   },
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole("button", { name: /请求提示|request hint/i })).toBeDisabled()
+    await expect(canvas.getByRole("button", { name: /查看提示|view hints/i })).toBeEnabled()
     await expect(
-      canvas.getByRole("button", { name: /请求答题框架|request answer framework/i }),
-    ).toBeDisabled()
+      canvas.getByRole("button", { name: /查看答题框架|view answer framework/i }),
+    ).toBeEnabled()
     await expect(canvas.getByRole("button", { name: /收藏题目|save question/i })).toBeDisabled()
     await expect(canvas.getByRole("button", { name: /标记为薄弱题|mark as weak/i })).toBeDisabled()
     await expect(canvas.getByRole("button", { name: /跳过本题|skip question/i })).toBeDisabled()
-    await expect(
-      canvas.getByRole("button", { name: /结束本轮练习|end practice session/i }),
-    ).toBeDisabled()
     await expect(canvas.getByRole("textbox")).toBeEnabled()
   },
 })
@@ -60,7 +57,6 @@ export const AnsweringMobileFixedActions = meta.story({
       /收藏题目|save question/i,
       /标记为薄弱题|mark as weak/i,
       /跳过本题|skip question/i,
-      /结束本轮练习|end practice session/i,
     ]) {
       await expect(within(actionBar).getByRole("button", { name })).toBeVisible()
     }
@@ -71,30 +67,27 @@ export const AnsweringReferenceAnswerHidden = meta.story({
   args: createPracticeViewArgs("answeringQuestion"),
   play: async ({ canvas }) => {
     await expect(
-      canvas.getByRole("button", { name: /RIVA 示例回答|RIVA example answer/i }),
+      canvas.getByRole("button", { name: /查看参考答案|view reference answer/i }),
     ).toBeVisible()
     await expect(canvas.queryByText(/我会选用推荐材料|I would use/i)).not.toBeInTheDocument()
   },
 })
 
 export const AnsweringReferenceAnswerRevealed = meta.story({
-  args: withReferenceAnswer("answeringQuestion", "project", 1, true),
+  args: withReferenceAnswer("answeringQuestion", "project", 1),
   play: async ({ canvas }) => {
-    await expect(canvas.getByText(/个性化示例回答|personalized example answer/i)).toBeVisible()
+    await expandReference(canvas)
     await expect(canvas.getByText(/我会选用推荐材料中的/)).toBeVisible()
   },
 })
 
 function longAnsweringArgs() {
-  const args = withReferenceAnswer("answeringQuestion", "project", 1, true)
+  const args = withReferenceAnswer("answeringQuestion", "project", 1)
   const response = structuredClone(args.content.data)
   if (response.session.status !== "answering") throw new Error("Answering fixture required.")
-  if (response.session.question.referenceAnswer.status !== "revealed") {
-    throw new Error("Revealed reference answer required.")
-  }
   response.session.question.prompt = `${response.session.question.prompt} ${response.session.question.prompt}`
-  response.session.question.referenceAnswer.content.answer = Array(8)
-    .fill(response.session.question.referenceAnswer.content.answer)
+  response.session.question.referenceAnswer = Array(8)
+    .fill(response.session.question.referenceAnswer)
     .join("\n\n")
   return { ...args, content: { data: response, status: "ready" as const } }
 }
@@ -102,6 +95,7 @@ function longAnsweringArgs() {
 export const AnsweringLongContentWithFixedActions = meta.story({
   args: longAnsweringArgs(),
   play: async ({ canvas }) => {
+    await expandReference(canvas)
     await expect(canvas.getByTestId("practice-reference-answer")).toBeVisible()
     await expect(canvas.getByTestId("practice-question-actions-bar")).toBeVisible()
     await expect(canvas.getByTestId("practice-answering-state")).toHaveClass(
@@ -112,44 +106,20 @@ export const AnsweringLongContentWithFixedActions = meta.story({
   },
 })
 
-export const AnsweringTechnicalReference = meta.story({
-  args: withReferenceAnswer("answeringQuestion", "technical_basics", 1, true),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText(/技术参考答案|technical reference answer/i)).toBeVisible()
-  },
-})
-
 export const AnsweringReactReference = meta.story({
-  args: withReferenceAnswer("answeringQuestion", "technical_basics", 1, true),
+  args: withReferenceAnswer("answeringQuestion", "technical_basics", 1),
   play: async ({ canvas }) => {
+    await expandReference(canvas)
     await expect(canvas.getByText(/React 重复渲染首先要区分/)).toBeVisible()
-    await expect(canvas.getByText(/Profiler 定位更新来源/)).toBeVisible()
   },
 })
 
 export const AnsweringRequestLayerReference = meta.story({
-  args: withReferenceAnswer("answeringQuestion", "technical_basics", 2, true),
+  args: withReferenceAnswer("answeringQuestion", "technical_basics", 2),
   play: async ({ canvas }) => {
+    await expandReference(canvas)
     await expect(canvas.getByText(/长期演进的数据请求层/)).toBeVisible()
-    await expect(canvas.getByText(/稳定缓存 key/)).toBeVisible()
     await expect(canvas.queryByText(/React 重复渲染首先要区分/)).not.toBeInTheDocument()
-  },
-})
-
-export const AnsweringAssistedRetry = meta.story({
-  args: withReferenceAnswer("answeringQuestion", "project", 1, true, "retry"),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText(/参考答案辅助重练|reference-assisted retry/i)).toBeVisible()
-  },
-})
-
-export const AnsweringNextQuestionWithReference = meta.story({
-  args: withReferenceAnswer("answeringQuestion", "project", 2, true, "nextQuestion"),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByText(/作答前已查看参考答案|viewed before submission/i)).toBeVisible()
-    await expect(
-      canvas.queryByText(/参考答案辅助重练|reference-assisted retry/i),
-    ).not.toBeInTheDocument()
   },
 })
 
@@ -177,3 +147,12 @@ export const DraftLeaveProtection = meta.story({
     ).toBeInTheDocument()
   },
 })
+
+async function expandReference(canvas: ReturnType<typeof within>) {
+  await userEvent.click(canvas.getByRole("button", { name: /查看参考答案|view reference answer/i }))
+  await userEvent.click(
+    within(screen.getByRole("alertdialog")).getByRole("button", {
+      name: /查看参考答案|view reference answer/i,
+    }),
+  )
+}

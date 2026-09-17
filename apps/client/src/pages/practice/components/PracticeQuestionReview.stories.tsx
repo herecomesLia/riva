@@ -38,14 +38,3 @@ export const MainQuestionOnly = meta.story({
     followUpCompletion: { status: "completed" },
   },
 })
-
-export const ReferenceUnavailable = meta.story({
-  args: {
-    question: {
-      ...complete.session.question,
-      referenceAnswer: { status: "unavailable", content: null, viewedBeforeSubmission: false },
-    },
-    followUps: complete.session.followUps,
-    followUpCompletion: complete.session.followUpCompletion,
-  },
-})

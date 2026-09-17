@@ -56,7 +56,6 @@ const answering: AnsweringSession = {
   status: "answering",
   selection,
   question: question(),
-  assistedRetry: false,
 }
 const firstFollowUp: AnsweringFollowUpSession = {
   status: "answeringFollowUp",
@@ -91,30 +90,10 @@ const processing: ProcessingSession = {
   ],
   followUpCompletion: { status: "completed" },
 }
-const followUpReference: PracticeFollowUp["referenceAnswer"] = {
-  status: "revealed",
-  content: practiceFixture.followUp.reference,
-  viewedBeforeSubmission: false,
-}
-
 function review(overrides: Partial<ReviewSession> = {}): ReviewSession {
   return {
     ...structuredClone(processing),
     status: "review",
-    question: question({
-      referenceAnswer: {
-        status: "revealed",
-        content: structuredClone(practiceFixture.questionHelp.reference),
-        viewedBeforeSubmission: false,
-      },
-    }),
-    followUps: processing.followUps.map((exchange) => ({
-      ...structuredClone(exchange),
-      question: {
-        ...structuredClone(exchange.question),
-        referenceAnswer: structuredClone(followUpReference),
-      },
-    })),
     evaluation: structuredClone(practiceFixture.evaluation),
     review: structuredClone(practiceFixture.review),
     ...overrides,
@@ -160,18 +139,6 @@ const scenarios = {
   ),
   generatingQuestion: data({ status: "generatingQuestion", selection }),
   answeringQuestion: data(answering),
-  answeringHintRevealed: data({
-    ...answering,
-    question: question({
-      hints: { status: "revealed", content: practiceFixture.questionHelp.hints },
-    }),
-  }),
-  answeringFrameworkRevealed: data({
-    ...answering,
-    question: question({
-      framework: { status: "revealed", content: practiceFixture.questionHelp.framework },
-    }),
-  }),
   answeringSavedQuestion: data({ ...answering, question: question({ isSaved: true }) }),
   answeringWeakQuestion: data({ ...answering, question: question({ isWeak: true }) }),
   answeringFirstFollowUp: data(firstFollowUp),
@@ -233,27 +200,23 @@ const scenarios = {
       followUps: [
         {
           ...answeredFollowUp,
-          question: { ...answeredFollowUp.question, referenceAnswer: followUpReference },
+          question: {
+            ...answeredFollowUp.question,
+            referenceAnswer: practiceFixture.followUp.question.referenceAnswer,
+          },
         },
       ],
       followUpCompletion: {
         status: "endedEarly",
-        unanswered: { ...secondFollowUp, referenceAnswer: followUpReference },
+        unanswered: {
+          ...secondFollowUp,
+          referenceAnswer: practiceFixture.followUp.question.referenceAnswer,
+        },
       },
     }),
   ),
   completedSession: data(completed),
-  retryingCurrentQuestion: data({
-    ...answering,
-    assistedRetry: true,
-    question: question({
-      referenceAnswer: {
-        status: "revealed",
-        content: practiceFixture.questionHelp.reference,
-        viewedBeforeSubmission: true,
-      },
-    }),
-  }),
+  retryingCurrentQuestion: data(answering),
   generatingNextQuestion: data({ status: "generatingQuestion", selection }),
   completedWithWeakQuestions: data({
     ...completed,
@@ -265,22 +228,5 @@ const scenarios = {
 export type PracticeScenario = keyof typeof scenarios
 
 export function createPracticeScenario(scenario: PracticeScenario = "setupReady"): PracticeData {
-  const result = structuredClone(scenarios[scenario])
-  if (result.session.status === "review") {
-    const revealGuidance = (
-      question: PracticeQuestion | PracticeFollowUp,
-      help: { hints: string[]; framework: string[] },
-    ) => {
-      if (question.hints.status === "notRequested")
-        question.hints = { status: "revealed", content: structuredClone(help.hints) }
-      if (question.framework.status === "notRequested")
-        question.framework = { status: "revealed", content: structuredClone(help.framework) }
-    }
-    revealGuidance(result.session.question, practiceFixture.questionHelp)
-    for (const exchange of result.session.followUps)
-      revealGuidance(exchange.question, practiceFixture.followUp)
-    if (result.session.followUpCompletion.status === "endedEarly")
-      revealGuidance(result.session.followUpCompletion.unanswered, practiceFixture.followUp)
-  }
-  return result
+  return structuredClone(scenarios[scenario])
 }

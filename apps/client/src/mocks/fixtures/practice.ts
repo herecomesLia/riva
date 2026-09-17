@@ -1,10 +1,8 @@
 import type {
   CompletedSession,
-  FollowUpReferenceAnswer,
   PracticeEvaluation,
   PracticeFollowUp,
   PracticeQuestion,
-  PracticeReferenceAnswer,
   PracticeReview,
   PracticeSelection,
 } from "@/models/practice-workflow"
@@ -29,34 +27,23 @@ export const practiceFixture = {
     prompt: "请结合一个真实经历，说明你如何分析问题、做出关键判断、推动行动并验证最终结果。",
     assessedCapabilities: ["问题分析"],
     recommendedMaterials: ["一个由你推动解决问题的经历"],
-    hints: { status: "notRequested", content: null },
-    framework: { status: "notRequested", content: null },
-    referenceAnswer: { status: "notRequested", content: null, viewedBeforeSubmission: false },
+    guidance: {
+      hints: ["说明你的关键判断和验证依据。"],
+      framework: ["背景、目标、行动与结果"],
+    },
+    referenceAnswer: "我先明确目标和约束，再用小范围验证选择方案，推动落地后对比结果并复盘。",
     isSaved: false,
     isWeak: false,
   } satisfies PracticeQuestion,
-  questionHelp: {
-    hints: ["说明你的关键判断和验证依据。"],
-    framework: ["背景、目标、行动与结果"],
-    reference: {
-      kind: "personalizedExample",
-      answer: "我先明确目标和约束，再用小范围验证选择方案，推动落地后对比结果并复盘。",
-    } satisfies PracticeReferenceAnswer,
-  },
   followUp: {
     question: {
       prompt: "你如何验证结果来自你的关键行动，还有哪些因素可能影响结论？",
-      hints: { status: "notRequested", content: null },
-      framework: { status: "notRequested", content: null },
-      referenceAnswer: { status: "notRequested", content: null, viewedBeforeSubmission: false },
+      guidance: {
+        hints: ["说明对照证据和结论边界。"],
+        framework: ["验证方法、证据与局限"],
+      },
+      referenceAnswer: "我会对比行动前后的结果，排查同期变化，并说明证据能支持的结论范围。",
     } satisfies PracticeFollowUp,
-    hints: ["说明对照证据和结论边界。"],
-    framework: ["验证方法、证据与局限"],
-    reference: {
-      kind: "personalizedSupplement",
-      addressedGap: "结果归因证据不足。",
-      answer: "我会对比行动前后的结果，排查同期变化，并说明证据能支持的结论范围。",
-    } satisfies FollowUpReferenceAnswer,
   },
   evaluation: {
     overallScore: 78,

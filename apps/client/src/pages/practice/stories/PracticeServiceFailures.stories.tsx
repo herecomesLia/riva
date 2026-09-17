@@ -5,7 +5,7 @@ import { withRouter } from "#storybook/decorators/with-router"
 import { PracticeView } from "../PracticeView"
 import { createPracticeViewArgs } from "./practice-story-fixtures"
 
-type Failure = "load" | "start" | "generation" | "processing" | "action"
+type Failure = "load" | "start" | "generation" | "processing"
 
 function PracticeServiceFailureStory({ failure }: { failure: Failure }) {
   const [recovered, setRecovered] = useState(false)
@@ -23,11 +23,9 @@ function PracticeServiceFailureStory({ failure }: { failure: Failure }) {
         ? recovered
           ? "answeringQuestion"
           : "generatingQuestion"
-        : failure === "action"
-          ? "answeringQuestion"
-          : failure === "start" && recovered
-            ? "generatingQuestion"
-            : "setupReady",
+        : failure === "start" && recovered
+          ? "generatingQuestion"
+          : "setupReady",
   )
   return (
     <PracticeView
@@ -40,12 +38,6 @@ function PracticeServiceFailureStory({ failure }: { failure: Failure }) {
           throw new Error("Private request detail")
         }
         recover()
-      }}
-      answeringActions={{
-        ...args.answeringActions,
-        onRequestHint: async () => {
-          throw new Error("Private request detail")
-        },
       }}
     />
   )
@@ -93,13 +85,5 @@ export const TaskFailureAfterAnswerRetry = meta.story({
     await expect(await canvas.findByTestId("practice-task-failure")).toBeVisible()
     await userEvent.click(canvas.getByRole("button", { name: /重新尝试|try again/i }))
     await expect(await canvas.findByTestId("practice-review-state")).toBeVisible()
-  },
-})
-
-export const ActionFailure = meta.story({
-  args: { failure: "action" },
-  play: async ({ canvas }) => {
-    await userEvent.click(canvas.getByRole("button", { name: /请求提示|request hint/i }))
-    await expect(await canvas.findByRole("alert")).toBeVisible()
   },
 })

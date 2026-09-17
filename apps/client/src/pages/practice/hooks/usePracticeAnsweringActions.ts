@@ -1,9 +1,6 @@
 import { useRef } from "react"
 
 import {
-  requestAnswerFramework,
-  requestPracticeHint,
-  requestPracticeReferenceAnswer,
   setQuestionSaved,
   setQuestionWeak,
   skipPracticeQuestion,
@@ -37,17 +34,11 @@ export function usePracticeAnsweringActions(runAction: RunPracticeAction): {
   actions: PracticeAnsweringActions
   pending: PracticeAnsweringPending
 } {
-  const hintMutation = usePracticeMutation(requestPracticeHint)
-  const frameworkMutation = usePracticeMutation(requestAnswerFramework)
-  const referenceAnswerMutation = usePracticeMutation(requestPracticeReferenceAnswer)
   const savedMutation = usePracticeMutation(setQuestionSaved)
   const weakMutation = usePracticeMutation(setQuestionWeak)
   const submitAnswerMutation = usePracticeMutation(submitPrimaryAnswer)
   const skipMutation = usePracticeMutation(skipPracticeQuestion)
   const interactionLocked =
-    hintMutation.isPending ||
-    frameworkMutation.isPending ||
-    referenceAnswerMutation.isPending ||
     savedMutation.isPending ||
     weakMutation.isPending ||
     submitAnswerMutation.isPending ||
@@ -55,18 +46,12 @@ export function usePracticeAnsweringActions(runAction: RunPracticeAction): {
 
   return {
     actions: {
-      onRequestFramework: () => runAction(() => frameworkMutation.mutateAsync()),
-      onRequestHint: () => runAction(() => hintMutation.mutateAsync()),
-      onRequestReferenceAnswer: () => runAction(() => referenceAnswerMutation.mutateAsync()),
       onSetSaved: (input) => runAction(() => savedMutation.mutateAsync(input)),
       onSetWeak: (input) => runAction(() => weakMutation.mutateAsync(input)),
       onSkip: () => runAction(() => skipMutation.mutateAsync()),
       onSubmitAnswer: (input) => runAction(() => submitAnswerMutation.mutateAsync(input)),
     },
     pending: {
-      framework: frameworkMutation.isPending,
-      hint: hintMutation.isPending,
-      referenceAnswer: referenceAnswerMutation.isPending,
       interactionLocked,
       saved: savedMutation.isPending,
       skip: skipMutation.isPending,

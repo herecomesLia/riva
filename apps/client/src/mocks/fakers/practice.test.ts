@@ -26,20 +26,16 @@ describe("practiceFaker", () => {
     const answering = await faker.pollTask()
     expect(answering).toMatchObject({
       status: "answering",
-      assistedRetry: false,
       selection,
       question: practiceFixture.question,
     })
     await expect(faker.get()).resolves.toEqual(answering)
   })
 
-  it("preserves assistance, answers, flags and reference visibility through review", async () => {
+  it("preserves complete question content, answers and flags through review", async () => {
     const faker = createPracticeFaker()
     await faker.start(selection)
     await faker.pollTask()
-    await faker.hint()
-    await faker.framework()
-    await faker.reference()
     await faker.save(true)
     await faker.weak(true)
     expect(await faker.answer("  Main answer  ")).toMatchObject({
@@ -50,45 +46,17 @@ describe("practiceFaker", () => {
       status: "answeringFollowUp",
       currentFollowUp: practiceFixture.followUp.question,
     })
-    await faker.followHint()
-    await faker.followFramework()
-    await faker.followReference()
-    expect(await faker.answerFollowUp("  Follow-up answer  ")).toMatchObject({
-      status: "processing",
-    })
-    const review = await faker.pollTask()
-    expect(review).toMatchObject({
+    await faker.answerFollowUp("  Follow-up answer  ")
+    expect(await faker.pollTask()).toMatchObject({
       status: "review",
+      question: { ...practiceFixture.question, isSaved: true, isWeak: true },
+      mainAnswer: { content: "Main answer" },
+      followUps: [
+        { question: practiceFixture.followUp.question, answer: { content: "Follow-up answer" } },
+      ],
       evaluation: practiceFixture.evaluation,
       review: practiceFixture.review,
-      mainAnswer: { content: "Main answer" },
-      question: {
-        isSaved: true,
-        isWeak: true,
-        hints: { status: "revealed", content: practiceFixture.questionHelp.hints },
-        framework: { status: "revealed", content: practiceFixture.questionHelp.framework },
-        referenceAnswer: {
-          status: "revealed",
-          content: practiceFixture.questionHelp.reference,
-          viewedBeforeSubmission: true,
-        },
-      },
-      followUps: [
-        {
-          answer: { content: "Follow-up answer" },
-          question: {
-            hints: { status: "revealed", content: practiceFixture.followUp.hints },
-            framework: { status: "revealed", content: practiceFixture.followUp.framework },
-            referenceAnswer: {
-              status: "revealed",
-              content: practiceFixture.followUp.reference,
-              viewedBeforeSubmission: true,
-            },
-          },
-        },
-      ],
     })
-
     await faker.nextQuestion()
     await faker.pollTask()
     await faker.answer("Another answer")
@@ -96,23 +64,8 @@ describe("practiceFaker", () => {
     await faker.endFollowUps()
     expect(await faker.pollTask()).toMatchObject({
       status: "review",
-      question: {
-        hints: { status: "revealed", content: practiceFixture.questionHelp.hints },
-        framework: { status: "revealed", content: practiceFixture.questionHelp.framework },
-        referenceAnswer: { status: "revealed", viewedBeforeSubmission: false },
-      },
-      followUpCompletion: {
-        status: "endedEarly",
-        unanswered: {
-          hints: { status: "revealed", content: practiceFixture.followUp.hints },
-          framework: { status: "revealed", content: practiceFixture.followUp.framework },
-          referenceAnswer: {
-            status: "revealed",
-            content: practiceFixture.followUp.reference,
-            viewedBeforeSubmission: false,
-          },
-        },
-      },
+      question: practiceFixture.question,
+      followUpCompletion: { status: "endedEarly", unanswered: practiceFixture.followUp.question },
     })
   })
 
@@ -128,21 +81,12 @@ describe("practiceFaker", () => {
     expect(await faker.pollTask()).toMatchObject({
       status: "review",
       followUps: [
-        {
-          question: {
-            hints: { status: "revealed", content: practiceFixture.followUp.hints },
-            framework: { status: "revealed", content: practiceFixture.followUp.framework },
-            referenceAnswer: { status: "revealed", viewedBeforeSubmission: false },
-          },
-        },
+        { question: practiceFixture.followUp.question, answer: { content: "First follow-up" } },
       ],
     })
     expect(await faker.retryQuestion()).toMatchObject({
       status: "answering",
-      assistedRetry: true,
-      question: {
-        referenceAnswer: { status: "revealed", viewedBeforeSubmission: true },
-      },
+      question: practiceFixture.question,
     })
     await faker.answer("Retry answer")
     await faker.pollTask()

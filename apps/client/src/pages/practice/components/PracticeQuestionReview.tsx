@@ -1,12 +1,11 @@
 import { useTranslation } from "react-i18next"
 import type { Ref } from "react"
 
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { ReviewSession } from "@/models/practice-workflow"
 
 import { PracticeFollowUpReview } from "./PracticeFollowUpReview"
-import { PracticeReviewReferenceSections } from "./PracticeReferenceAnswer"
+import { PracticeReviewReferenceSections } from "./PracticeReviewReferenceSections"
 
 type Props = Pick<ReviewSession, "question" | "followUps" | "followUpCompletion"> & {
   scrollRef?: Ref<HTMLDivElement>
@@ -45,20 +44,7 @@ export function PracticeQuestionReview({
             <h3 className="min-w-0 font-heading font-medium">
               {t("practice.questionReview.mainQuestion")}
             </h3>
-            {question.referenceAnswer.status === "revealed" && (
-              <Badge className="shrink-0" variant="outline">
-                {question.referenceAnswer.viewedBeforeSubmission
-                  ? t("practice.referenceAnswer.viewedBeforeSubmission")
-                  : t("practice.referenceAnswer.notViewedBeforeSubmission")}
-              </Badge>
-            )}
           </div>
-          {question.referenceAnswer.status === "revealed" &&
-            question.referenceAnswer.content.kind === "technicalReference" && (
-              <Badge className="self-start" variant="secondary">
-                {t("practice.referenceAnswer.kind.technicalReference")}
-              </Badge>
-            )}
           <PracticeReviewReferenceSections question={question} />
         </section>
         <PracticeFollowUpReview completion={followUpCompletion} exchanges={followUps} />

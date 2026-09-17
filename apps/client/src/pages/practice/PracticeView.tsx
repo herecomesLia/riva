@@ -64,9 +64,6 @@ import { PracticeReferenceAnswer } from "./components/PracticeReferenceAnswer"
 import type { PracticeInteractionResult } from "./practice-interaction"
 
 export type PracticeAnsweringActions = {
-  onRequestFramework: () => Promise<PracticeInteractionResult>
-  onRequestHint: () => Promise<PracticeInteractionResult>
-  onRequestReferenceAnswer: () => Promise<PracticeInteractionResult>
   onSetSaved: (value: boolean) => Promise<PracticeInteractionResult>
   onSetWeak: (value: boolean) => Promise<PracticeInteractionResult>
   onSkip: () => Promise<PracticeInteractionResult>
@@ -74,26 +71,17 @@ export type PracticeAnsweringActions = {
 }
 
 export type PracticeFollowUpActions = {
-  onRequestHint: () => Promise<PracticeInteractionResult>
-  onRequestFramework: () => Promise<PracticeInteractionResult>
-  onRequestReferenceAnswer: () => Promise<PracticeInteractionResult>
   onEndFollowUps: () => Promise<PracticeInteractionResult>
   onSubmitFollowUp: (content: string) => Promise<PracticeInteractionResult>
 }
 
 export type PracticeFollowUpPending = {
   end: boolean
-  framework: boolean
-  hint: boolean
   interactionLocked: boolean
-  referenceAnswer: boolean
   submit: boolean
 }
 
 export type PracticeAnsweringPending = {
-  framework: boolean
-  hint: boolean
-  referenceAnswer: boolean
   interactionLocked: boolean
   saved: boolean
   skip: boolean
@@ -361,11 +349,6 @@ function PracticeFollowUpView({
       />
       <PracticeFollowUpAssistance
         key={session.followUps.length}
-        interactionLocked={pending.interactionLocked}
-        onRequestFramework={() => actions.onRequestFramework()}
-        onRequestHint={() => actions.onRequestHint()}
-        onRequestReferenceAnswer={() => actions.onRequestReferenceAnswer()}
-        pending={pending}
         question={session.currentFollowUp}
       />
 
@@ -583,23 +566,8 @@ function PracticeAnsweringView({
           onDraftChange={setIsDraftDirty}
           onSubmit={(content) => actions.onSubmitAnswer(content)}
         />
-        <PracticeQuestionGuidance
-          framework={session.question.framework}
-          hints={session.question.hints}
-          interactionLocked={pending.interactionLocked}
-          isFrameworkPending={pending.framework}
-          isHintPending={pending.hint}
-          onRequestFramework={() => actions.onRequestFramework()}
-          onRequestHint={() => actions.onRequestHint()}
-        />
-        <PracticeReferenceAnswer
-          assistedRetry={session.assistedRetry}
-          interactionLocked={pending.interactionLocked}
-          isPending={pending.referenceAnswer}
-          mode="answering"
-          onRequest={() => actions.onRequestReferenceAnswer()}
-          state={session.question.referenceAnswer}
-        />
+        <PracticeQuestionGuidance {...session.question.guidance} />
+        <PracticeReferenceAnswer referenceAnswer={session.question.referenceAnswer} />
       </div>
       <PracticeQuestionActions
         interactionLocked={pending.interactionLocked}
