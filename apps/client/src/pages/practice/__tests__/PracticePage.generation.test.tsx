@@ -22,7 +22,7 @@ describe("PracticePage: generation", () => {
     answering.session.selection = structuredClone(generating.session.selection)
 
     vi.mocked(api.getPracticePage).mockResolvedValue(generating)
-    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(answering.session)
+    vi.mocked(api.getPracticeTaskStatus).mockResolvedValue(answering.session)
 
     context.renderPracticePage()
 
@@ -48,27 +48,26 @@ describe("PracticePage: generation", () => {
     const retryQuery =
       context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
     vi.mocked(api.getPracticePage).mockResolvedValue(generating)
-    vi.mocked(api.getQuestionGenerationStatus)
-      .mockRejectedValueOnce(new Error("unsafe generation details"))
-      .mockReturnValueOnce(retryQuery.promise)
+    vi.mocked(api.getPracticeTaskStatus).mockRejectedValueOnce(
+      new Error("unsafe generation details"),
+    )
+    vi.mocked(api.retryPracticeTask).mockReturnValueOnce(retryQuery.promise)
 
     context.renderPracticePage()
 
-    const errorState = await testing.screen.findByTestId("practice-generation-error-state")
-    expect(errorState).toHaveTextContent(i18n.t("practice.difficulty.hard"))
+    const errorState = await testing.screen.findByTestId("practice-task-failure")
+    expect(errorState).toHaveTextContent(i18n.t("practice.taskFailure.description"))
     expect(errorState).not.toHaveTextContent("unsafe generation details")
     await user.click(
-      testing.screen.getByRole("button", { name: i18n.t("practice.actions.retryGeneration") }),
+      testing.screen.getByRole("button", { name: i18n.t("practice.taskFailure.retry") }),
     )
     expect(
-      testing.screen.getByRole("button", { name: i18n.t("practice.actions.retryingGeneration") }),
+      testing.screen.getByRole("button", { name: i18n.t("practice.taskFailure.retrying") }),
     ).toBeDisabled()
 
-    await testing.waitFor(() => expect(api.getQuestionGenerationStatus).toHaveBeenCalledTimes(2))
-    expect(vi.mocked(api.getQuestionGenerationStatus).mock.calls).toEqual([
-      [undefined],
-      [undefined],
-    ])
+    await testing.waitFor(() => expect(api.retryPracticeTask).toHaveBeenCalledTimes(1))
+    expect(api.getPracticeTaskStatus).toHaveBeenCalledTimes(1)
+    expect(api.retryPracticeTask).toHaveBeenCalledWith()
     expect(api.startPracticeSession).not.toHaveBeenCalled()
     await testing.act(async () => {
       retryQuery.resolve(answering.session)

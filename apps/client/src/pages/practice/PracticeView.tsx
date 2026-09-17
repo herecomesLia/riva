@@ -29,7 +29,7 @@ import type {
   ActiveSelection,
   AnsweringFollowUpSession,
   AnsweringSession,
-  EvaluatingSession,
+  ProcessingSession,
   PracticeData,
   ReviewSession,
   CompletedSession,
@@ -39,7 +39,6 @@ import type { PracticeTrainingEntryResolution } from "@/models/training-entry"
 
 import {
   PracticeGeneratingState,
-  PracticeGenerationErrorState,
   PracticeLoadErrorState,
   PracticeLoadingState,
   PracticeNoRolesState,
@@ -54,7 +53,8 @@ import { PracticeConversationTimeline } from "./components/PracticeConversationT
 import { PracticeFollowUpComposer } from "./components/PracticeFollowUpComposer"
 import { PracticeFollowUpAssistance } from "./components/PracticeFollowUpAssistance"
 import { PracticeReviewWorkspace } from "./components/PracticeReviewWorkspace"
-import { PracticeEvaluationStatus } from "./components/PracticeEvaluationStatus"
+import { PracticeProcessingState } from "./components/PracticeProcessingState"
+import { PracticeTaskFailure } from "./components/PracticeTaskFailure"
 import { PracticeScoreOverview } from "./components/PracticeScoreOverview"
 import { PracticeDimensionScores } from "./components/PracticeDimensionScores"
 import { PracticeReviewSummary, PracticeWeaknesses } from "./components/PracticeReviewDetails"
@@ -64,7 +64,6 @@ import { PracticeReferenceAnswer } from "./components/PracticeReferenceAnswer"
 import type { PracticeInteractionResult } from "./practice-interaction"
 
 export type PracticeAnsweringActions = {
-  onEnd: () => Promise<PracticeInteractionResult>
   onRequestFramework: () => Promise<PracticeInteractionResult>
   onRequestHint: () => Promise<PracticeInteractionResult>
   onRequestReferenceAnswer: () => Promise<PracticeInteractionResult>
@@ -92,7 +91,6 @@ export type PracticeFollowUpPending = {
 }
 
 export type PracticeAnsweringPending = {
-  end: boolean
   framework: boolean
   hint: boolean
   referenceAnswer: boolean
@@ -150,13 +148,10 @@ type PracticeViewProps =
       followUpPending: PracticeFollowUpPending
       reviewActions: PracticeReviewActions
       reviewPending: PracticeReviewPending
-      evaluationError: boolean
-      isEvaluationRetrying: boolean
-      generationError: boolean
-      isGenerationRetrying: boolean
+      taskError: boolean
+      isTaskRetrying: boolean
       isStarting: boolean
-      onRetryGeneration: () => void
-      onRetryEvaluation: () => void
+      onRetryTask: () => void
       onStart: (input: ActiveSelection) => Promise<void>
       historyEntryResolution?: PracticeTrainingEntryResolution
     }
@@ -229,7 +224,7 @@ function PracticeViewContent(props: PracticeViewProps) {
   }
 
   if (props.content.status === "loading") return <PracticeLoadingState />
-  if (!("generationError" in props)) return <PracticeLoadingState />
+  if (!("taskError" in props)) return <PracticeLoadingState />
 
   const response = props.content.data
   const { session, setupContext } = response
@@ -266,15 +261,8 @@ function PracticeViewContent(props: PracticeViewProps) {
     }
 
     case "generatingQuestion":
-      if (props.generationError) {
-        return (
-          <PracticeGenerationErrorState
-            context={setupContext}
-            isRetrying={props.isGenerationRetrying}
-            onRetry={props.onRetryGeneration}
-            selection={session.selection}
-          />
-        )
+      if (props.taskError) {
+        return <PracticeTaskFailure isRetrying={props.isTaskRetrying} onRetry={props.onRetryTask} />
       }
 
       return <PracticeGeneratingState context={setupContext} selection={session.selection} />
@@ -299,13 +287,13 @@ function PracticeViewContent(props: PracticeViewProps) {
         />
       )
 
-    case "evaluating":
+    case "processing":
       return (
-        <PracticeEvaluatingView
+        <PracticeProcessingView
           context={setupContext}
-          evaluationError={props.evaluationError}
-          isEvaluationRetrying={props.isEvaluationRetrying}
-          onRetryEvaluation={props.onRetryEvaluation}
+          taskError={props.taskError}
+          isTaskRetrying={props.isTaskRetrying}
+          onRetryTask={props.onRetryTask}
           session={session}
         />
       )
@@ -403,21 +391,21 @@ function PracticeFollowUpView({
   )
 }
 
-function PracticeEvaluatingView({
+function PracticeProcessingView({
   context,
-  evaluationError,
-  isEvaluationRetrying,
-  onRetryEvaluation,
+  taskError,
+  isTaskRetrying,
+  onRetryTask,
   session,
 }: {
   context: PracticeData["setupContext"]
-  evaluationError: boolean
-  isEvaluationRetrying: boolean
-  onRetryEvaluation: () => void
-  session: EvaluatingSession
+  session: ProcessingSession
+  taskError: boolean
+  isTaskRetrying: boolean
+  onRetryTask: () => void
 }) {
   return (
-    <div className="flex flex-col gap-5" data-testid="practice-evaluating-state">
+    <div className="flex flex-col gap-5" data-testid="practice-processing-state">
       <PracticeSessionHeader context={context} selection={session.selection} />
       <PracticeConversationTimeline
         followUpCompletion={session.followUpCompletion}
@@ -425,11 +413,11 @@ function PracticeEvaluatingView({
         mainAnswer={session.mainAnswer}
         question={session.question}
       />
-      <PracticeEvaluationStatus
-        error={evaluationError}
-        isRetrying={isEvaluationRetrying}
-        onRetry={onRetryEvaluation}
-      />
+      {taskError ? (
+        <PracticeTaskFailure isRetrying={isTaskRetrying} onRetry={onRetryTask} />
+      ) : (
+        <PracticeProcessingState />
+      )}
     </div>
   )
 }
@@ -456,9 +444,6 @@ function PracticeReviewView({
         <div className="grid items-start gap-5 @2xl:grid-cols-[minmax(0,1fr)_minmax(14rem,1fr)]">
           <div className="flex min-w-0 flex-col gap-3 break-words [overflow-wrap:anywhere]">
             <PracticeSessionHeader context={context} selection={session.selection} />
-            <p className="text-sm text-muted-foreground">
-              {t("practice.review.attempt", { count: session.attemptNumber })}
-            </p>
           </div>
           <PracticeScoreOverview evaluation={session.evaluation} />
         </div>
@@ -529,7 +514,6 @@ function PracticeCompletedView({
       </CardHeader>
       <CardContent className="flex flex-col gap-3 text-sm">
         <p>{t("practice.completed.questions", { count: session.questionsCompleted })}</p>
-        <p>{t("practice.completed.retries", { count: session.retryCount })}</p>
         <p>{t("practice.completed.saved", { count: session.savedQuestionCount })}</p>
         <p>{t("practice.completed.markedWeak", { count: session.weakQuestionCount })}</p>
         <p>
@@ -619,13 +603,11 @@ function PracticeAnsweringView({
       </div>
       <PracticeQuestionActions
         interactionLocked={pending.interactionLocked}
-        isEndPending={pending.end}
         isWeak={session.question.isWeak}
         isSaved={session.question.isSaved}
         isSavedPending={pending.saved}
         isSkipPending={pending.skip}
         isWeakPending={pending.weak}
-        onEnd={() => actions.onEnd()}
         onSetSaved={(isSaved) => actions.onSetSaved(isSaved)}
         onSetWeak={(isWeak) => actions.onSetWeak(isWeak)}
         onSkip={() => actions.onSkip()}

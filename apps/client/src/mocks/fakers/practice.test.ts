@@ -23,7 +23,7 @@ describe("practiceFaker", () => {
     const generating = await faker.start(selection)
     expect(generating).toMatchObject({ status: "generatingQuestion", selection })
     await expect(faker.get()).resolves.toEqual(generating)
-    const answering = await faker.pollQuestion()
+    const answering = await faker.pollTask()
     expect(answering).toMatchObject({
       status: "answering",
       assistedRetry: false,
@@ -36,13 +36,17 @@ describe("practiceFaker", () => {
   it("preserves assistance, answers, flags and reference visibility through review", async () => {
     const faker = createPracticeFaker()
     await faker.start(selection)
-    await faker.pollQuestion()
+    await faker.pollTask()
     await faker.hint()
     await faker.framework()
     await faker.reference()
     await faker.save(true)
     await faker.weak(true)
     expect(await faker.answer("  Main answer  ")).toMatchObject({
+      status: "processing",
+      mainAnswer: { content: "Main answer" },
+    })
+    expect(await faker.pollTask()).toMatchObject({
       status: "answeringFollowUp",
       currentFollowUp: practiceFixture.followUp.question,
     })
@@ -50,9 +54,9 @@ describe("practiceFaker", () => {
     await faker.followFramework()
     await faker.followReference()
     expect(await faker.answerFollowUp("  Follow-up answer  ")).toMatchObject({
-      status: "evaluating",
+      status: "processing",
     })
-    const review = await faker.pollEvaluation()
+    const review = await faker.pollTask()
     expect(review).toMatchObject({
       status: "review",
       evaluation: practiceFixture.evaluation,
@@ -86,10 +90,11 @@ describe("practiceFaker", () => {
     })
 
     await faker.nextQuestion()
-    await faker.pollQuestion()
+    await faker.pollTask()
     await faker.answer("Another answer")
+    await faker.pollTask()
     await faker.endFollowUps()
-    expect(await faker.pollEvaluation()).toMatchObject({
+    expect(await faker.pollTask()).toMatchObject({
       status: "review",
       question: {
         hints: { status: "revealed", content: practiceFixture.questionHelp.hints },
@@ -114,14 +119,14 @@ describe("practiceFaker", () => {
   it("supports skip, retry and next with fixed review data", async () => {
     const faker = createPracticeFaker()
     await faker.start(selection)
-    await faker.pollQuestion()
+    await faker.pollTask()
     expect(await faker.skipQuestion()).toMatchObject({ status: "generatingQuestion", selection })
-    await faker.pollQuestion()
+    await faker.pollTask()
     await faker.answer("First answer")
+    await faker.pollTask()
     await faker.answerFollowUp("First follow-up")
-    expect(await faker.pollEvaluation()).toMatchObject({
+    expect(await faker.pollTask()).toMatchObject({
       status: "review",
-      attemptNumber: 1,
       followUps: [
         {
           question: {
@@ -140,28 +145,29 @@ describe("practiceFaker", () => {
       },
     })
     await faker.answer("Retry answer")
+    await faker.pollTask()
     await faker.answerFollowUp("Retry follow-up")
-    expect(await faker.pollEvaluation()).toMatchObject({
+    expect(await faker.pollTask()).toMatchObject({
       status: "review",
-      attemptNumber: practiceFixture.attemptNumber,
     })
     expect(await faker.nextQuestion()).toMatchObject({ status: "generatingQuestion", selection })
-    await faker.pollQuestion()
+    await faker.pollTask()
     await faker.answer("Next answer")
+    await faker.pollTask()
     await faker.answerFollowUp("Next follow-up")
-    expect(await faker.pollEvaluation()).toMatchObject({
+    expect(await faker.pollTask()).toMatchObject({
       status: "review",
-      attemptNumber: practiceFixture.attemptNumber,
     })
   })
 
   it("provides completion samples and preserves selection for the next session", async () => {
     const faker = createPracticeFaker()
     await faker.start(selection)
-    await faker.pollQuestion()
+    await faker.pollTask()
     await faker.answer("Answer")
+    await faker.pollTask()
     await faker.answerFollowUp("Follow-up")
-    await faker.pollEvaluation()
+    await faker.pollTask()
     await faker.save(true)
     await faker.weak(true)
     expect(await faker.endSession()).toMatchObject({
@@ -170,10 +176,9 @@ describe("practiceFaker", () => {
     })
     expect(await faker.nextSession()).toEqual({ status: "setup", selection })
     await faker.start(selection)
-    await faker.pollQuestion()
+    await faker.pollTask()
     expect(await faker.endSession()).toMatchObject({
-      status: "completed",
-      ...practiceFixture.completion,
+      status: "answering",
     })
   })
 })

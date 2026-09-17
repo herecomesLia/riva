@@ -62,7 +62,8 @@ export async function preparePracticeTrainingEntry(
 }
 
 export const startPracticeSession = practiceFaker.start
-export const getQuestionGenerationStatus = practiceFaker.pollQuestion
+export const getPracticeTaskStatus = practiceFaker.pollTask
+export const retryPracticeTask = practiceFaker.pollTask
 export const requestPracticeHint = practiceFaker.hint
 export const requestAnswerFramework = practiceFaker.framework
 export const requestPracticeReferenceAnswer = practiceFaker.reference
@@ -74,7 +75,6 @@ export const requestPracticeFollowUpFramework = practiceFaker.followFramework
 export const requestPracticeFollowUpReferenceAnswer = practiceFaker.followReference
 export const submitFollowUpAnswer = practiceFaker.answerFollowUp
 export const endPracticeFollowUps = practiceFaker.endFollowUps
-export const getPracticeEvaluationStatus = practiceFaker.pollEvaluation
 export const retryCurrentPracticeQuestion = practiceFaker.retryQuestion
 export const continueToNextPracticeQuestion = practiceFaker.nextQuestion
 export const skipPracticeQuestion = practiceFaker.skipQuestion

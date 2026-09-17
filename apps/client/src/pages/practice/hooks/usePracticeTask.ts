@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react"
-import type { PracticeSession } from "@/models/practice-workflow"
+import { getPracticeTaskStatus, retryPracticeTask } from "@/services/practice"
 import { usePracticeMutation } from "./usePracticeSession"
 
-export function usePracticeStageRequest(active: boolean, request: () => Promise<PracticeSession>) {
+export function usePracticeTask(active: boolean) {
   const requested = useRef(false)
   const retryLock = useRef(false)
   const [failed, setFailed] = useState(false)
-  const { mutate, reset, isError, isPending } = usePracticeMutation(request)
+  const { mutate, reset, isError, isPending } = usePracticeMutation((retry: boolean) =>
+    retry ? retryPracticeTask() : getPracticeTaskStatus(),
+  )
   useEffect(() => {
     if (!active) {
       requested.current = false
@@ -14,7 +16,7 @@ export function usePracticeStageRequest(active: boolean, request: () => Promise<
       setFailed(false)
     } else if (!requested.current) {
       requested.current = true
-      mutate()
+      mutate(false)
     }
   }, [active, mutate, reset])
   useEffect(() => {
@@ -26,7 +28,7 @@ export function usePracticeStageRequest(active: boolean, request: () => Promise<
     retry: () => {
       if (!active || isPending || retryLock.current) return
       retryLock.current = true
-      mutate(undefined, {
+      mutate(true, {
         onSettled: () => {
           retryLock.current = false
         },

@@ -4,7 +4,7 @@ import type {
   AnsweringFollowUpSession,
   AnsweringSession,
   CompletedSession,
-  EvaluatingSession,
+  ProcessingSession,
   PracticeData,
   PracticeFollowUp,
   PracticeQuestion,
@@ -80,8 +80,8 @@ const followUp: AnsweringFollowUpSession = {
   followUps: [answeredFollowUp],
   currentFollowUp: secondFollowUp,
 }
-const evaluating: EvaluatingSession = {
-  status: "evaluating",
+const processing: ProcessingSession = {
+  status: "processing",
   selection,
   question: question(),
   mainAnswer: firstFollowUp.mainAnswer,
@@ -99,9 +99,8 @@ const followUpReference: PracticeFollowUp["referenceAnswer"] = {
 
 function review(overrides: Partial<ReviewSession> = {}): ReviewSession {
   return {
-    ...structuredClone(evaluating),
+    ...structuredClone(processing),
     status: "review",
-    attemptNumber: practiceFixture.attemptNumber,
     question: question({
       referenceAnswer: {
         status: "revealed",
@@ -109,7 +108,7 @@ function review(overrides: Partial<ReviewSession> = {}): ReviewSession {
         viewedBeforeSubmission: false,
       },
     }),
-    followUps: evaluating.followUps.map((exchange) => ({
+    followUps: processing.followUps.map((exchange) => ({
       ...structuredClone(exchange),
       question: {
         ...structuredClone(exchange.question),
@@ -139,7 +138,6 @@ const completed: CompletedSession = {
   selection,
   ...practiceFixture.completion,
   questionsCompleted: 1,
-  retryCount: 0,
   savedQuestionCount: 0,
   weakQuestionCount: 0,
   finalAttemptAverageScore: 85,
@@ -182,17 +180,17 @@ const scenarios = {
     selection: { ...selection, questionType: "behavioral" },
   }),
   answeringFollowUp: data(followUp),
-  evaluatingNoFollowUp: data({
-    ...evaluating,
+  processingNoFollowUp: data({
+    ...processing,
     selection: { ...selection, questionType: "motivation" },
     followUps: [],
   }),
-  evaluatingFollowUpEndedEarly: data({
-    ...evaluating,
+  processingFollowUpEndedEarly: data({
+    ...processing,
     followUps: [answeredFollowUp],
     followUpCompletion: { status: "endedEarly", unanswered: secondFollowUp },
   }),
-  evaluatingAnswer: data(evaluating),
+  processingAnswer: data(processing),
   reviewRetryRecommended: data(review()),
   reviewNextRecommended: data(review({ review: nextReview })),
   reviewBalanced: data(review({ review: nextReview })),
@@ -257,7 +255,6 @@ const scenarios = {
     }),
   }),
   generatingNextQuestion: data({ status: "generatingQuestion", selection }),
-  completedWithRetries: data({ ...completed, retryCount: 1, finalAttemptAverageScore: 94 }),
   completedWithWeakQuestions: data({
     ...completed,
     weakQuestionCount: 1,

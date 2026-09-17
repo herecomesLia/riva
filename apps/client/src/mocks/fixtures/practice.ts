@@ -10,11 +10,9 @@ import type {
 } from "@/models/practice-workflow"
 
 export const practiceFixture = {
-  attemptNumber: 1,
   // UI samples, intentionally independent of actions taken in the faker.
   completion: {
     questionsCompleted: 2,
-    retryCount: 1,
     savedQuestionCount: 1,
     weakQuestionCount: 1,
     finalAttemptAverageScore: 78,

@@ -105,7 +105,6 @@ export function createPracticeReviewStoryFixture(
 export function createPracticeViewArgs(scenario: Parameters<typeof createPracticeScenario>[0]) {
   return {
     answeringActions: {
-      onEnd: fn(async () => "executed" as const),
       onRequestFramework: fn(async () => "executed" as const),
       onRequestHint: fn(async () => "executed" as const),
       onRequestReferenceAnswer: fn(async () => "executed" as const),
@@ -119,7 +118,6 @@ export function createPracticeViewArgs(scenario: Parameters<typeof createPractic
     },
     completedPending: false,
     answeringPending: {
-      end: false,
       framework: false,
       hint: false,
       referenceAnswer: false,
@@ -160,13 +158,10 @@ export function createPracticeViewArgs(scenario: Parameters<typeof createPractic
       weak: false,
     },
     content: { data: createPracticeScenario(scenario), status: "ready" as const },
-    evaluationError: false,
-    generationError: false,
-    isEvaluationRetrying: false,
-    isGenerationRetrying: false,
+    taskError: false,
+    isTaskRetrying: false,
     isStarting: false,
-    onRetryGeneration: fn(),
-    onRetryEvaluation: fn(),
+    onRetryTask: fn(),
     onStart: fn(async () => undefined),
     variant: "default" as const,
   }

@@ -2,7 +2,6 @@ import { Link } from "@tanstack/react-router"
 import { AlertCircleIcon, BriefcaseBusinessIcon, LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -135,47 +134,6 @@ export function PracticeGeneratingState({
         <PracticeSelectionSummary context={context} selection={selection} />
         <p className="text-sm text-muted-foreground">{t("practice.generation.progress")}</p>
       </CardContent>
-    </Card>
-  )
-}
-
-export function PracticeGenerationErrorState({
-  context,
-  isRetrying,
-  onRetry,
-  selection,
-}: {
-  context: PracticeSetupContext
-  isRetrying: boolean
-  onRetry: () => void
-  selection: ActiveSelection
-}) {
-  const { t } = useTranslation()
-
-  return (
-    <Card data-testid="practice-generation-error-state">
-      <CardHeader>
-        <CardTitle>
-          <h2>{t("practice.setup.title")}</h2>
-        </CardTitle>
-        <CardDescription>{t("practice.setup.description")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-5">
-        <Alert variant="destructive">
-          <AlertCircleIcon />
-          <AlertTitle>{t("practice.errors.generationTitle")}</AlertTitle>
-          <AlertDescription>{t("practice.errors.generationDescription")}</AlertDescription>
-        </Alert>
-        <PracticeSelectionSummary context={context} selection={selection} />
-      </CardContent>
-      <CardFooter>
-        <Button disabled={isRetrying} onClick={onRetry}>
-          {isRetrying && <Spinner aria-hidden="true" data-icon="inline-start" />}
-          {isRetrying
-            ? t("practice.actions.retryingGeneration")
-            : t("practice.actions.retryGeneration")}
-        </Button>
-      </CardFooter>
     </Card>
   )
 }

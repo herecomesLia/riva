@@ -33,8 +33,6 @@ export const practice = {
   actions: {
     start: "Start practice",
     starting: "Starting",
-    retryGeneration: "Generate again",
-    retryingGeneration: "Generating again",
     usePersonalized: "Switch to personalized",
     manageRoles: "Go to target roles",
   },
@@ -61,9 +59,6 @@ export const practice = {
   errors: {
     startTitle: "Unable to start practice",
     startDescription: "Your setup is preserved. Please try again in a moment.",
-    generationTitle: "Question generation did not complete",
-    generationDescription:
-      "Your setup is preserved. Generate again without resubmitting the previous task.",
     submitTitle: "Answer submission failed",
     submitDescription: "Your answer is still in the editor. Please try again.",
     hintTitle: "Hint unavailable",
@@ -77,14 +72,9 @@ export const practice = {
     nextDescription: "Unable to generate the next question right now. Please try again.",
     reviewEndDescription: "Unable to end this session right now. Please try again.",
     skipDescription: "The question was not skipped. Please try again.",
-    endDescription: "Your practice session is still active. Please try again.",
     followUpSubmitTitle: "Follow-up answer not submitted",
     followUpSubmitDescription: "Your follow-up draft is still here. Please try again.",
     endFollowUpDescription: "The follow-up is still active. Please try again.",
-    evaluationTitle: "Unable to generate the evaluation",
-    evaluationDescription: "Your complete conversation is preserved. You can safely retry.",
-    evaluationRetryDescription:
-      "The evaluation retry did not start. Your complete conversation is still preserved.",
     prepareNextRoundTitle: "Unable to prepare the next round",
     prepareNextRoundDescription: "Your session summary is still here. Please try again shortly.",
   },
@@ -129,8 +119,6 @@ export const practice = {
     answerPlaceholder: "Add your specific reasoning, actions, or evidence for this follow-up…",
     submit: "Submit follow-up answer",
     submitting: "Submitting follow-up answer",
-    processing: "Riva is reviewing your answer and preparing the next step…",
-    processingDescription: "Your answer was sent. Riva is deciding whether to follow up again.",
     endAnswering: "End this question",
     endDialogTitle: "End the current follow-up?",
     endDialogDescription:
@@ -237,7 +225,6 @@ export const practice = {
     markWeak: "Mark as weak",
     unmarkWeak: "Remove weak mark",
     skip: "Skip question",
-    end: "End practice session",
   },
   dialog: {
     cancel: "Keep answering",
@@ -245,8 +232,6 @@ export const practice = {
     skipDescription:
       "Your unsubmitted answer will not be saved. Riva will start generating another question.",
     confirmSkip: "Skip question",
-    endTitle: "End this targeted-practice session?",
-    endDescription: "Your unsubmitted answer will not be saved, and this session will end.",
     confirmEnd: "End practice",
     leaveTitle: "Leave and discard your answer?",
     leaveDescription: "This answer has not been submitted. Leaving will discard the draft.",
@@ -256,13 +241,15 @@ export const practice = {
     stay: "Keep answering",
     leave: "Leave page",
   },
-  evaluating: {
-    title: "Generating your evaluation",
-    description:
-      "This question is complete. Riva is using the full conversation to prepare multidimensional scores and a review.",
-    progress: "Evaluation usually takes only a moment. Keep this page open.",
-    retry: "Retry evaluation",
-    retrying: "Retrying evaluation",
+  processing: {
+    title: "RIVA is processing your answer",
+    description: "Deciding the next step based on this conversation. Please wait.",
+  },
+  taskFailure: {
+    title: "Processing did not complete",
+    description: "Your practice record is preserved. You can try again.",
+    retry: "Try again",
+    retrying: "Retrying",
   },
   scoreDimensions: {
     relevance: "Content relevance",
@@ -291,7 +278,6 @@ export const practice = {
     retryRecommended: "Retry this question",
     nextRecommended: "Next-question recommendation",
     actionsTitle: "Question status",
-    attempt: "Attempt {{count}}",
     retryCurrent: "Retry this question",
     nextQuestion: "Continue to next question",
     endSession: "End this session",
@@ -302,7 +288,6 @@ export const practice = {
     title: "This targeted-practice session has ended",
     description: "This targeted-practice session is complete. Here is a concise summary.",
     questions: "Questions completed: {{count}}",
-    retries: "Retries: {{count}}",
     saved: "Saved questions: {{count}}",
     markedWeak: "Marked weak questions: {{count}}",
     finalAttemptAverage: "Final-attempt average score: {{score}} points",

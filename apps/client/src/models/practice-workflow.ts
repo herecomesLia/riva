@@ -122,8 +122,8 @@ export type FollowUpCompletion =
       unanswered: PracticeFollowUp
     }
 
-export type EvaluatingSession = {
-  status: "evaluating"
+export type ProcessingSession = {
+  status: "processing"
   selection: ActiveSelection
   question: PracticeQuestion
   mainAnswer: PracticeAnswer
@@ -179,9 +179,8 @@ export type PracticeReview = {
   recommendation: PracticeRecommendation
 }
 
-export type ReviewSession = Omit<EvaluatingSession, "status"> & {
+export type ReviewSession = Omit<ProcessingSession, "status"> & {
   status: "review"
-  attemptNumber: number
   evaluation: PracticeEvaluation
   review: PracticeReview
 }
@@ -190,7 +189,6 @@ export type CompletedSession = {
   status: "completed"
   selection: ActiveSelection
   questionsCompleted: number
-  retryCount: number
   savedQuestionCount: number
   weakQuestionCount: number
   finalAttemptAverageScore: number
@@ -202,7 +200,7 @@ export type PracticeSession =
   | GeneratingSession
   | AnsweringSession
   | AnsweringFollowUpSession
-  | EvaluatingSession
+  | ProcessingSession
   | ReviewSession
   | CompletedSession
 

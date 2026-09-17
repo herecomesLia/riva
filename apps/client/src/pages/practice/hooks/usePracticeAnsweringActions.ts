@@ -2,7 +2,6 @@ import { useRef } from "react"
 
 import {
   requestAnswerFramework,
-  endPracticeSession,
   requestPracticeHint,
   requestPracticeReferenceAnswer,
   setQuestionSaved,
@@ -45,7 +44,6 @@ export function usePracticeAnsweringActions(runAction: RunPracticeAction): {
   const weakMutation = usePracticeMutation(setQuestionWeak)
   const submitAnswerMutation = usePracticeMutation(submitPrimaryAnswer)
   const skipMutation = usePracticeMutation(skipPracticeQuestion)
-  const endMutation = usePracticeMutation(endPracticeSession)
   const interactionLocked =
     hintMutation.isPending ||
     frameworkMutation.isPending ||
@@ -53,12 +51,10 @@ export function usePracticeAnsweringActions(runAction: RunPracticeAction): {
     savedMutation.isPending ||
     weakMutation.isPending ||
     submitAnswerMutation.isPending ||
-    skipMutation.isPending ||
-    endMutation.isPending
+    skipMutation.isPending
 
   return {
     actions: {
-      onEnd: () => runAction(() => endMutation.mutateAsync()),
       onRequestFramework: () => runAction(() => frameworkMutation.mutateAsync()),
       onRequestHint: () => runAction(() => hintMutation.mutateAsync()),
       onRequestReferenceAnswer: () => runAction(() => referenceAnswerMutation.mutateAsync()),
@@ -68,7 +64,6 @@ export function usePracticeAnsweringActions(runAction: RunPracticeAction): {
       onSubmitAnswer: (input) => runAction(() => submitAnswerMutation.mutateAsync(input)),
     },
     pending: {
-      end: endMutation.isPending,
       framework: frameworkMutation.isPending,
       hint: hintMutation.isPending,
       referenceAnswer: referenceAnswerMutation.isPending,

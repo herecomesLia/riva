@@ -106,8 +106,8 @@ export const NoHistoryQuestions = meta.story({
 
 export const GeneratingQuestion = meta.story({ args: createPracticeViewArgs("generatingQuestion") })
 
-export const GenerationError = meta.story({
-  args: { ...createPracticeViewArgs("generatingQuestion"), generationError: true },
+export const TaskFailureBeforeQuestion = meta.story({
+  args: { ...createPracticeViewArgs("generatingQuestion"), taskError: true },
 })
 
 export const RetryingCurrentQuestion = meta.story({
@@ -118,6 +118,6 @@ export const GeneratingNextQuestion = meta.story({
   args: createPracticeViewArgs("generatingNextQuestion"),
 })
 
-export const NextQuestionError = meta.story({
-  args: { ...createPracticeViewArgs("generatingNextQuestion"), generationError: true },
+export const TaskFailureBeforeNextQuestion = meta.story({
+  args: { ...createPracticeViewArgs("generatingNextQuestion"), taskError: true },
 })

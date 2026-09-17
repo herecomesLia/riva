@@ -18,7 +18,7 @@ export const CompletedSession = meta.story({
     const completed = canvas.getByTestId("practice-completed-state")
     await expect(completed).toBeVisible()
     await expect(completed).toHaveTextContent(/完成题数：1|Questions completed: 1/i)
-    await expect(completed).toHaveTextContent(/重练次数：0|Retries: 0/i)
+    await expect(completed).not.toHaveTextContent(/重练次数|Retries:/i)
     await expect(completed).toHaveTextContent(/标记薄弱题数：0|Marked weak questions: 0/i)
     await expect(completed).toHaveTextContent(
       /最终作答平均分：85 分|Final-attempt average score: 85 points/i,
@@ -65,18 +65,6 @@ export const CompletedNextRoundError = meta.story({
     await expect(canvas.getByRole("alert")).toBeVisible()
     await expect(canvas.queryByText(/internal next-round error/i)).not.toBeInTheDocument()
     await expect(canvas.getByTestId("practice-completed-state")).toBeVisible()
-  },
-})
-
-export const CompletedWithRetries = meta.story({
-  args: createPracticeViewArgs("completedWithRetries"),
-  play: async ({ canvas }) => {
-    const completed = canvas.getByTestId("practice-completed-state")
-    await expect(completed).toHaveTextContent(/完成题数：1|Questions completed: 1/i)
-    await expect(completed).toHaveTextContent(/重练次数：1|Retries: 1/i)
-    await expect(completed).toHaveTextContent(
-      /最终作答平均分：94 分|Final-attempt average score: 94 points/i,
-    )
   },
 })
 

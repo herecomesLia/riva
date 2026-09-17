@@ -3,8 +3,8 @@ import { vi } from "vitest"
 vi.mock("@/services/practice", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/practice")>()),
   getPracticePage: vi.fn(),
-  getPracticeEvaluationStatus: vi.fn(),
-  getQuestionGenerationStatus: vi.fn(),
+  getPracticeTaskStatus: vi.fn(),
+  retryPracticeTask: vi.fn(),
   endPracticeFollowUps: vi.fn(),
   requestAnswerFramework: vi.fn(),
   endPracticeSession: vi.fn(),

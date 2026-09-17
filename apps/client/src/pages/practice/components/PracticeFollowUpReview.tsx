@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
 import type {
-  EvaluatingSession,
+  ProcessingSession,
   FollowUpCompletion,
   PracticeFollowUp,
 } from "@/models/practice-workflow"
@@ -10,7 +10,7 @@ import type {
 import { PracticeReviewReferenceSections } from "./PracticeReferenceAnswer"
 
 type Props = {
-  exchanges: EvaluatingSession["followUps"]
+  exchanges: ProcessingSession["followUps"]
   completion: FollowUpCompletion
 }
 

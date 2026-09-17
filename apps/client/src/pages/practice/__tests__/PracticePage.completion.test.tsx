@@ -235,7 +235,7 @@ describe("PracticePage: completion", () => {
 
     const deferred = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
     vi.mocked(api.getPracticePage).mockResolvedValue(review)
-    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(generating.session)
+    vi.mocked(api.getPracticeTaskStatus).mockResolvedValue(generating.session)
     vi.mocked(api.continueToNextPracticeQuestion).mockReturnValue(deferred.promise)
     context.renderPracticePage()
     const nextButton = await testing.screen.findByRole("button", { name: /继续下一题/i })
@@ -422,7 +422,7 @@ describe("PracticePage: completion", () => {
       return
 
     vi.mocked(api.getPracticePage).mockResolvedValue(review)
-    vi.mocked(api.getQuestionGenerationStatus).mockResolvedValue(generating.session)
+    vi.mocked(api.getPracticeTaskStatus).mockResolvedValue(generating.session)
     vi.mocked(api.continueToNextPracticeQuestion).mockReturnValue(deferred.promise)
     context.renderPracticePage()
     const nextButton = await testing.screen.findByRole("button", { name: /继续下一题/i })

@@ -7,8 +7,7 @@ import {
   usePracticeActionLock,
 } from "./hooks/usePracticeAnsweringActions"
 import { usePracticeFollowUpActions } from "./hooks/usePracticeFollowUpActions"
-import { usePracticeStageRequest } from "./hooks/usePracticeStageRequest"
-import { getQuestionGenerationStatus, getPracticeEvaluationStatus } from "@/services/practice"
+import { usePracticeTask } from "./hooks/usePracticeTask"
 import { usePracticeReviewActions } from "./hooks/usePracticeReviewActions"
 import { usePracticeSession } from "./hooks/usePracticeSession"
 import { PracticeView } from "./PracticeView"
@@ -25,13 +24,9 @@ export function PracticePage() {
     historyEntryResolution,
     retryHistoryEntry,
   } = usePracticeSession(entrySearch)
-  const generation = usePracticeStageRequest(
-    practiceQuery.data?.session.status === "generatingQuestion",
-    getQuestionGenerationStatus,
-  )
-  const evaluation = usePracticeStageRequest(
-    practiceQuery.data?.session.status === "evaluating",
-    getPracticeEvaluationStatus,
+  const task = usePracticeTask(
+    practiceQuery.data?.session.status === "generatingQuestion" ||
+      practiceQuery.data?.session.status === "processing",
   )
   const runAction = usePracticeActionLock()
   const answering = usePracticeAnsweringActions(runAction)
@@ -59,16 +54,13 @@ export function PracticePage() {
           status: "ready",
           data: practiceQuery.data,
         }}
-        evaluationError={evaluation.error}
         followUpActions={followUp.actions}
         followUpPending={followUp.pending}
-        generationError={generation.error}
-        isEvaluationRetrying={evaluation.isRetrying}
-        isGenerationRetrying={generation.isRetrying}
+        taskError={task.error}
+        isTaskRetrying={task.isRetrying}
         isStarting={isStarting}
         historyEntryResolution={historyEntryResolution}
-        onRetryEvaluation={evaluation.retry}
-        onRetryGeneration={generation.retry}
+        onRetryTask={task.retry}
         onStart={start}
         reviewActions={review.actions}
         reviewPending={review.pending}

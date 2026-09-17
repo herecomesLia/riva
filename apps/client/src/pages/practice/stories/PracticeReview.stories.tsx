@@ -12,14 +12,14 @@ const meta = preview.meta({
   title: "Pages/Practice/Review",
 })
 
-export const Evaluating = meta.story({
-  args: createPracticeViewArgs("evaluatingAnswer"),
+export const Processing = meta.story({
+  args: createPracticeViewArgs("processingAnswer"),
 })
 
-export const EvaluationError = meta.story({
-  args: { ...createPracticeViewArgs("evaluatingAnswer"), evaluationError: true },
+export const TaskFailureWithConversation = meta.story({
+  args: { ...createPracticeViewArgs("processingAnswer"), taskError: true },
   play: async ({ canvas }) => {
-    await expect(canvas.getByTestId("practice-evaluation-error")).toBeVisible()
+    await expect(canvas.getByTestId("practice-task-failure")).toBeVisible()
     await expect(canvas.queryByText(/unsafe|stack|exception/i)).not.toBeInTheDocument()
   },
 })
@@ -102,18 +102,18 @@ export const FollowUpReviewWithUnansweredReference = meta.story({
 })
 
 export const FollowUpEndedEarly = meta.story({
-  args: createPracticeViewArgs("evaluatingFollowUpEndedEarly"),
+  args: createPracticeViewArgs("processingFollowUpEndedEarly"),
   play: async ({ canvas }) => {
-    await expect(canvas.getByTestId("practice-evaluating-state")).toBeVisible()
+    await expect(canvas.getByTestId("practice-processing-state")).toBeVisible()
     await expect(canvas.getByTestId("practice-follow-up-incomplete")).toBeVisible()
     await expect(canvas.queryByRole("textbox")).not.toBeInTheDocument()
   },
 })
 
-export const NoFollowUpRequired = meta.story({
-  args: createPracticeViewArgs("evaluatingNoFollowUp"),
+export const ProcessingMainAnswer = meta.story({
+  args: createPracticeViewArgs("processingNoFollowUp"),
   play: async ({ canvas }) => {
-    await expect(canvas.getByTestId("practice-evaluating-state")).toBeVisible()
+    await expect(canvas.getByTestId("practice-processing-state")).toBeVisible()
     await expect(canvas.queryByText(/追问 1|Follow-up 1/i)).not.toBeInTheDocument()
   },
 })

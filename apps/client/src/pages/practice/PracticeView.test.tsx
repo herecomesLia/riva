@@ -24,7 +24,6 @@ function createAnsweringActions(
   overrides: Partial<PracticeAnsweringActions> = {},
 ): PracticeAnsweringActions {
   return {
-    onEnd: vi.fn(async () => "executed" as const),
     onRequestFramework: vi.fn(async () => "executed" as const),
     onRequestHint: vi.fn(async () => "executed" as const),
     onRequestReferenceAnswer: vi.fn(async () => "executed" as const),
@@ -37,7 +36,6 @@ function createAnsweringActions(
 }
 
 const answeringPending: PracticeAnsweringPending = {
-  end: false,
   framework: false,
   hint: false,
   referenceAnswer: false,
@@ -95,10 +93,10 @@ const reviewPending: PracticeReviewPending = {
 function renderReadyView(
   data: PracticeData,
   options: {
-    generationError?: boolean
-    isGenerationRetrying?: boolean
+    taskError?: boolean
+    isTaskRetrying?: boolean
     isStarting?: boolean
-    onRetryGeneration?: () => void
+    onRetryTask?: () => void
     onStart?: (input: ActiveSelection) => Promise<void>
     answeringActions?: PracticeAnsweringActions
     answeringPending?: PracticeAnsweringPending
@@ -108,9 +106,6 @@ function renderReadyView(
     reviewPending?: PracticeReviewPending
     completedActions?: PracticeCompletedActions
     completedPending?: boolean
-    evaluationError?: boolean
-    isEvaluationRetrying?: boolean
-    onRetryEvaluation?: () => void
   } = {},
 ) {
   const onStart = options.onStart ?? vi.fn(async () => undefined)
@@ -129,13 +124,10 @@ function renderReadyView(
       reviewActions={options.reviewActions ?? createReviewActions()}
       reviewPending={options.reviewPending ?? reviewPending}
       content={{ status: "ready", data: viewData }}
-      evaluationError={options.evaluationError ?? false}
-      generationError={options.generationError ?? false}
-      isEvaluationRetrying={options.isEvaluationRetrying ?? false}
-      isGenerationRetrying={options.isGenerationRetrying ?? false}
+      taskError={options.taskError ?? false}
+      isTaskRetrying={options.isTaskRetrying ?? false}
       isStarting={options.isStarting ?? false}
-      onRetryGeneration={options.onRetryGeneration ?? vi.fn()}
-      onRetryEvaluation={options.onRetryEvaluation ?? vi.fn()}
+      onRetryTask={options.onRetryTask ?? vi.fn()}
       onStart={onStart}
       variant="default"
     />
@@ -188,7 +180,7 @@ const sessionStateCases = {
     scenario: "answeringFirstFollowUp",
     testId: "practice-answering-follow-up-state",
   },
-  evaluating: { scenario: "evaluatingAnswer", testId: "practice-evaluating-state" },
+  processing: { scenario: "processingAnswer", testId: "practice-processing-state" },
   review: { scenario: "reviewBalanced", testId: "practice-review-state" },
   completed: { scenario: "completedSession", testId: "practice-completed-state" },
 } as const satisfies Record<
@@ -235,7 +227,6 @@ describe("PracticeView", () => {
 
     const completed = await screen.findByTestId("practice-completed-state")
     expect(completed).toHaveTextContent(i18n.t("practice.completed.questions", { count: 1 }))
-    expect(completed).toHaveTextContent(i18n.t("practice.completed.retries", { count: 0 }))
     expect(completed).toHaveTextContent(i18n.t("practice.completed.saved", { count: 0 }))
     expect(completed).toHaveTextContent(i18n.t("practice.completed.markedWeak", { count: 0 }))
     expect(completed).toHaveTextContent(
@@ -471,15 +462,12 @@ describe("PracticeView", () => {
         completedActions={{ onPrepareNextRound: vi.fn(async () => "executed" as const) }}
         completedPending={false}
         content={{ status: "ready", data: answering }}
-        evaluationError={false}
+        taskError={false}
         followUpActions={followUpActions}
         followUpPending={followUpPending}
-        generationError={false}
-        isEvaluationRetrying={false}
-        isGenerationRetrying={false}
+        isTaskRetrying={false}
         isStarting={false}
-        onRetryEvaluation={vi.fn()}
-        onRetryGeneration={vi.fn()}
+        onRetryTask={vi.fn()}
         onStart={vi.fn(async () => undefined)}
         reviewActions={reviewActions}
         reviewPending={reviewPending}
@@ -497,15 +485,12 @@ describe("PracticeView", () => {
         completedActions={{ onPrepareNextRound: vi.fn(async () => "executed" as const) }}
         completedPending={false}
         content={{ status: "ready", data: review }}
-        evaluationError={false}
+        taskError={false}
         followUpActions={followUpActions}
         followUpPending={followUpPending}
-        generationError={false}
-        isEvaluationRetrying={false}
-        isGenerationRetrying={false}
+        isTaskRetrying={false}
         isStarting={false}
-        onRetryEvaluation={vi.fn()}
-        onRetryGeneration={vi.fn()}
+        onRetryTask={vi.fn()}
         onStart={vi.fn(async () => undefined)}
         reviewActions={reviewActions}
         reviewPending={reviewPending}
@@ -763,23 +748,22 @@ describe("PracticeView", () => {
     expect(hardButton).toHaveAttribute("aria-pressed", "true")
   })
 
-  it("keeps settings visible after generation fails and retries once", async () => {
+  it("shows the unified failure before a question exists and retries once", async () => {
     const user = userEvent.setup()
     const data = createPracticeScenario("generatingQuestion")
     if (data.session.status !== "generatingQuestion") return
     data.session.selection.difficulty = "hard"
-    const onRetryGeneration = vi.fn()
-    renderReadyView(data, { generationError: true, onRetryGeneration })
+    const onRetryTask = vi.fn()
+    renderReadyView(data, { taskError: true, onRetryTask })
 
-    const errorState = await screen.findByTestId("practice-generation-error-state")
-    expect(errorState).toHaveTextContent(i18n.t("practice.difficulty.hard"))
-    expect(errorState).toHaveTextContent("Senior Frontend Engineer")
+    const errorState = await screen.findByTestId("practice-task-failure")
+    expect(errorState).toHaveTextContent(i18n.t("practice.taskFailure.description"))
     await user.click(
       within(errorState).getByRole("button", {
-        name: i18n.t("practice.actions.retryGeneration"),
+        name: i18n.t("practice.taskFailure.retry"),
       }),
     )
-    expect(onRetryGeneration).toHaveBeenCalledTimes(1)
+    expect(onRetryTask).toHaveBeenCalledTimes(1)
   })
 
   it("shows the question card without internal scoring or answer content", async () => {
@@ -1057,19 +1041,10 @@ describe("PracticeView", () => {
     expect(actions.onSkip).toHaveBeenCalledTimes(1)
   })
 
-  it("requires confirmation before ending the practice session", async () => {
-    const user = userEvent.setup()
-    const { actions } = renderReadyView(createPracticeScenario("answeringQuestion"))
-
-    await user.click(
-      await screen.findByRole("button", { name: i18n.t("practice.questionActions.end") }),
-    )
-    expect(actions.onEnd).not.toHaveBeenCalled()
-    const dialog = screen.getByRole("alertdialog")
-    await user.click(
-      within(dialog).getByRole("button", { name: i18n.t("practice.dialog.confirmEnd") }),
-    )
-    expect(actions.onEnd).toHaveBeenCalledTimes(1)
+  it("does not offer ending the session while answering", async () => {
+    renderReadyView(createPracticeScenario("answeringQuestion"))
+    await screen.findByTestId("practice-answering-state")
+    expect(screen.queryByRole("button", { name: i18n.t("practice.review.endSession") })).toBeNull()
   })
 
   it("blocks route changes while an unsubmitted draft exists", async () => {
@@ -1485,7 +1460,9 @@ describe("PracticeView", () => {
       },
     })
 
-    expect(await screen.findByText(i18n.t("practice.followUp.processing"))).toBeVisible()
+    expect(
+      await screen.findByRole("button", { name: i18n.t("practice.followUp.submitting") }),
+    ).toBeDisabled()
     expect(
       screen.getByRole("button", { name: i18n.t("practice.followUp.submitting") }),
     ).toBeDisabled()
@@ -1513,24 +1490,24 @@ describe("PracticeView", () => {
   })
 
   it("keeps the completed timeline visible while scoring is pending", async () => {
-    const data = createPracticeScenario("evaluatingNoFollowUp")
+    const data = createPracticeScenario("processingNoFollowUp")
     renderReadyView(data)
-    if (data.session.status !== "evaluating") return
+    if (data.session.status !== "processing") return
 
     const timeline = await screen.findByTestId("practice-conversation-timeline")
     expect(timeline).toHaveTextContent(data.session.question.prompt)
     expect(timeline).toHaveTextContent(data.session.mainAnswer.content)
-    expect(screen.getByTestId("practice-evaluating-state")).toHaveTextContent(
-      i18n.t("practice.evaluating.title"),
+    expect(screen.getByTestId("practice-processing-state")).toHaveTextContent(
+      i18n.t("practice.processing.title"),
     )
     expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
   })
 
   it("shows the unanswered follow-up in order after follow-ups end early", async () => {
-    const data = createPracticeScenario("evaluatingFollowUpEndedEarly")
+    const data = createPracticeScenario("processingFollowUpEndedEarly")
     renderReadyView(data)
     if (
-      data.session.status !== "evaluating" ||
+      data.session.status !== "processing" ||
       data.session.followUpCompletion.status !== "endedEarly"
     ) {
       return
@@ -1566,19 +1543,19 @@ describe("PracticeView", () => {
 
   it("shows a safe evaluation error and retries without losing the conversation", async () => {
     const user = userEvent.setup()
-    const data = createPracticeScenario("evaluatingAnswer")
-    const onRetryEvaluation = vi.fn()
-    renderReadyView(data, { evaluationError: true, onRetryEvaluation })
-    if (data.session.status !== "evaluating") return
+    const data = createPracticeScenario("processingAnswer")
+    const onRetryTask = vi.fn()
+    renderReadyView(data, { taskError: true, onRetryTask })
+    if (data.session.status !== "processing") return
 
     expect(await screen.findByTestId("practice-conversation-timeline")).toHaveTextContent(
       data.session.mainAnswer.content,
     )
-    const error = screen.getByTestId("practice-evaluation-error")
-    expect(error).toHaveTextContent(i18n.t("practice.errors.evaluationDescription"))
+    const error = screen.getByTestId("practice-task-failure")
+    expect(error).toHaveTextContent(i18n.t("practice.taskFailure.description"))
     expect(error).not.toHaveTextContent("stack trace")
-    await user.click(screen.getByRole("button", { name: i18n.t("practice.evaluating.retry") }))
-    expect(onRetryEvaluation).toHaveBeenCalledOnce()
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.taskFailure.retry") }))
+    expect(onRetryTask).toHaveBeenCalledOnce()
   })
 
   it("renders all eight score dimensions with response explanations", async () => {

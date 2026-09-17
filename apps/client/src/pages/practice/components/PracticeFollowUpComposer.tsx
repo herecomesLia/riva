@@ -83,11 +83,7 @@ export function PracticeFollowUpComposer({
     <Card data-testid="practice-follow-up-composer">
       <CardHeader>
         <CardTitle>{t("practice.followUp.composerTitle")}</CardTitle>
-        <CardDescription>
-          {isPending
-            ? t("practice.followUp.processingDescription")
-            : t("practice.followUp.composerDescription")}
-        </CardDescription>
+        <CardDescription>{t("practice.followUp.composerDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -120,7 +116,7 @@ export function PracticeFollowUpComposer({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <FieldDescription aria-live="polite">
                     {isPending
-                      ? t("practice.followUp.processing")
+                      ? t("practice.followUp.submitting")
                       : t("practice.answer.characterCount", { count: field.state.value.length })}
                   </FieldDescription>
                   <div className="flex flex-wrap gap-2">

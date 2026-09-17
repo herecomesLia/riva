@@ -4,7 +4,7 @@ import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Message, MessageContent, MessageHeader } from "@/components/ui/message"
 import type {
-  EvaluatingSession,
+  ProcessingSession,
   PracticeFollowUp,
   PracticeAnswer,
   FollowUpCompletion,
@@ -14,7 +14,7 @@ import type {
 type PracticeConversationTimelineProps = {
   question: PracticeQuestion
   mainAnswer: PracticeAnswer
-  followUps: EvaluatingSession["followUps"]
+  followUps: ProcessingSession["followUps"]
   currentFollowUp?: PracticeFollowUp
   followUpCompletion?: FollowUpCompletion
 }

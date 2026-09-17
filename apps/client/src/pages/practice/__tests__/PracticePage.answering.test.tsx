@@ -93,7 +93,7 @@ describe("PracticePage: answering", () => {
     expect(api.prepareNextPracticeSession).not.toHaveBeenCalled()
   })
 
-  it("prevents duplicate main-answer submission and enters follow-up", async () => {
+  it("prevents duplicate submission and preserves the answer while processing before follow-up", async () => {
     const user = userEvent.setup()
     const answering = api.createPracticeScenario("answeringQuestion")
     const following = api.createPracticeScenario("answeringFirstFollowUp")
@@ -106,8 +106,14 @@ describe("PracticePage: answering", () => {
 
     const submission =
       context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
+    const task = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
+    const processing = api.createPracticeScenario("processingNoFollowUp")
+    if (processing.session.status !== "processing") throw new Error("Processing fixture required.")
+    processing.session.mainAnswer.content = "我负责定位问题并推动方案落地。"
+    following.session.mainAnswer = structuredClone(processing.session.mainAnswer)
     vi.mocked(api.getPracticePage).mockResolvedValue(answering)
     vi.mocked(api.submitPrimaryAnswer).mockReturnValue(submission.promise)
+    vi.mocked(api.getPracticeTaskStatus).mockReturnValue(task.promise)
 
     context.renderPracticePage()
 
@@ -137,8 +143,8 @@ describe("PracticePage: answering", () => {
       testing.screen.getByRole("button", { name: i18n.t("practice.questionActions.skip") }),
     ).toBeDisabled()
     expect(
-      testing.screen.getByRole("button", { name: i18n.t("practice.questionActions.end") }),
-    ).toBeDisabled()
+      testing.screen.queryByRole("button", { name: i18n.t("practice.review.endSession") }),
+    ).toBeNull()
     await user.click(pendingButton)
     expect(api.submitPrimaryAnswer).toHaveBeenCalledTimes(1)
     expect(api.requestPracticeHint).not.toHaveBeenCalled()
@@ -149,8 +155,19 @@ describe("PracticePage: answering", () => {
     expect(api.endPracticeSession).not.toHaveBeenCalled()
 
     await testing.act(async () => {
-      submission.resolve(following.session)
+      submission.resolve(processing.session)
       await submission.promise
+    })
+    expect(await testing.screen.findByTestId("practice-processing-status")).toHaveTextContent(
+      i18n.t("practice.processing.title"),
+    )
+    expect(testing.screen.getByTestId("practice-conversation-timeline")).toHaveTextContent(
+      "我负责定位问题并推动方案落地。",
+    )
+    expect(testing.screen.queryByRole("textbox")).toBeNull()
+    await testing.act(async () => {
+      task.resolve(following.session)
+      await task.promise
     })
     expect(
       await testing.screen.findByTestId("practice-answering-follow-up-state"),
@@ -185,7 +202,6 @@ describe("PracticePage: answering", () => {
       i18n.t("practice.questionActions.save"),
       i18n.t("practice.questionActions.markWeak"),
       i18n.t("practice.questionActions.skip"),
-      i18n.t("practice.questionActions.end"),
       i18n.t("practice.answer.submit"),
     ]
     for (const name of lockedButtonNames) {

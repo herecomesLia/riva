@@ -1,4 +1,4 @@
-import { LogOutIcon, SkipForwardIcon } from "lucide-react"
+import { SkipForwardIcon } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -22,29 +22,25 @@ import { PracticeFlagActions } from "./PracticeFlagActions"
 
 type PracticeQuestionActionsProps = {
   interactionLocked: boolean
-  isEndPending: boolean
   isWeak: boolean
   isSaved: boolean
   isSavedPending: boolean
   isSkipPending: boolean
   isWeakPending: boolean
-  onEnd: () => Promise<PracticeInteractionResult>
   onSetSaved: (isSaved: boolean) => Promise<PracticeInteractionResult>
   onSetWeak: (isWeak: boolean) => Promise<PracticeInteractionResult>
   onSkip: () => Promise<PracticeInteractionResult>
 }
 
-type ActionError = "saved" | "weak" | "skip" | "end" | null
+type ActionError = "saved" | "weak" | "skip" | null
 
 export function PracticeQuestionActions({
   interactionLocked,
-  isEndPending,
   isWeak,
   isSaved,
   isSavedPending,
   isSkipPending,
   isWeakPending,
-  onEnd,
   onSetSaved,
   onSetWeak,
   onSkip,
@@ -52,7 +48,6 @@ export function PracticeQuestionActions({
   const { t } = useTranslation()
   const [actionError, setActionError] = useState<ActionError>(null)
   const [skipOpen, setSkipOpen] = useState(false)
-  const [endOpen, setEndOpen] = useState(false)
 
   async function setSaved() {
     if (interactionLocked) return
@@ -82,17 +77,6 @@ export function PracticeQuestionActions({
       if (result === "executed") setSkipOpen(false)
     } catch {
       setActionError("skip")
-    }
-  }
-
-  async function end() {
-    if (interactionLocked) return
-    setActionError(null)
-    try {
-      const result = await onEnd()
-      if (result === "executed") setEndOpen(false)
-    } catch {
-      setActionError("end")
     }
   }
 
@@ -152,43 +136,6 @@ export function PracticeQuestionActions({
             <AlertDialogAction disabled={interactionLocked} onClick={() => void skip()}>
               {isSkipPending ? <Spinner aria-hidden="true" data-icon="inline-start" /> : null}
               {t("practice.dialog.confirmSkip")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog onOpenChange={setEndOpen} open={endOpen}>
-        <AlertDialogTrigger
-          render={
-            <Button
-              className="w-full sm:w-auto"
-              disabled={interactionLocked}
-              type="button"
-              variant="outline"
-            >
-              <LogOutIcon data-icon="inline-start" />
-              {t("practice.questionActions.end")}
-            </Button>
-          }
-        />
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("practice.dialog.endTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("practice.dialog.endDescription")}</AlertDialogDescription>
-          </AlertDialogHeader>
-          {actionError === "end" ? (
-            <PracticeActionErrorAlert description={t("practice.errors.endDescription")} />
-          ) : null}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={interactionLocked}>
-              {t("practice.dialog.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={interactionLocked}
-              onClick={() => void end()}
-              variant="destructive"
-            >
-              {isEndPending ? <Spinner aria-hidden="true" data-icon="inline-start" /> : null}
-              {t("practice.dialog.confirmEnd")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

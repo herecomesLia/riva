@@ -23,18 +23,6 @@ export function createPracticeFaker() {
       })
     },
 
-    // One call advances the loading sample; no background job is simulated.
-    async pollQuestion() {
-      if (session.status !== "generatingQuestion") return structuredClone(session)
-
-      return update({
-        status: "answering",
-        assistedRetry: false,
-        selection: session.selection,
-        question: practiceFixture.question,
-      })
-    },
-
     async hint() {
       if (session.status !== "answering") return structuredClone(session)
 
@@ -97,12 +85,12 @@ export function createPracticeFaker() {
 
       const mainAnswer = { content: content.trim() }
       return update({
-        status: "answeringFollowUp",
+        status: "processing",
         selection: session.selection,
         question: session.question,
         mainAnswer,
         followUps: [],
-        currentFollowUp: practiceFixture.followUp.question,
+        followUpCompletion: { status: "completed" },
       })
     },
 
@@ -153,7 +141,7 @@ export function createPracticeFaker() {
       if (session.status !== "answeringFollowUp") return structuredClone(session)
 
       return update({
-        status: "evaluating",
+        status: "processing",
         selection: session.selection,
         question: session.question,
         mainAnswer: session.mainAnswer,
@@ -172,7 +160,7 @@ export function createPracticeFaker() {
       if (session.status !== "answeringFollowUp") return structuredClone(session)
 
       return update({
-        status: "evaluating",
+        status: "processing",
         selection: session.selection,
         question: session.question,
         mainAnswer: session.mainAnswer,
@@ -184,9 +172,28 @@ export function createPracticeFaker() {
       })
     },
 
-    // One call advances the evaluation sample to review.
-    async pollEvaluation() {
-      if (session.status !== "evaluating") return structuredClone(session)
+    // One poll completes the provisional round task, yielding a question, follow-up, or result.
+    async pollTask() {
+      if (session.status === "generatingQuestion") {
+        return update({
+          status: "answering",
+          assistedRetry: false,
+          selection: session.selection,
+          question: practiceFixture.question,
+        })
+      }
+      if (session.status !== "processing") return structuredClone(session)
+
+      if (session.followUps.length === 0 && session.followUpCompletion.status !== "endedEarly") {
+        return update({
+          status: "answeringFollowUp",
+          selection: session.selection,
+          question: session.question,
+          mainAnswer: session.mainAnswer,
+          followUps: session.followUps,
+          currentFollowUp: practiceFixture.followUp.question,
+        })
+      }
 
       const questionHelp = practiceFixture.questionHelp
       const question = structuredClone(session.question)
@@ -238,7 +245,6 @@ export function createPracticeFaker() {
                 unanswered: revealFollowUp(session.followUpCompletion.unanswered),
               }
             : session.followUpCompletion,
-        attemptNumber: practiceFixture.attemptNumber,
         evaluation: practiceFixture.evaluation,
         review: practiceFixture.review,
       })
@@ -278,7 +284,7 @@ export function createPracticeFaker() {
     },
 
     async endSession() {
-      if (session.status !== "review" && session.status !== "answering") {
+      if (session.status !== "review") {
         return structuredClone(session)
       }
 

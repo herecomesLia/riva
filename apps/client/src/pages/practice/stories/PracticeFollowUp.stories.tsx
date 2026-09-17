@@ -147,9 +147,9 @@ export const FollowUpSubmitError = meta.story({
 })
 
 export const FollowUpCompleted = meta.story({
-  args: createPracticeViewArgs("evaluatingAnswer"),
+  args: createPracticeViewArgs("processingAnswer"),
   play: async ({ canvas }) => {
-    await expect(canvas.getByTestId("practice-evaluating-state")).toBeVisible()
+    await expect(canvas.getByTestId("practice-processing-state")).toBeVisible()
     await expect(canvas.getByTestId("practice-conversation-timeline")).toBeVisible()
   },
 })

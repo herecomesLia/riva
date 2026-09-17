@@ -7,8 +7,8 @@ import { PracticePage } from "@/pages/practice"
 import {
   endPracticeFollowUps,
   getPracticePage,
-  getPracticeEvaluationStatus,
-  getQuestionGenerationStatus,
+  getPracticeTaskStatus,
+  retryPracticeTask,
   requestAnswerFramework,
   endPracticeSession,
   requestPracticeHint,
@@ -48,8 +48,8 @@ export function renderPracticePage(initialEntry = "/practice") {
 beforeEach(async () => {
   await i18n.changeLanguage(defaultLanguage)
   vi.mocked(getPracticePage).mockReset()
-  vi.mocked(getPracticeEvaluationStatus).mockReset()
-  vi.mocked(getQuestionGenerationStatus).mockReset()
+  vi.mocked(getPracticeTaskStatus).mockReset()
+  vi.mocked(retryPracticeTask).mockReset()
   vi.mocked(endPracticeFollowUps).mockReset()
   vi.mocked(requestAnswerFramework).mockReset()
   vi.mocked(endPracticeSession).mockReset()
@@ -73,8 +73,8 @@ beforeEach(async () => {
 export {
   createPracticeScenario,
   getPracticePage,
-  getPracticeEvaluationStatus,
-  getQuestionGenerationStatus,
+  getPracticeTaskStatus,
+  retryPracticeTask,
   endPracticeFollowUps,
   requestAnswerFramework,
   endPracticeSession,
