@@ -14,13 +14,13 @@ from riva.models.career_profile import (
     ProjectEntry,
     WorkExperienceEntry,
 )
-from riva.services.career_profiles import CareerProfileService
+from riva.services.career_profile import CareerProfileService
 from riva.services.errors import (
     ConflictError,
     DomainValidationError,
     NotFoundError,
 )
-from riva.services.users import UserService
+from riva.services.user import UserService
 
 
 @pytest.fixture

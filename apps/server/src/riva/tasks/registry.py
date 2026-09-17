@@ -35,7 +35,7 @@ class Task(Enum):
 
 
 IMPORT_PATHS: tuple[str, ...] = (
-    "riva.tasks.roles",
+    "riva.tasks.role",
     "riva.tasks.career_profile",
     "riva.tasks.practice",
 )
@@ -43,3 +43,4 @@ IMPORT_PATHS: tuple[str, ...] = (
 
 def configure_task_registry(app: procrastinate.App) -> None:
     app.import_paths = IMPORT_PATHS
+    app.perform_import_paths.cache_clear()

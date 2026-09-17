@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from riva.db import Database
 from riva.models.role import JobDescription, Role
 from riva.services.errors import ConflictError, NotFoundError
-from riva.services.job_descriptions import JobDescriptionService
-from riva.services.roles import RoleService
-from riva.services.users import UserService
+from riva.services.job_description import JobDescriptionService
+from riva.services.role import RoleService
+from riva.services.user import UserService
 
 
 async def test_update_jd_preserves_untouched_modules_and_refreshes_parent_timestamp(
@@ -33,7 +33,7 @@ async def test_update_jd_preserves_untouched_modules_and_refreshes_parent_timest
     await role_service.session.commit()
     next_updated_at = datetime(2025, 1, 2, tzinfo=UTC)
     monkeypatch.setattr(
-        "riva.services.job_descriptions.utc_now", lambda: next_updated_at
+        "riva.services.job_description.utc_now", lambda: next_updated_at
     )
 
     await JobDescriptionService(role_service.session).update(

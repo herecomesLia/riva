@@ -9,7 +9,7 @@ from riva.api.errors import CsrfFailedError
 from riva.api.errors.openapi import error_responses
 from riva.models import User
 from riva.schemas.auth import LoginCredentials, RegisterCredentials
-from riva.schemas.users import UserResponse
+from riva.schemas.user import UserResponse
 from riva.services.errors import InvalidCredentialsError, UsernameTakenError
 
 logger = structlog.get_logger("riva.auth")

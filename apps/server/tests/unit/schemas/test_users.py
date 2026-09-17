@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from riva.schemas.users import UpdateCurrentUserRequest
+from riva.schemas.user import UpdateCurrentUserRequest
 
 
 def test_current_user_update_accepts_display_name() -> None:

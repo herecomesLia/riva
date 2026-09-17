@@ -16,8 +16,8 @@ from riva.models.role import (
     Role,
 )
 from riva.services.errors import ConflictError, NotFoundError
-from riva.services.roles import RoleService
-from riva.services.users import UserService
+from riva.services.role import RoleService
+from riva.services.user import UserService
 
 
 @pytest.fixture

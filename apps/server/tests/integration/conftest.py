@@ -26,7 +26,7 @@ from riva.models.role import (
     RoleMatching,
     RoleMatchingAnalysis,
 )
-from riva.services.users import UserService
+from riva.services.user import UserService
 from riva.tasks import setup_task_schema
 from tests.support.clock import Clock
 from tests.support.settings import TEST_ORIGIN, make_test_settings
@@ -189,7 +189,7 @@ def user_service(db_session: AsyncSession, settings: Settings) -> UserService:
 @pytest.fixture
 def clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
     test_clock = Clock()
-    monkeypatch.setattr("riva.services.users.utc_now", test_clock)
+    monkeypatch.setattr("riva.services.user.utc_now", test_clock)
     return test_clock
 
 

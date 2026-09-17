@@ -18,7 +18,7 @@ from riva.schemas.practice import (
     PracticeSummaryResponse,
     SubmitPracticeAnswerRequest,
 )
-from riva.schemas.tasks import (
+from riva.schemas.task import (
     TaskErrorBody,
     TaskFailureResponse,
     TaskStateResponse,

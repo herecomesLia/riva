@@ -17,7 +17,7 @@ from riva.services.errors import (
     SessionExpiredError,
     UsernameTakenError,
 )
-from riva.services.users import UserService
+from riva.services.user import UserService
 from tests.support.clock import Clock
 
 USERNAME = "TestUser"

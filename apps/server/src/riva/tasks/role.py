@@ -3,7 +3,7 @@ from uuid import UUID
 from procrastinate import JobContext
 from sqlalchemy import select, update
 
-from riva.ai.roles import JobDescriptionExtractor, RoleMatchingAnalyzer
+from riva.ai.role import JobDescriptionExtractor, RoleMatchingAnalyzer
 from riva.llm.errors import LLMOutputError, LLMUnavailableError
 from riva.models.career_profile import CareerProfile, CareerProfileContent
 from riva.models.role import (

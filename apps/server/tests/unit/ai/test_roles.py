@@ -8,7 +8,7 @@ from langchain_core.runnables import RunnableLambda
 from openai import BadRequestError
 from pydantic import ValidationError
 
-from riva.ai.roles import (
+from riva.ai.role import (
     CriterionMatch,
     JobDescriptionExtractor,
     MatchingCriteria,

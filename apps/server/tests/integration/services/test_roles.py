@@ -8,7 +8,7 @@ from riva.models.role import (
     RoleMatchingAnalysis,
 )
 from riva.models.user import User
-from riva.services.roles import RoleService
+from riva.services.role import RoleService
 from tests.support.practice import make_input
 
 

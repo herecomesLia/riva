@@ -12,9 +12,9 @@ from riva.llm import LLMClient
 from riva.llm.errors import LLMOutputError, LLMUnavailableError
 from riva.models import User
 from riva.models.career_profile import CareerProfile, CareerProfileContent
-from riva.services.career_profiles import CareerProfileService
+from riva.services.career_profile import CareerProfileService
 from riva.services.errors import ConflictError
-from riva.services.users import UserService
+from riva.services.user import UserService
 from riva.tasks import (
     Task,
     TaskController,

@@ -11,11 +11,11 @@ from riva.core.config import Settings
 from riva.db import Database
 from riva.llm import LLMClient
 from riva.models import User
-from riva.services.career_profiles import CareerProfileService
-from riva.services.job_descriptions import JobDescriptionService
+from riva.services.career_profile import CareerProfileService
+from riva.services.job_description import JobDescriptionService
 from riva.services.practice import PracticeService
-from riva.services.roles import RoleService
-from riva.services.users import UserService
+from riva.services.role import RoleService
+from riva.services.user import UserService
 
 
 def get_settings(request: Request) -> Settings:

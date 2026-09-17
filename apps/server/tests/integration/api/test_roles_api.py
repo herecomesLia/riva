@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from riva.db import Database
 from riva.models.role import Role
-from riva.services.job_descriptions import JobDescriptionService
+from riva.services.job_description import JobDescriptionService
 from riva.tasks import TaskErrorCode
 from tests.support.assertions import assert_error_response
 from tests.support.auth import ORIGIN_HEADERS, register_user

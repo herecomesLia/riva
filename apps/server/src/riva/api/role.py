@@ -23,7 +23,7 @@ from riva.schemas.role import (
     UpdateJobDescriptionRequest,
     UpdateRoleRequest,
 )
-from riva.schemas.tasks import (
+from riva.schemas.task import (
     TaskErrorBody,
     TaskFailureResponse,
     TaskStateResponse,

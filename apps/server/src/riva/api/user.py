@@ -10,7 +10,7 @@ from riva.api.errors import (
 )
 from riva.api.errors.openapi import error_responses
 from riva.models import User
-from riva.schemas.users import UpdateCurrentUserRequest, UserResponse
+from riva.schemas.user import UpdateCurrentUserRequest, UserResponse
 from riva.services.errors import InvalidSessionError, SessionExpiredError
 
 router = APIRouter(

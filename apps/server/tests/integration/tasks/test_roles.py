@@ -25,8 +25,8 @@ from riva.models.role import (
     RoleMatchingAnalysis,
     RoleMatchingResult,
 )
-from riva.services.job_descriptions import JobDescriptionService
-from riva.services.roles import RoleService
+from riva.services.job_description import JobDescriptionService
+from riva.services.role import RoleService
 from riva.tasks import (
     Task,
     TaskController,
@@ -37,7 +37,7 @@ from riva.tasks import (
 )
 from riva.tasks.core.app import create_task_connector
 from riva.tasks.registry import configure_task_registry
-from riva.tasks.roles import analyze_role_matching, extract_jd_text
+from riva.tasks.role import analyze_role_matching, extract_jd_text
 
 CONTENT = JobDescriptionContent(
     responsibilities=["Build APIs"],
@@ -52,7 +52,7 @@ CONTENT = JobDescriptionContent(
 @pytest.fixture
 def extract(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
     result = AsyncMock(return_value=CONTENT)
-    monkeypatch.setattr("riva.tasks.roles.JobDescriptionExtractor.from_text", result)
+    monkeypatch.setattr("riva.tasks.role.JobDescriptionExtractor.from_text", result)
     return result
 
 
@@ -326,7 +326,7 @@ async def matching_role(extraction_database, extraction_role):
 @pytest.fixture
 def analyze(monkeypatch):
     mock = AsyncMock(return_value=MATCHING_RESULT.model_copy(update={"score": 90}))
-    monkeypatch.setattr("riva.tasks.roles.RoleMatchingAnalyzer.analyze", mock)
+    monkeypatch.setattr("riva.tasks.role.RoleMatchingAnalyzer.analyze", mock)
     return mock
 
 
@@ -470,7 +470,7 @@ async def test_matching_late_completion_respects_ownership_and_input_snapshots(
                 elif action == "delete":
                     await service.delete(user, role.id)
                 else:
-                    from riva.services.career_profiles import CareerProfileService
+                    from riva.services.career_profile import CareerProfileService
 
                     await CareerProfileService(session).update(user, skills=["Go"])
                     await JobDescriptionService(session).update(

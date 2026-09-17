@@ -12,7 +12,7 @@ from riva.schemas.career_profile import (
     CreateCareerProfileRequest,
     UpdateCareerProfileRequest,
 )
-from riva.schemas.tasks import (
+from riva.schemas.task import (
     TaskErrorBody,
     TaskFailureResponse,
     TaskStateResponse,

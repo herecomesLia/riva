@@ -10,7 +10,7 @@ from riva.schemas.health import (
     HealthStatus,
     ServiceHealthStatus,
 )
-from riva.schemas.users import UpdateCurrentUserRequest, UserResponse
+from riva.schemas.user import UpdateCurrentUserRequest, UserResponse
 
 __all__ = [
     "CareerProfileResponse",
