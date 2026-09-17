@@ -11,6 +11,4 @@ export interface CreatePracticeRequest {
   roleId: string
   questionType: PracticeQuestionType
   difficulty: PracticeDifficulty
-  /** @minimum 0 */
-  maxFollowUps: number
 }

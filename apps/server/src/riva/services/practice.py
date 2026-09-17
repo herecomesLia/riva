@@ -80,7 +80,7 @@ class PracticeService:
         role: Role,
         question_type: PracticeQuestionType,
         difficulty: PracticeDifficulty,
-        max_follow_ups: int,
+        max_follow_ups: int = 3,
     ) -> UUID:
         user = await self._lock_user(user)
         if user.active_practice_id is not None:

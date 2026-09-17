@@ -59,7 +59,6 @@ def _build_practice_response(practice: PracticeSession) -> PracticeResponse:
         role=_build_role_response(practice),
         question_type=practice.question_type,
         difficulty=practice.difficulty,
-        max_follow_ups=practice.max_follow_ups,
         rounds=[
             PracticeRoundResponse.model_validate(round) for round in practice.rounds
         ],
@@ -134,7 +133,6 @@ async def create_practice(
         role=role,
         question_type=payload.question_type,
         difficulty=payload.difficulty,
-        max_follow_ups=payload.max_follow_ups,
     )
     return CreatePracticeResponse(id=practice_id)
 

@@ -20,7 +20,6 @@ class CreatePracticeRequest(RequestModel):
     role_id: UUID
     question_type: PracticeQuestionType
     difficulty: PracticeDifficulty
-    max_follow_ups: int = Field(strict=True, ge=0)
 
 
 class SubmitPracticeAnswerRequest(RequestModel):
@@ -72,7 +71,6 @@ class PracticeResponse(ResponseModel):
     role: PracticeRoleResponse
     question_type: PracticeQuestionType
     difficulty: PracticeDifficulty
-    max_follow_ups: int
     rounds: list[PracticeRoundResponse]
     ended_at: datetime | None
     created_at: datetime

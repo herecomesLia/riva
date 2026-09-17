@@ -312,7 +312,6 @@ export const getCreatePracticeRequestMock = (
   roleId: faker.string.uuid(),
   questionType: getPracticeQuestionTypeMock(),
   difficulty: getPracticeDifficultyMock(),
-  maxFollowUps: faker.number.int({ min: 0 }),
   ...overrideResponse,
 })
 
@@ -730,7 +729,6 @@ export const getPracticeResponseMock = (
   role: { ...getPracticeRoleResponseMock() },
   questionType: getPracticeQuestionTypeMock(),
   difficulty: getPracticeDifficultyMock(),
-  maxFollowUps: faker.number.int(),
   rounds: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
     () => ({ ...getPracticeRoundResponseMock() }),
   ),

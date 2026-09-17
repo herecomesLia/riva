@@ -27,7 +27,6 @@ async def _create_practice(client):
             "roleId": role.json()["id"],
             "questionType": "project",
             "difficulty": "hard",
-            "maxFollowUps": 1,
         },
     )
     assert response.status_code == 201, response.text
@@ -75,7 +74,6 @@ async def test_create_and_active_identify_the_current_round(client):
         "role": {"id": role_id, "title": "Engineer", "company": "Original company"},
         "questionType": "project",
         "difficulty": "hard",
-        "maxFollowUps": 1,
         "createdAt": active["createdAt"],
     }
 

@@ -14,7 +14,6 @@ export interface PracticeResponse {
   role: PracticeRoleResponse
   questionType: PracticeQuestionType
   difficulty: PracticeDifficulty
-  maxFollowUps: number
   rounds: PracticeRoundResponse[]
   endedAt: string | null
   createdAt: string

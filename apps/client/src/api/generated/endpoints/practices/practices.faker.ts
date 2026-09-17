@@ -48,7 +48,6 @@ export const getGetActivePracticeResponseMock = (
   role: { ...getPracticeRoleResponseMock() },
   questionType: getPracticeQuestionTypeMock(),
   difficulty: getPracticeDifficultyMock(),
-  maxFollowUps: faker.number.int(),
   rounds: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
     () => ({ ...getPracticeRoundResponseMock() }),
   ),
@@ -64,7 +63,6 @@ export const getGetPracticeResponseMock = (
   role: { ...getPracticeRoleResponseMock() },
   questionType: getPracticeQuestionTypeMock(),
   difficulty: getPracticeDifficultyMock(),
-  maxFollowUps: faker.number.int(),
   rounds: Array.from({ length: faker.number.int({ min: 1, max: 10 }) }, (_, i) => i + 1).map(
     () => ({ ...getPracticeRoundResponseMock() }),
   ),

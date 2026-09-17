@@ -110,11 +110,11 @@ async def test_create_claims_active_session_and_captures_context(extraction_data
             role=role,
             question_type="project",
             difficulty="hard",
-            max_follow_ups=1,
         )
     async with db.sessionmaker() as session:
         practice = await session.get(PracticeSession, practice_id)
         assert (await session.get(User, user_id)).active_practice_id == practice_id
+        assert practice.max_follow_ups == 3
         assert (
             practice.profile_snapshot == profile
             and practice.role_snapshot == role_context
@@ -147,7 +147,6 @@ async def test_active_practice_follows_session_lifecycle(
             role=role,
             question_type="project",
             difficulty="hard",
-            max_follow_ups=1,
         )
         active = await service.get_active(user)
         assert active.id == created
@@ -222,7 +221,6 @@ async def test_concurrent_create_allows_only_one_active_session(extraction_datab
                     role=role,
                     question_type="project",
                     difficulty="hard",
-                    max_follow_ups=1,
                 )
             except ConflictError:
                 return None
@@ -472,7 +470,6 @@ async def test_end_session_releases_active_practice(extraction_database):
             role=practice.role,
             question_type="project",
             difficulty="hard",
-            max_follow_ups=1,
         )
         assert new != practice_id and user.active_practice_id == new
 
@@ -576,7 +573,6 @@ async def test_dispatch_failure_rolls_back_business_mutation(
                     role=await session.get(Role, role_id),
                     question_type="project",
                     difficulty="hard",
-                    max_follow_ups=1,
                 )
             else:
                 await service.restart_round(user, practice_id, round_id=round_id)
