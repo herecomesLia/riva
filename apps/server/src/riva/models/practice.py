@@ -60,7 +60,7 @@ class PracticeCriterion(BaseModel):
 
 class PracticeQuestionContent(BaseModel):
     content: NonBlankStr = Field(
-        description="One focused interview question; do not disclose hints, frameworks, assessment criteria or the reference answer."
+        description="The interview question presented to the candidate."
     )
     guidance: PracticeGuidance = Field(
         description="Coaching hints and an answer framework, separate from the question content."
@@ -69,7 +69,7 @@ class PracticeQuestionContent(BaseModel):
         description="Question-specific assessment criteria used for evaluation and review."
     )
     reference_answer: NonBlankStr = Field(
-        description="Illustrative answer, not the only correct solution; use conditional wording for facts absent from the profile."
+        description="An illustrative answer to the question, not the only correct solution."
     )
 
 

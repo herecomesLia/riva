@@ -348,7 +348,12 @@ class _PracticeRoundState(TypedDict):
 
 
 class _GeneratedQuestion(PracticeQuestionContent):
-    pass
+    content: NonBlankStr = Field(
+        description="One focused interview question; do not disclose hints, frameworks, assessment criteria or the reference answer."
+    )
+    reference_answer: NonBlankStr = Field(
+        description="Illustrative answer, not the only correct solution; use conditional wording for facts absent from the profile."
+    )
 
 
 class _NextStep(BaseModel):

@@ -10,7 +10,7 @@ import type { PracticeQuestionTurnResponseRole } from "./practiceQuestionTurnRes
 
 export interface PracticeQuestionTurnResponse {
   /**
-   * One focused interview question; do not disclose hints, frameworks, assessment criteria or the reference answer.
+   * The interview question presented to the candidate.
    * @minLength 1
    */
   content: string
@@ -19,7 +19,7 @@ export interface PracticeQuestionTurnResponse {
   /** Question-specific assessment criteria used for evaluation and review. */
   criteria: PracticeCriterion[]
   /**
-   * Illustrative answer, not the only correct solution; use conditional wording for facts absent from the profile.
+   * An illustrative answer to the question, not the only correct solution.
    * @minLength 1
    */
   referenceAnswer: string
