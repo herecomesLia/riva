@@ -34,15 +34,15 @@ describe("Practice service", () => {
       title: roleFixture.title,
       company: roleFixture.company,
       supportedQuestionTypes: [
-        "projectDeepDive",
+        "project",
         "behavioral",
-        "businessUnderstanding",
+        "business_understanding",
         "motivation",
-        "technicalFoundation",
+        "technical_basics",
       ],
     })
     expect(page.setupContext).toMatchObject({
-      availableDifficulties: ["basic", "pressure"],
+      availableDifficulties: ["basic", "hard"],
       eligibleQuestionCounts: { saved: 1, history: 1 },
     })
     expect(page.session).toEqual({

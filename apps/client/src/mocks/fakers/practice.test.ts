@@ -8,7 +8,7 @@ const selection: ActiveSelection = {
   ...practiceFixture.selection,
   roleId: "role-id",
   questionType: "motivation",
-  difficulty: "pressure",
+  difficulty: "hard",
   source: "history",
   prioritizeWeaknesses: true,
 }

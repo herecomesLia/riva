@@ -78,7 +78,7 @@ export const AnsweringReferenceAnswerHidden = meta.story({
 })
 
 export const AnsweringReferenceAnswerRevealed = meta.story({
-  args: withReferenceAnswer("answeringQuestion", "projectDeepDive", 1, true),
+  args: withReferenceAnswer("answeringQuestion", "project", 1, true),
   play: async ({ canvas }) => {
     await expect(canvas.getByText(/个性化示例回答|personalized example answer/i)).toBeVisible()
     await expect(canvas.getByText(/我会选用推荐材料中的/)).toBeVisible()
@@ -86,7 +86,7 @@ export const AnsweringReferenceAnswerRevealed = meta.story({
 })
 
 function longAnsweringArgs() {
-  const args = withReferenceAnswer("answeringQuestion", "projectDeepDive", 1, true)
+  const args = withReferenceAnswer("answeringQuestion", "project", 1, true)
   const response = structuredClone(args.content.data)
   if (response.session.status !== "answering") throw new Error("Answering fixture required.")
   if (response.session.question.referenceAnswer.status !== "revealed") {
@@ -113,14 +113,14 @@ export const AnsweringLongContentWithFixedActions = meta.story({
 })
 
 export const AnsweringTechnicalReference = meta.story({
-  args: withReferenceAnswer("answeringQuestion", "technicalFoundation", 1, true),
+  args: withReferenceAnswer("answeringQuestion", "technical_basics", 1, true),
   play: async ({ canvas }) => {
     await expect(canvas.getByText(/技术参考答案|technical reference answer/i)).toBeVisible()
   },
 })
 
 export const AnsweringReactReference = meta.story({
-  args: withReferenceAnswer("answeringQuestion", "technicalFoundation", 1, true),
+  args: withReferenceAnswer("answeringQuestion", "technical_basics", 1, true),
   play: async ({ canvas }) => {
     await expect(canvas.getByText(/React 重复渲染首先要区分/)).toBeVisible()
     await expect(canvas.getByText(/Profiler 定位更新来源/)).toBeVisible()
@@ -128,7 +128,7 @@ export const AnsweringReactReference = meta.story({
 })
 
 export const AnsweringRequestLayerReference = meta.story({
-  args: withReferenceAnswer("answeringQuestion", "technicalFoundation", 2, true),
+  args: withReferenceAnswer("answeringQuestion", "technical_basics", 2, true),
   play: async ({ canvas }) => {
     await expect(canvas.getByText(/长期演进的数据请求层/)).toBeVisible()
     await expect(canvas.getByText(/稳定缓存 key/)).toBeVisible()
@@ -137,14 +137,14 @@ export const AnsweringRequestLayerReference = meta.story({
 })
 
 export const AnsweringAssistedRetry = meta.story({
-  args: withReferenceAnswer("answeringQuestion", "projectDeepDive", 1, true, "retry"),
+  args: withReferenceAnswer("answeringQuestion", "project", 1, true, "retry"),
   play: async ({ canvas }) => {
     await expect(canvas.getByText(/参考答案辅助重练|reference-assisted retry/i)).toBeVisible()
   },
 })
 
 export const AnsweringNextQuestionWithReference = meta.story({
-  args: withReferenceAnswer("answeringQuestion", "projectDeepDive", 2, true, "nextQuestion"),
+  args: withReferenceAnswer("answeringQuestion", "project", 2, true, "nextQuestion"),
   play: async ({ canvas }) => {
     await expect(canvas.getByText(/作答前已查看参考答案|viewed before submission/i)).toBeVisible()
     await expect(

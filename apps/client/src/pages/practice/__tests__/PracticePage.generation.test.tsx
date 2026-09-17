@@ -41,7 +41,7 @@ describe("PracticePage: generation", () => {
     ) {
       throw new Error("Generating and answering fixtures are required.")
     }
-    generating.session.selection.difficulty = "pressure"
+    generating.session.selection.difficulty = "hard"
 
     answering.session.selection = structuredClone(generating.session.selection)
 
@@ -55,7 +55,7 @@ describe("PracticePage: generation", () => {
     context.renderPracticePage()
 
     const errorState = await testing.screen.findByTestId("practice-generation-error-state")
-    expect(errorState).toHaveTextContent(i18n.t("practice.difficulty.pressure"))
+    expect(errorState).toHaveTextContent(i18n.t("practice.difficulty.hard"))
     expect(errorState).not.toHaveTextContent("unsafe generation details")
     await user.click(
       testing.screen.getByRole("button", { name: i18n.t("practice.actions.retryGeneration") }),

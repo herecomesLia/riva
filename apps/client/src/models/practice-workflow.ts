@@ -1,14 +1,11 @@
-export type QuestionType =
-  "projectDeepDive" | "behavioral" | "businessUnderstanding" | "motivation" | "technicalFoundation"
-
-export type Difficulty = "basic" | "pressure"
+import type { PracticeDifficulty, PracticeQuestionType } from "@/api/generated/models"
 
 export type QuestionSource = "personalized" | "saved" | "history"
 
 export type PracticeSelection = {
   roleId: string | null
-  questionType: QuestionType
-  difficulty: Difficulty
+  questionType: PracticeQuestionType
+  difficulty: PracticeDifficulty
   source: QuestionSource
   prioritizeWeaknesses: boolean
 }
@@ -167,8 +164,8 @@ export type PracticeRecommendation =
       action: "nextQuestion"
       reason: string
       nextQuestion: {
-        questionType: QuestionType
-        difficulty: Difficulty
+        questionType: PracticeQuestionType
+        difficulty: PracticeDifficulty
         focusAreas: string[]
       }
     }
@@ -213,12 +210,12 @@ export type PracticeRoleOption = {
   id: string
   title: string
   company: string | null
-  supportedQuestionTypes: QuestionType[]
+  supportedQuestionTypes: PracticeQuestionType[]
 }
 
 export type PracticeSetupContext = {
   roles: PracticeRoleOption[]
-  availableDifficulties: Difficulty[]
+  availableDifficulties: PracticeDifficulty[]
   eligibleQuestionCounts: { saved: number; history: number }
 }
 

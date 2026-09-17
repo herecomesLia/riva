@@ -525,7 +525,7 @@ describe("PracticeView", () => {
       "Senior Frontend Engineer",
     )
     expect(
-      screen.getByRole("button", { name: i18n.t("practice.questionTypes.projectDeepDive") }),
+      screen.getByRole("button", { name: i18n.t("practice.questionTypes.project") }),
     ).toHaveAttribute("aria-pressed", "true")
     expect(
       screen.getByRole("button", { name: i18n.t("practice.difficulty.basic") }),
@@ -608,7 +608,7 @@ describe("PracticeView", () => {
     await user.click(
       screen.getByRole("button", { name: i18n.t("practice.questionTypes.behavioral") }),
     )
-    await user.click(screen.getByRole("button", { name: i18n.t("practice.difficulty.pressure") }))
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.difficulty.hard") }))
     await user.click(screen.getByRole("button", { name: i18n.t("practice.sources.saved") }))
     await user.click(
       screen.getByRole("switch", { name: i18n.t("practice.setup.fields.prioritizeWeaknesses") }),
@@ -618,7 +618,7 @@ describe("PracticeView", () => {
     expect(onStart).toHaveBeenCalledWith({
       roleId: "role_frontend_bytedance",
       questionType: "behavioral",
-      difficulty: "pressure",
+      difficulty: "hard",
       source: "saved",
       prioritizeWeaknesses: true,
     })
@@ -630,14 +630,14 @@ describe("PracticeView", () => {
     await screen.findByTestId("practice-setup-state")
 
     expect(
-      screen.getByRole("button", { name: i18n.t("practice.questionTypes.technicalFoundation") }),
+      screen.getByRole("button", { name: i18n.t("practice.questionTypes.technical_basics") }),
     ).toBeInTheDocument()
 
     await user.click(screen.getByTestId("practice-role-trigger"))
     await user.click(await screen.findByRole("option", { name: /Product Manager/ }))
 
     expect(
-      screen.queryByRole("button", { name: i18n.t("practice.questionTypes.technicalFoundation") }),
+      screen.queryByRole("button", { name: i18n.t("practice.questionTypes.technical_basics") }),
     ).not.toBeInTheDocument()
   })
 
@@ -656,7 +656,7 @@ describe("PracticeView", () => {
     await user.click(
       screen.getByRole("button", { name: i18n.t("practice.questionTypes.behavioral") }),
     )
-    await user.click(screen.getByRole("button", { name: i18n.t("practice.difficulty.pressure") }))
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.difficulty.hard") }))
     await user.click(screen.getByRole("button", { name: i18n.t("practice.sources.saved") }))
     await user.click(
       screen.getByRole("switch", {
@@ -668,7 +668,7 @@ describe("PracticeView", () => {
     expect(onStart).toHaveBeenCalledWith({
       roleId: "role_frontend_bytedance",
       questionType: "behavioral",
-      difficulty: "pressure",
+      difficulty: "hard",
       source: "saved",
       prioritizeWeaknesses: true,
     })
@@ -699,7 +699,7 @@ describe("PracticeView", () => {
     expect(onStart).toHaveBeenCalledWith({
       roleId: "role_frontend_bytedance",
       questionType: "behavioral",
-      difficulty: "pressure",
+      difficulty: "hard",
       source: "saved",
       prioritizeWeaknesses: true,
     })
@@ -750,29 +750,29 @@ describe("PracticeView", () => {
     renderReadyView(createPracticeScenario("setupReady"), { onStart })
     await screen.findByTestId("practice-setup-state")
 
-    const pressureButton = screen.getByRole("button", {
-      name: i18n.t("practice.difficulty.pressure"),
+    const hardButton = screen.getByRole("button", {
+      name: i18n.t("practice.difficulty.hard"),
     })
-    await user.click(pressureButton)
+    await user.click(hardButton)
     await user.click(getStartButton())
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       i18n.t("practice.errors.startDescription"),
     )
     expect(screen.queryByText("unsafe backend details")).not.toBeInTheDocument()
-    expect(pressureButton).toHaveAttribute("aria-pressed", "true")
+    expect(hardButton).toHaveAttribute("aria-pressed", "true")
   })
 
   it("keeps settings visible after generation fails and retries once", async () => {
     const user = userEvent.setup()
     const data = createPracticeScenario("generatingQuestion")
     if (data.session.status !== "generatingQuestion") return
-    data.session.selection.difficulty = "pressure"
+    data.session.selection.difficulty = "hard"
     const onRetryGeneration = vi.fn()
     renderReadyView(data, { generationError: true, onRetryGeneration })
 
     const errorState = await screen.findByTestId("practice-generation-error-state")
-    expect(errorState).toHaveTextContent(i18n.t("practice.difficulty.pressure"))
+    expect(errorState).toHaveTextContent(i18n.t("practice.difficulty.hard"))
     expect(errorState).toHaveTextContent("Senior Frontend Engineer")
     await user.click(
       within(errorState).getByRole("button", {

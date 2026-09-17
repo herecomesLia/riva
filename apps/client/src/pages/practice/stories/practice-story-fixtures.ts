@@ -1,3 +1,4 @@
+import type { PracticeQuestionType } from "@/api/generated/models"
 import { practiceFixture } from "@/mocks/fixtures/practice"
 import { expect, fn, screen, waitFor, within } from "storybook/test"
 
@@ -209,7 +210,7 @@ const referenceExamples = {
 
 export function withReferenceAnswer(
   scenario: "answeringQuestion" | "reviewBalanced",
-  questionType: "projectDeepDive" | "technicalFoundation",
+  questionType: PracticeQuestionType,
   ordinal: 1 | 2,
   viewedBeforeSubmission: boolean,
   origin: "initial" | "retry" | "nextQuestion" = "initial",
@@ -232,7 +233,7 @@ export function withReferenceAnswer(
   response.session.question.referenceAnswer = {
     status: "revealed",
     content: structuredClone(
-      questionType === "technicalFoundation"
+      questionType === "technical_basics"
         ? ordinal === 1
           ? referenceExamples.react
           : referenceExamples.requestLayer

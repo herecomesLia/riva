@@ -22,7 +22,7 @@ export const practiceFixture = {
   } satisfies Omit<CompletedSession, "status" | "selection">,
   selection: {
     roleId: null,
-    questionType: "projectDeepDive",
+    questionType: "project",
     difficulty: "basic",
     source: "personalized",
     prioritizeWeaknesses: false,

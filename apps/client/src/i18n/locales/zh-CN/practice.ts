@@ -14,15 +14,15 @@ export const practice = {
     weaknessDescription: "结合近期表现，优先生成需要加强的题目。",
   },
   questionTypes: {
-    projectDeepDive: "项目深挖",
+    project: "项目深挖",
     behavioral: "行为面试",
-    businessUnderstanding: "业务理解",
+    business_understanding: "业务理解",
     motivation: "求职动机",
-    technicalFoundation: "技术基础",
+    technical_basics: "技术基础",
   },
   difficulty: {
     basic: "基础",
-    pressure: "高压",
+    hard: "高压",
   },
   sources: {
     personalized: "个性化题目",

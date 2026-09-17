@@ -15,15 +15,15 @@ export const practice = {
     weaknessDescription: "Use recent performance to focus on an area that needs improvement.",
   },
   questionTypes: {
-    projectDeepDive: "Project deep dive",
+    project: "Project deep dive",
     behavioral: "Behavioral",
-    businessUnderstanding: "Business understanding",
+    business_understanding: "Business understanding",
     motivation: "Motivation",
-    technicalFoundation: "Technical foundations",
+    technical_basics: "Technical foundations",
   },
   difficulty: {
     basic: "Basic",
-    pressure: "Pressure",
+    hard: "Pressure",
   },
   sources: {
     personalized: "Personalized",

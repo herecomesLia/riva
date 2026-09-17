@@ -46,7 +46,7 @@ describe("training history navigation contracts", () => {
         entry: "history",
         roleId: "role-1",
         questionType: "behavioral",
-        difficulty: "pressure",
+        difficulty: "hard",
         source: "history",
         prioritizeWeaknesses: "true",
         record: { id: "must-not-pass" },
@@ -58,7 +58,7 @@ describe("training history navigation contracts", () => {
       entry: "history",
       roleId: "role-1",
       questionType: "behavioral",
-      difficulty: "pressure",
+      difficulty: "hard",
       source: "history",
       prioritizeWeaknesses: true,
     })

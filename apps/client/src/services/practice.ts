@@ -1,5 +1,6 @@
 import { practiceFaker } from "@/mocks/fakers/practice"
-import type { PracticeData, PracticeSetupContext, QuestionType } from "@/models/practice-workflow"
+import { PracticeDifficulty, PracticeQuestionType } from "@/api/generated/models"
+import type { PracticeData, PracticeSetupContext } from "@/models/practice-workflow"
 import { resolvePracticeTrainingEntry } from "@/models/training-entry"
 import type {
   PracticeTrainingEntryParameters,
@@ -10,13 +11,7 @@ import type { RoleListResponse } from "@/api/generated/models"
 import { listRoles } from "@/services/roles"
 
 function setupContext(roles: RoleListResponse["roles"]): PracticeSetupContext {
-  const supportedQuestionTypes: QuestionType[] = [
-    "projectDeepDive",
-    "behavioral",
-    "businessUnderstanding",
-    "motivation",
-    "technicalFoundation",
-  ]
+  const supportedQuestionTypes = Object.values(PracticeQuestionType)
   return {
     roles: roles
       .filter((role) => !role.isArchived)
@@ -26,7 +21,7 @@ function setupContext(roles: RoleListResponse["roles"]): PracticeSetupContext {
         company,
         supportedQuestionTypes,
       })),
-    availableDifficulties: ["basic", "pressure"],
+    availableDifficulties: Object.values(PracticeDifficulty),
     eligibleQuestionCounts: { saved: 1, history: 1 },
   }
 }

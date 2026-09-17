@@ -23,7 +23,7 @@ describe("PracticePage: completion", () => {
       prepared.session.selection = {
         roleId: productRole.id,
         questionType: "behavioral",
-        difficulty: "pressure",
+        difficulty: "hard",
         source: "history",
         prioritizeWeaknesses: true,
       }
@@ -38,14 +38,14 @@ describe("PracticePage: completion", () => {
       })
 
       context.renderPracticePage(
-        "/practice?entry=history&roleId=role_product_manager_meituan&questionType=behavioral&difficulty=pressure&source=history&prioritizeWeaknesses=true",
+        "/practice?entry=history&roleId=role_product_manager_meituan&questionType=behavioral&difficulty=hard&source=history&prioritizeWeaknesses=true",
       )
 
       expect(await testing.screen.findByTestId("practice-setup-state")).toBeInTheDocument()
       expect(vi.mocked(api.preparePracticeTrainingEntry).mock.calls[0]?.[0]).toEqual({
         roleId: "role_product_manager_meituan",
         questionType: "behavioral",
-        difficulty: "pressure",
+        difficulty: "hard",
         source: "history",
         prioritizeWeaknesses: true,
       })
@@ -58,7 +58,7 @@ describe("PracticePage: completion", () => {
         }),
       ).toHaveAttribute("aria-pressed", "true")
       expect(
-        testing.screen.getByRole("button", { name: i18n.t("practice.difficulty.pressure") }),
+        testing.screen.getByRole("button", { name: i18n.t("practice.difficulty.hard") }),
       ).toHaveAttribute("aria-pressed", "true")
       expect(
         testing.screen.getByRole("button", { name: i18n.t("practice.sources.history") }),
@@ -105,7 +105,7 @@ describe("PracticePage: completion", () => {
     vi.mocked(api.startPracticeSession).mockResolvedValue(generating.session)
 
     context.renderPracticePage(
-      "/practice?entry=history&roleId=role_product_manager_meituan&questionType=technicalFoundation&difficulty=basic&source=history",
+      "/practice?entry=history&roleId=role_product_manager_meituan&questionType=technical_basics&difficulty=basic&source=history",
     )
 
     expect(await testing.screen.findByTestId("history-entry-adjusted")).toHaveTextContent(
@@ -146,7 +146,7 @@ describe("PracticePage: completion", () => {
     vi.mocked(api.startPracticeSession).mockResolvedValue(generating.session)
 
     context.renderPracticePage(
-      "/practice?entry=history&roleId=role_deleted&questionType=projectDeepDive&difficulty=basic&source=history",
+      "/practice?entry=history&roleId=role_deleted&questionType=project&difficulty=basic&source=history",
     )
 
     expect(await testing.screen.findByTestId("history-entry-role-unavailable")).toHaveTextContent(
@@ -185,7 +185,7 @@ describe("PracticePage: completion", () => {
       })
 
     context.renderPracticePage(
-      "/practice?entry=history&roleId=role_frontend_bytedance&questionType=projectDeepDive",
+      "/practice?entry=history&roleId=role_frontend_bytedance&questionType=project",
     )
     expect(await testing.screen.findByTestId("history-entry-failed")).toBeInTheDocument()
     await user.click(
@@ -283,7 +283,7 @@ describe("PracticePage: completion", () => {
     if (completed.session.status !== "completed" || prepared.session.status !== "setup") return
     completed.session.selection = {
       ...completed.session.selection,
-      difficulty: "pressure",
+      difficulty: "hard",
       questionType: "behavioral",
       prioritizeWeaknesses: true,
       source: "saved",

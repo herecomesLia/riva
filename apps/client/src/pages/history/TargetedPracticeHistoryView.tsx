@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import { toPracticeQuestionType } from "@/models/training-entry"
+import { toPracticeDifficulty, toPracticeQuestionType } from "@/models/training-entry"
 import type {
   TargetedPracticeRecordDetailResponse,
   TrainingRecordStatus,
@@ -82,7 +82,7 @@ export function TargetedPracticeHistoryView({
                     entry: "history",
                     roleId: state.data.role.id,
                     questionType: toPracticeQuestionType(state.data.setup.questionType),
-                    difficulty: state.data.setup.difficulty,
+                    difficulty: toPracticeDifficulty(state.data.setup.difficulty),
                     source: state.data.setup.source,
                     prioritizeWeaknesses: state.data.setup.prioritizedWeaknesses,
                   }}

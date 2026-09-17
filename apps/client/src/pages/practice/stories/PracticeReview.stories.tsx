@@ -29,7 +29,7 @@ export const BalancedReview = meta.story({
 })
 
 export const ReviewWithPersonalizedExample = meta.story({
-  args: withReferenceAnswer("reviewBalanced", "projectDeepDive", 1, false),
+  args: withReferenceAnswer("reviewBalanced", "project", 1, false),
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getAllByRole("button", { name: /^查看复盘：|^View review:/i })[0])
     await expect(canvas.getByText(/我会选用推荐材料中的/)).toBeVisible()
@@ -37,7 +37,7 @@ export const ReviewWithPersonalizedExample = meta.story({
 })
 
 export const ReviewWithTechnicalReference = meta.story({
-  args: withReferenceAnswer("reviewBalanced", "technicalFoundation", 1, false),
+  args: withReferenceAnswer("reviewBalanced", "technical_basics", 1, false),
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getAllByRole("button", { name: /^查看复盘：|^View review:/i })[0])
     await expect(canvas.getByText(/技术参考答案|technical reference answer/i)).toBeVisible()
@@ -45,7 +45,7 @@ export const ReviewWithTechnicalReference = meta.story({
 })
 
 export const ReviewWithReactReference = meta.story({
-  args: withReferenceAnswer("reviewBalanced", "technicalFoundation", 1, false),
+  args: withReferenceAnswer("reviewBalanced", "technical_basics", 1, false),
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getAllByRole("button", { name: /^查看复盘：|^View review:/i })[0])
     await expect(canvas.getByText(/React 重复渲染首先要区分/)).toBeVisible()
@@ -53,7 +53,7 @@ export const ReviewWithReactReference = meta.story({
 })
 
 export const ReviewWithRequestLayerReference = meta.story({
-  args: withReferenceAnswer("reviewBalanced", "technicalFoundation", 2, false),
+  args: withReferenceAnswer("reviewBalanced", "technical_basics", 2, false),
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getAllByRole("button", { name: /^查看复盘：|^View review:/i })[0])
     await expect(canvas.getByText(/长期演进的数据请求层/)).toBeVisible()
@@ -62,7 +62,7 @@ export const ReviewWithRequestLayerReference = meta.story({
 })
 
 export const ReviewAssistedAttempt = meta.story({
-  args: withReferenceAnswer("reviewBalanced", "projectDeepDive", 1, true),
+  args: withReferenceAnswer("reviewBalanced", "project", 1, true),
   play: async ({ canvas }) => {
     await userEvent.click(canvas.getAllByRole("button", { name: /^查看复盘：|^View review:/i })[0])
     await expect(canvas.getByText(/作答前已查看|viewed before submission/i)).toBeVisible()

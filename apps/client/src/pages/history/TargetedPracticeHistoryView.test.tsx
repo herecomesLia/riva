@@ -64,7 +64,8 @@ describe("TargetedPracticeHistoryView", () => {
     const retryHref = retryLink.getAttribute("href") ?? ""
     expect(retryHref).toContain("entry=history")
     expect(retryHref).toContain(`roleId=${encodeURIComponent(record.role.id)}`)
-    expect(retryHref).toContain(`difficulty=${record.setup.difficulty}`)
+    expect(retryHref).toContain("questionType=project")
+    expect(retryHref).toContain("difficulty=hard")
     expect(retryHref).toContain(`source=${record.setup.source}`)
     expect(retryHref).toContain(
       `prioritizeWeaknesses=${String(record.setup.prioritizedWeaknesses)}`,

@@ -69,7 +69,7 @@ describe("MockInterviewHistoryView", () => {
     const recommendationHref = recommendationLink.getAttribute("href") ?? ""
     expect(recommendationHref).toContain("/practice?")
     expect(recommendationHref).toContain(`roleId=${encodeURIComponent(record.role.id)}`)
-    expect(recommendationHref).toContain("questionType=technicalFoundation")
+    expect(recommendationHref).toContain("questionType=technical_basics")
     expect(recommendationHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
   })
 

@@ -1,5 +1,5 @@
 import type { InterviewEntrySearch, PracticeEntrySearch } from "@/app/training-entry-search"
-import { tryToPracticeQuestionType } from "@/models/training-entry"
+import { toPracticeDifficulty, tryToPracticeQuestionType } from "@/models/training-entry"
 import type { TrainingRecordRecommendation } from "@/models/training-records"
 
 export type TrainingRecommendationEntry =
@@ -40,7 +40,7 @@ export function mapTrainingRecommendationToEntry(
       entry: "history",
       roleId,
       ...(questionType ? { questionType } : {}),
-      difficulty: recommendation.difficulty,
+      difficulty: toPracticeDifficulty(recommendation.difficulty),
       source: "history",
       prioritizeWeaknesses: recommendation.focusAreas.length > 0,
     },

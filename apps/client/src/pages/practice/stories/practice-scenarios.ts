@@ -20,11 +20,11 @@ const defaultSetupContext: PracticeSetupContext = {
       title: "Senior Frontend Engineer",
       company: "ByteDance",
       supportedQuestionTypes: [
-        "projectDeepDive",
+        "project",
         "behavioral",
-        "businessUnderstanding",
+        "business_understanding",
         "motivation",
-        "technicalFoundation",
+        "technical_basics",
       ],
     },
     {
@@ -32,15 +32,10 @@ const defaultSetupContext: PracticeSetupContext = {
       title: "Product Manager",
       company: "Meituan",
       // Static coverage for changing roles with an unsupported selected question type.
-      supportedQuestionTypes: [
-        "projectDeepDive",
-        "behavioral",
-        "businessUnderstanding",
-        "motivation",
-      ],
+      supportedQuestionTypes: ["project", "behavioral", "business_understanding", "motivation"],
     },
   ],
-  availableDifficulties: ["basic", "pressure"],
+  availableDifficulties: ["basic", "hard"],
   eligibleQuestionCounts: { saved: 1, history: 1 },
 }
 
@@ -134,7 +129,7 @@ const nextReview: ReviewSession["review"] = {
     reason: "继续练习新的问题，巩固结果验证与沟通能力。",
     nextQuestion: {
       questionType: "behavioral",
-      difficulty: "pressure",
+      difficulty: "hard",
       focusAreas: ["结果验证"],
     },
   },

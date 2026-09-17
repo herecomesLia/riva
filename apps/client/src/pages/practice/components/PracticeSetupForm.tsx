@@ -36,11 +36,10 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { PracticeDifficulty, PracticeQuestionType } from "@/api/generated/models"
 import type {
   ActiveSelection,
-  Difficulty,
   QuestionSource,
-  QuestionType,
   PracticeSetupContext,
   PracticeSelection,
 } from "@/models/practice-workflow"
@@ -48,25 +47,13 @@ import type { PracticeTrainingEntryResolution } from "@/models/training-entry"
 
 const setupSchema = z.object({
   roleId: z.string().min(1),
-  questionType: z.enum([
-    "projectDeepDive",
-    "behavioral",
-    "businessUnderstanding",
-    "motivation",
-    "technicalFoundation",
-  ]),
-  difficulty: z.enum(["basic", "pressure"]),
+  questionType: z.enum(PracticeQuestionType),
+  difficulty: z.enum(PracticeDifficulty),
   source: z.enum(["personalized", "saved", "history"]),
   prioritizeWeaknesses: z.boolean(),
 })
 
-const questionTypes: QuestionType[] = [
-  "projectDeepDive",
-  "behavioral",
-  "businessUnderstanding",
-  "motivation",
-  "technicalFoundation",
-]
+const questionTypes = Object.values(PracticeQuestionType)
 const sources: QuestionSource[] = ["personalized", "saved", "history"]
 
 type PracticeSetupFormProps = {
@@ -200,7 +187,7 @@ export function PracticeSetupForm({
                         disabled={pending}
                         onValueChange={(values) => {
                           const value = values[0]
-                          if (value) field.handleChange(value as QuestionType)
+                          if (value) field.handleChange(value as PracticeQuestionType)
                         }}
                         spacing={2}
                         value={[field.state.value]}
@@ -239,7 +226,7 @@ export function PracticeSetupForm({
                   disabled={pending}
                   onValueChange={(values) => {
                     const value = values[0]
-                    if (value) field.handleChange(value as Difficulty)
+                    if (value) field.handleChange(value as PracticeDifficulty)
                   }}
                   spacing={2}
                   value={[field.state.value]}

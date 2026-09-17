@@ -29,8 +29,8 @@ const setupContext: PracticeSetupContext = {
 describe("training entry search application", () => {
   it("centralizes cross-mode history question-type mapping", () => {
     expect(toPracticeQuestionType("selfIntroduction")).toBe("motivation")
-    expect(toPracticeQuestionType("roleCapability")).toBe("businessUnderstanding")
-    expect(toPracticeQuestionType("technicalOrBusiness")).toBe("technicalFoundation")
+    expect(toPracticeQuestionType("roleCapability")).toBe("business_understanding")
+    expect(toPracticeQuestionType("technicalOrBusiness")).toBe("technical_basics")
     expect(toPracticeQuestionType("resumeRisk")).toBe("behavioral")
   })
 
@@ -41,7 +41,7 @@ describe("training entry search application", () => {
         selection,
         {
           roleId: "role_missing",
-          questionType: "businessUnderstanding",
+          questionType: "business_understanding",
         },
         { status: "unavailable", reason: "roleDeleted" },
       ),
@@ -51,7 +51,7 @@ describe("training entry search application", () => {
       configuration: {
         ...selection,
         roleId: null,
-        questionType: "businessUnderstanding",
+        questionType: "business_understanding",
       },
     })
   })
@@ -106,8 +106,8 @@ describe("training entry search application", () => {
         selection,
         {
           roleId: selection.roleId,
-          questionType: "technicalFoundation",
-          difficulty: "pressure",
+          questionType: "technical_basics",
+          difficulty: "hard",
         },
         { status: "available" },
       ),

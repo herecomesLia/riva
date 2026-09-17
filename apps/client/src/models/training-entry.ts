@@ -1,24 +1,19 @@
+import type { PracticeDifficulty, PracticeQuestionType } from "@/api/generated/models"
 import type {
   InterviewDifficulty,
   InterviewDurationMinutes,
   InterviewType,
   InterviewSetup,
 } from "./interview-workflow"
-import type {
-  Difficulty,
-  QuestionSource,
-  QuestionType,
-  PracticeSetupContext,
-  PracticeSelection,
-} from "./practice-workflow"
-import type { TrainingRecordQuestionType } from "./training-records"
+import type { QuestionSource, PracticeSetupContext, PracticeSelection } from "./practice-workflow"
+import type { TrainingRecordDifficulty, TrainingRecordQuestionType } from "./training-records"
 
 export type TrainingEntryOrigin = "history"
 
 export type PracticeTrainingEntryParameters = {
   roleId?: string
-  questionType?: QuestionType
-  difficulty?: Difficulty
+  questionType?: PracticeQuestionType
+  difficulty?: PracticeDifficulty
   source?: QuestionSource
   prioritizeWeaknesses?: boolean
 }
@@ -81,25 +76,36 @@ export type InterviewTrainingEntryPreparationResponse = {
 
 const practiceTypeByTrainingRecordType = {
   selfIntroduction: "motivation",
-  projectDeepDive: "projectDeepDive",
-  roleCapability: "businessUnderstanding",
+  projectDeepDive: "project",
+  roleCapability: "business_understanding",
   behavioral: "behavioral",
-  technicalOrBusiness: "technicalFoundation",
-  businessUnderstanding: "businessUnderstanding",
-  technicalFoundation: "technicalFoundation",
+  technicalOrBusiness: "technical_basics",
+  businessUnderstanding: "business_understanding",
+  technicalFoundation: "technical_basics",
   resumeRisk: "behavioral",
   motivation: "motivation",
-} satisfies Record<TrainingRecordQuestionType, QuestionType>
+} satisfies Record<TrainingRecordQuestionType, PracticeQuestionType>
 
-export function tryToPracticeQuestionType(questionType: unknown): QuestionType | undefined {
+export function tryToPracticeQuestionType(questionType: unknown): PracticeQuestionType | undefined {
   return typeof questionType === "string" &&
     Object.hasOwn(practiceTypeByTrainingRecordType, questionType)
     ? practiceTypeByTrainingRecordType[questionType as TrainingRecordQuestionType]
     : undefined
 }
 
-export function toPracticeQuestionType(questionType: TrainingRecordQuestionType): QuestionType {
+export function toPracticeQuestionType(
+  questionType: TrainingRecordQuestionType,
+): PracticeQuestionType {
   return practiceTypeByTrainingRecordType[questionType]
+}
+
+const practiceDifficultyByTrainingRecordDifficulty = {
+  basic: "basic",
+  pressure: "hard",
+} satisfies Record<TrainingRecordDifficulty, PracticeDifficulty>
+
+export function toPracticeDifficulty(difficulty: TrainingRecordDifficulty): PracticeDifficulty {
+  return practiceDifficultyByTrainingRecordDifficulty[difficulty]
 }
 
 export function resolvePracticeTrainingEntry(

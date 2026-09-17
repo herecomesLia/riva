@@ -21,8 +21,8 @@ describe("mapTrainingRecommendationToEntry", () => {
       search: {
         entry: "history",
         roleId: "role-1",
-        questionType: "technicalFoundation",
-        difficulty: "pressure",
+        questionType: "technical_basics",
+        difficulty: "hard",
         source: "history",
         prioritizeWeaknesses: true,
       },

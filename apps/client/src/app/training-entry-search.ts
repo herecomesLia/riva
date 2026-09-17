@@ -1,20 +1,15 @@
 import { interviewTypes } from "@/models/interview-workflow"
 import type { InterviewDifficulty, InterviewDurationMinutes } from "@/models/interview-workflow"
-import type { Difficulty, QuestionSource, QuestionType } from "@/models/practice-workflow"
+import { PracticeDifficulty, PracticeQuestionType } from "@/api/generated/models"
+import type { QuestionSource } from "@/models/practice-workflow"
 import type {
   InterviewTrainingEntryParameters,
   PracticeTrainingEntryParameters,
   TrainingEntryOrigin,
 } from "@/models/training-entry"
 
-const practiceQuestionTypes: QuestionType[] = [
-  "projectDeepDive",
-  "behavioral",
-  "businessUnderstanding",
-  "motivation",
-  "technicalFoundation",
-]
-const practiceDifficulties: Difficulty[] = ["basic", "pressure"]
+const practiceQuestionTypes = Object.values(PracticeQuestionType)
+const practiceDifficulties = Object.values(PracticeDifficulty)
 const practiceSources: QuestionSource[] = ["personalized", "saved", "history"]
 const interviewDifficulties: InterviewDifficulty[] = ["basic", "pressure"]
 const interviewDurations: InterviewDurationMinutes[] = [15, 30, 45]
