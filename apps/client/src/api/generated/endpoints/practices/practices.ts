@@ -10,7 +10,6 @@ import type {
   PracticeListResponse,
   PracticeResponse,
   PracticeRoundResponse,
-  PracticeRoundStartedResponse,
   SubmitPracticeAnswerRequest,
   TaskFailureResponse,
   TaskStatusResponse,
@@ -111,9 +110,9 @@ export const getPracticesApi = () => {
   const skipPracticeRound = (
     practiceId: string,
     roundId: string,
-    options?: SecondParameter<typeof request<PracticeRoundStartedResponse>>,
+    options?: SecondParameter<typeof request<void>>,
   ) => {
-    return request<PracticeRoundStartedResponse>(
+    return request<void>(
       { url: `/api/practices/${practiceId}/rounds/${roundId}/skip`, method: "POST" },
       options,
     )
@@ -137,9 +136,9 @@ export const getPracticesApi = () => {
   const restartPracticeRound = (
     practiceId: string,
     roundId: string,
-    options?: SecondParameter<typeof request<PracticeRoundStartedResponse>>,
+    options?: SecondParameter<typeof request<void>>,
   ) => {
-    return request<PracticeRoundStartedResponse>(
+    return request<void>(
       { url: `/api/practices/${practiceId}/rounds/${roundId}/restart`, method: "POST" },
       options,
     )
@@ -150,9 +149,9 @@ export const getPracticesApi = () => {
   const startNextPracticeRound = (
     practiceId: string,
     roundId: string,
-    options?: SecondParameter<typeof request<PracticeRoundStartedResponse>>,
+    options?: SecondParameter<typeof request<void>>,
   ) => {
-    return request<PracticeRoundStartedResponse>(
+    return request<void>(
       { url: `/api/practices/${practiceId}/rounds/${roundId}/next`, method: "POST" },
       options,
     )

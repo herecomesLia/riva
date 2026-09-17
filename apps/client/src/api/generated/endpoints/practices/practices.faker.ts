@@ -11,7 +11,6 @@ import type {
   PracticeListResponse,
   PracticeResponse,
   PracticeRoundResponse,
-  PracticeRoundStartedResponse,
   TaskFailureResponse,
   TaskStatusResponse,
 } from "../../models"
@@ -40,11 +39,7 @@ export const getListPracticesResponseMock = (
 
 export const getCreatePracticeResponseMock = (
   overrideResponse: Partial<Extract<CreatePracticeResponse, object>> = {},
-): CreatePracticeResponse => ({
-  id: faker.string.uuid(),
-  roundId: faker.string.uuid(),
-  ...overrideResponse,
-})
+): CreatePracticeResponse => ({ id: faker.string.uuid(), ...overrideResponse })
 
 export const getGetActivePracticeResponseMock = (
   overrideResponse: Partial<Extract<PracticeResponse, object>> = {},
@@ -89,18 +84,6 @@ export const getGetPracticeRoundResponseMock = (
   result: faker.helpers.arrayElement([{ ...getPracticeResultResponseMock() }, null]),
   ...overrideResponse,
 })
-
-export const getSkipPracticeRoundResponseMock = (
-  overrideResponse: Partial<Extract<PracticeRoundStartedResponse, object>> = {},
-): PracticeRoundStartedResponse => ({ roundId: faker.string.uuid(), ...overrideResponse })
-
-export const getRestartPracticeRoundResponseMock = (
-  overrideResponse: Partial<Extract<PracticeRoundStartedResponse, object>> = {},
-): PracticeRoundStartedResponse => ({ roundId: faker.string.uuid(), ...overrideResponse })
-
-export const getStartNextPracticeRoundResponseMock = (
-  overrideResponse: Partial<Extract<PracticeRoundStartedResponse, object>> = {},
-): PracticeRoundStartedResponse => ({ roundId: faker.string.uuid(), ...overrideResponse })
 
 export const getGetPracticeTaskStateResponseMock = (): TaskStatusResponse | TaskFailureResponse =>
   faker.helpers.arrayElement([

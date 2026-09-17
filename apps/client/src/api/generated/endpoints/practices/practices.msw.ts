@@ -12,7 +12,6 @@ import type {
   PracticeListResponse,
   PracticeResponse,
   PracticeRoundResponse,
-  PracticeRoundStartedResponse,
   TaskFailureResponse,
   TaskStatusResponse,
 } from "../../models"
@@ -24,9 +23,6 @@ import {
   getGetPracticeRoundResponseMock,
   getGetPracticeTaskStateResponseMock,
   getListPracticesResponseMock,
-  getRestartPracticeRoundResponseMock,
-  getSkipPracticeRoundResponseMock,
-  getStartNextPracticeRoundResponseMock,
 } from "./practices.faker"
 
 export {
@@ -35,9 +31,6 @@ export {
   getGetActivePracticeResponseMock,
   getGetPracticeResponseMock,
   getGetPracticeRoundResponseMock,
-  getSkipPracticeRoundResponseMock,
-  getRestartPracticeRoundResponseMock,
-  getStartNextPracticeRoundResponseMock,
   getGetPracticeTaskStateResponseMock,
 } from "./practices.faker"
 
@@ -201,23 +194,17 @@ export const getSubmitPracticeAnswerMockHandler = (
 
 export const getSkipPracticeRoundMockHandler = (
   overrideResponse?:
-    | PracticeRoundStartedResponse
-    | ((
-        info: Parameters<Parameters<typeof http.post>[1]>[0],
-      ) => Promise<PracticeRoundStartedResponse> | PracticeRoundStartedResponse),
+    void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void),
   options?: RequestHandlerOptions,
 ) => {
   return http.post(
     "*/api/practices/:practiceId/rounds/:roundId/skip",
     async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
-      return HttpResponse.json(
-        overrideResponse !== undefined
-          ? typeof overrideResponse === "function"
-            ? await overrideResponse(info)
-            : overrideResponse
-          : getSkipPracticeRoundResponseMock(),
-        { status: 202 },
-      )
+      if (typeof overrideResponse === "function") {
+        await overrideResponse(info)
+      }
+
+      return new HttpResponse(null, { status: 202 })
     },
     options,
   )
@@ -243,23 +230,17 @@ export const getFinishPracticeRoundMockHandler = (
 
 export const getRestartPracticeRoundMockHandler = (
   overrideResponse?:
-    | PracticeRoundStartedResponse
-    | ((
-        info: Parameters<Parameters<typeof http.post>[1]>[0],
-      ) => Promise<PracticeRoundStartedResponse> | PracticeRoundStartedResponse),
+    void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void),
   options?: RequestHandlerOptions,
 ) => {
   return http.post(
     "*/api/practices/:practiceId/rounds/:roundId/restart",
     async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
-      return HttpResponse.json(
-        overrideResponse !== undefined
-          ? typeof overrideResponse === "function"
-            ? await overrideResponse(info)
-            : overrideResponse
-          : getRestartPracticeRoundResponseMock(),
-        { status: 202 },
-      )
+      if (typeof overrideResponse === "function") {
+        await overrideResponse(info)
+      }
+
+      return new HttpResponse(null, { status: 202 })
     },
     options,
   )
@@ -267,23 +248,17 @@ export const getRestartPracticeRoundMockHandler = (
 
 export const getStartNextPracticeRoundMockHandler = (
   overrideResponse?:
-    | PracticeRoundStartedResponse
-    | ((
-        info: Parameters<Parameters<typeof http.post>[1]>[0],
-      ) => Promise<PracticeRoundStartedResponse> | PracticeRoundStartedResponse),
+    void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void),
   options?: RequestHandlerOptions,
 ) => {
   return http.post(
     "*/api/practices/:practiceId/rounds/:roundId/next",
     async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
-      return HttpResponse.json(
-        overrideResponse !== undefined
-          ? typeof overrideResponse === "function"
-            ? await overrideResponse(info)
-            : overrideResponse
-          : getStartNextPracticeRoundResponseMock(),
-        { status: 202 },
-      )
+      if (typeof overrideResponse === "function") {
+        await overrideResponse(info)
+      }
+
+      return new HttpResponse(null, { status: 202 })
     },
     options,
   )

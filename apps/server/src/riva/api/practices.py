@@ -15,7 +15,6 @@ from riva.schemas.practice import (
     PracticeResponse,
     PracticeRoleResponse,
     PracticeRoundResponse,
-    PracticeRoundStartedResponse,
     PracticeSummaryResponse,
     SubmitPracticeAnswerRequest,
 )
@@ -108,12 +107,10 @@ async def get_active_practice(
     current_user: CurrentUserDep,
     practice_service: PracticeServiceDep,
 ) -> PracticeResponse | Response:
-    practice = current_user.active_practice
+    practice = await practice_service.get_active(current_user)
     if practice is None:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
-    return _build_practice_response(
-        await practice_service.get(current_user, practice.id)
-    )
+    return _build_practice_response(practice)
 
 
 @router.post(
@@ -132,14 +129,14 @@ async def create_practice(
     role_service: RoleServiceDep,
 ) -> CreatePracticeResponse:
     role = await role_service.get(current_user, payload.role_id)
-    created = await practice_service.create(
+    practice_id = await practice_service.create(
         current_user,
         role=role,
         question_type=payload.question_type,
         difficulty=payload.difficulty,
         max_follow_ups=payload.max_follow_ups,
     )
-    return CreatePracticeResponse(id=created.practice_id, round_id=created.round_id)
+    return CreatePracticeResponse(id=practice_id)
 
 
 @router.get(
@@ -218,7 +215,7 @@ async def submit_practice_answer(
     "/{practice_id}/rounds/{round_id}/skip",
     operation_id="skip-practice-round",
     status_code=status.HTTP_202_ACCEPTED,
-    response_model=PracticeRoundStartedResponse,
+    response_class=Response,
     responses=error_responses(NotFoundError, ConflictError, RequestValidationError),
 )
 async def skip_practice_round(
@@ -226,11 +223,9 @@ async def skip_practice_round(
     round_id: UUID,
     current_user: CurrentUserDep,
     practice_service: PracticeServiceDep,
-) -> PracticeRoundStartedResponse:
-    new_round_id = await practice_service.skip_round(
-        current_user, practice_id, round_id=round_id
-    )
-    return PracticeRoundStartedResponse(round_id=new_round_id)
+) -> Response:
+    await practice_service.skip_round(current_user, practice_id, round_id=round_id)
+    return Response(status_code=status.HTTP_202_ACCEPTED)
 
 
 @router.post(
@@ -254,7 +249,7 @@ async def finish_practice_round(
     "/{practice_id}/rounds/{round_id}/restart",
     operation_id="restart-practice-round",
     status_code=status.HTTP_202_ACCEPTED,
-    response_model=PracticeRoundStartedResponse,
+    response_class=Response,
     responses=error_responses(NotFoundError, ConflictError, RequestValidationError),
 )
 async def restart_practice_round(
@@ -262,18 +257,16 @@ async def restart_practice_round(
     round_id: UUID,
     current_user: CurrentUserDep,
     practice_service: PracticeServiceDep,
-) -> PracticeRoundStartedResponse:
-    new_round_id = await practice_service.restart_round(
-        current_user, practice_id, round_id=round_id
-    )
-    return PracticeRoundStartedResponse(round_id=new_round_id)
+) -> Response:
+    await practice_service.restart_round(current_user, practice_id, round_id=round_id)
+    return Response(status_code=status.HTTP_202_ACCEPTED)
 
 
 @router.post(
     "/{practice_id}/rounds/{round_id}/next",
     operation_id="start-next-practice-round",
     status_code=status.HTTP_202_ACCEPTED,
-    response_model=PracticeRoundStartedResponse,
+    response_class=Response,
     responses=error_responses(NotFoundError, ConflictError, RequestValidationError),
 )
 async def start_next_practice_round(
@@ -281,11 +274,9 @@ async def start_next_practice_round(
     round_id: UUID,
     current_user: CurrentUserDep,
     practice_service: PracticeServiceDep,
-) -> PracticeRoundStartedResponse:
-    new_round_id = await practice_service.next_round(
-        current_user, practice_id, round_id=round_id
-    )
-    return PracticeRoundStartedResponse(round_id=new_round_id)
+) -> Response:
+    await practice_service.next_round(current_user, practice_id, round_id=round_id)
+    return Response(status_code=status.HTTP_202_ACCEPTED)
 
 
 @router.post(

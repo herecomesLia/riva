@@ -42,7 +42,6 @@ import type {
   PracticeResultResponse,
   PracticeRoleResponse,
   PracticeRoundResponse,
-  PracticeRoundStartedResponse,
   PracticeSummaryResponse,
   PracticeTurnResponse,
   ProjectEntryRequest,
@@ -319,11 +318,7 @@ export const getCreatePracticeRequestMock = (
 
 export const getCreatePracticeResponseMock = (
   overrideResponse: Partial<CreatePracticeResponse> = {},
-): CreatePracticeResponse => ({
-  id: faker.string.uuid(),
-  roundId: faker.string.uuid(),
-  ...overrideResponse,
-})
+): CreatePracticeResponse => ({ id: faker.string.uuid(), ...overrideResponse })
 
 export const getRecruitmentTrackMock = (): RecruitmentTrack =>
   faker.helpers.arrayElement(["campus", "experienced"] as const)
@@ -743,10 +738,6 @@ export const getPracticeResponseMock = (
   createdAt: faker.date.past().toISOString().slice(0, 19) + "Z",
   ...overrideResponse,
 })
-
-export const getPracticeRoundStartedResponseMock = (
-  overrideResponse: Partial<PracticeRoundStartedResponse> = {},
-): PracticeRoundStartedResponse => ({ roundId: faker.string.uuid(), ...overrideResponse })
 
 export const getRegisterCredentialsMock = (
   overrideResponse: Partial<RegisterCredentials> = {},

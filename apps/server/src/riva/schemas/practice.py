@@ -30,11 +30,6 @@ class SubmitPracticeAnswerRequest(RequestModel):
 
 class CreatePracticeResponse(ResponseModel):
     id: UUID
-    round_id: UUID
-
-
-class PracticeRoundStartedResponse(ResponseModel):
-    round_id: UUID
 
 
 class PracticeRoleResponse(ResponseModel):

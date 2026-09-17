@@ -31,7 +31,10 @@ async def _create_practice(client):
         },
     )
     assert response.status_code == 201, response.text
-    return response.json(), role.json()["id"]
+    created = response.json()
+    current = await client.get(f"/api/practices/{created['id']}")
+    assert current.status_code == 200, current.text
+    return {**created, "roundId": current.json()["rounds"][-1]["id"]}, role.json()["id"]
 
 
 def _round_path(created):
@@ -46,11 +49,9 @@ async def _publish_round(database, round_id, turns, *, result=None):
             await TaskController(session).abort(round.job_id)
         round.job_id = None
         round.result = result
-        existing = {turn.id for turn in round.turns}
         round.turns.extend(
             PracticeTurn(sequence=i, **turn.model_dump())
             for i, turn in enumerate(turns)
-            if turn.id not in existing
         )
         await session.commit()
 
@@ -59,7 +60,6 @@ async def test_create_and_active_identify_the_current_round(client):
     await register_user(client)
     assert (await client.get("/api/practices/active")).status_code == 204
     created, role_id = await _create_practice(client)
-    assert set(created) == {"id", "roundId"}
     listing = await client.get("/api/practices")
     assert listing.status_code == 200
     assert listing.json()["activePracticeId"] == created["id"]
@@ -78,9 +78,6 @@ async def test_create_and_active_identify_the_current_round(client):
         "maxFollowUps": 1,
         "createdAt": active["createdAt"],
     }
-    round = await client.get(_round_path(created))
-    assert round.status_code == 200
-    assert round.json()["id"] == created["roundId"]
 
 
 async def test_round_read_returns_content_and_hides_other_users_resources(
@@ -149,7 +146,7 @@ async def test_answer_is_readable_before_background_work_finishes(client, databa
 
 
 @pytest.mark.parametrize("action", ["skip", "restart", "next"])
-async def test_round_commands_return_the_new_current_round(client, database, action):
+async def test_round_commands_update_the_current_round(client, database, action):
     await register_user(client)
     created, _ = await _create_practice(client)
     question = make_question()
@@ -164,14 +161,11 @@ async def test_round_commands_return_the_new_current_round(client, database, act
         f"{_round_path(created)}/{action}", headers=ORIGIN_HEADERS
     )
     assert response.status_code == 202, response.text
-    new_id = response.json()["roundId"]
-    assert response.json() == {"roundId": new_id}
+    assert response.content == b""
+    current = await client.get("/api/practices/active")
+    assert current.status_code == 200, current.text
+    new_id = current.json()["rounds"][-1]["id"]
     assert new_id != created["roundId"]
-    active = (await client.get("/api/practices/active")).json()
-    assert active["rounds"][-1]["id"] == new_id
-    current = await client.get(f"/api/practices/{created['id']}/rounds/{new_id}")
-    assert current.status_code == 200
-    assert current.json()["id"] == new_id
 
 
 async def test_finish_accepts_existing_answers_for_evaluation(client, database):
@@ -228,7 +222,9 @@ async def test_history_aggregates_rounds_and_preserves_deleted_role_display(
     )
     started = await client.post(f"{_round_path(created)}/next", headers=ORIGIN_HEADERS)
     assert started.status_code == 202
-    second_id = started.json()["roundId"]
+    second = await client.get(f"/api/practices/{created['id']}")
+    assert second.status_code == 200, second.text
+    second_id = second.json()["rounds"][-1]["id"]
     await _publish_round(
         database,
         second_id,

@@ -7,5 +7,4 @@
 
 export interface CreatePracticeResponse {
   id: string
-  roundId: string
 }

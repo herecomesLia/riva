@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
@@ -24,12 +23,6 @@ from riva.services.types import TaskState
 from riva.tasks import Task, TaskController, TaskErrorCode, TaskStatus
 from riva.tasks.registry import PracticeRunAction
 from riva.utils import utc_now
-
-
-@dataclass(frozen=True, slots=True)
-class PracticeCreated:
-    practice_id: UUID
-    round_id: UUID
 
 
 class PracticeService:
@@ -63,6 +56,11 @@ class PracticeService:
             raise NotFoundError("Practice session was not found.")
         return practice
 
+    async def get_active(self, user: User) -> PracticeSession | None:
+        if user.active_practice_id is None:
+            return None
+        return await self.get(user, user.active_practice_id)
+
     async def get_round(
         self, user: User, practice_id: UUID, round_id: UUID
     ) -> PracticeRound:
@@ -83,7 +81,7 @@ class PracticeService:
         question_type: PracticeQuestionType,
         difficulty: PracticeDifficulty,
         max_follow_ups: int,
-    ) -> PracticeCreated:
+    ) -> UUID:
         user = await self._lock_user(user)
         if user.active_practice_id is not None:
             raise ConflictError("An active practice session already exists.")
@@ -129,10 +127,10 @@ class PracticeService:
             rounds=[],
         )
         self.session.add(practice)
-        round = await self._new_round(practice, sequence=0)
+        await self._new_round(practice, sequence=0)
         user.active_practice = practice
         await self.session.commit()
-        return PracticeCreated(practice_id=practice.id, round_id=round.id)
+        return practice.id
 
     async def answer(
         self,
@@ -173,7 +171,7 @@ class PracticeService:
 
     async def skip_round(
         self, user: User, practice_id: UUID, *, round_id: UUID
-    ) -> UUID:
+    ) -> None:
         practice = await self._lock(user, practice_id)
         round = self._current(practice, round_id)
         self._require_ready(round)
@@ -182,10 +180,9 @@ class PracticeService:
         sequence = round.sequence
         practice.rounds.remove(round)
         await self.session.flush()
-        new_round = await self._new_round(practice, sequence=sequence)
+        await self._new_round(practice, sequence=sequence)
         await self.session.commit()
         await self._delete_checkpoints([round_id])
-        return new_round.id
 
     async def finish_round(
         self, user: User, practice_id: UUID, *, round_id: UUID
@@ -209,7 +206,7 @@ class PracticeService:
         practice_id: UUID,
         *,
         round_id: UUID,
-    ) -> UUID:
+    ) -> None:
         practice = await self._lock(user, practice_id)
         round = self._current(practice, round_id)
         self._require_ready(round)
@@ -227,11 +224,10 @@ class PracticeService:
         await self._enqueue(practice, replacement, PracticeRunAction.RESTART)
         await self.session.commit()
         await self._delete_checkpoints([round_id])
-        return replacement.id
 
     async def next_round(
         self, user: User, practice_id: UUID, *, round_id: UUID
-    ) -> UUID:
+    ) -> None:
         practice = await self._lock(user, practice_id)
         round = self._current(practice, round_id)
         self._require_ready(round)
@@ -239,9 +235,8 @@ class PracticeService:
             raise ConflictError(
                 "Round must be completed before starting the next round."
             )
-        new_round = await self._new_round(practice, sequence=round.sequence + 1)
+        await self._new_round(practice, sequence=round.sequence + 1)
         await self.session.commit()
-        return new_round.id
 
     async def end_session(
         self, user: User, practice_id: UUID, *, round_id: UUID
