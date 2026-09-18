@@ -1,6 +1,7 @@
 import type {
   PracticeDifficulty,
   PracticeGuidance,
+  PracticeQuestionTurnResponse,
   PracticeQuestionType,
 } from "@/api/generated/models"
 
@@ -20,8 +21,7 @@ export type ActiveSelection = PracticeSelection & {
 
 export type PracticeQuestion = {
   prompt: string
-  assessedCapabilities: string[]
-  recommendedMaterials: string[]
+  criteria: PracticeQuestionTurnResponse["criteria"]
   guidance: PracticeGuidance
   referenceAnswer: string
   isSaved: boolean

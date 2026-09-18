@@ -80,8 +80,7 @@ export const practice = {
     unknownRole: "未知目标岗位",
   },
   question: {
-    capabilities: "考察能力",
-    recommendedMaterials: "推荐使用的项目或经历",
+    focus: "考察重点",
     saved: "已收藏",
     weak: "薄弱题",
   },

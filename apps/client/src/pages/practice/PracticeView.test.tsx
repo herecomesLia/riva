@@ -764,8 +764,12 @@ describe("PracticeView", () => {
     const questionType = i18n.t(`practice.questionTypes.${data.session.selection.questionType}`)
     const difficulty = i18n.t(`practice.difficulty.${data.session.selection.difficulty}`)
     expect(card).toHaveTextContent(data.session.question.prompt)
-    expect(card).toHaveTextContent(data.session.question.assessedCapabilities[0] ?? "")
-    expect(card).toHaveTextContent(data.session.question.recommendedMaterials[0] ?? "")
+    expect(
+      within(card).getByRole("heading", { name: i18n.t("practice.question.focus") }),
+    ).toBeInTheDocument()
+    for (const { dimension } of data.session.question.criteria) {
+      expect(within(card).getByText(dimension)).toHaveAttribute("data-slot", "badge")
+    }
     expect(within(card).queryByText(questionType)).not.toBeInTheDocument()
     expect(within(card).queryByText(difficulty)).not.toBeInTheDocument()
     expect(within(sessionHeader).getByText(questionType)).toHaveClass(
@@ -787,18 +791,31 @@ describe("PracticeView", () => {
     if (data.session.status !== "answering") return
 
     data.session.question.prompt = "后端新增模板返回的问题正文"
-    data.session.question.assessedCapabilities = ["后端返回的能力"]
-    data.session.question.recommendedMaterials = ["后端返回的材料"]
+    data.session.question.criteria = [
+      { dimension: "后端返回的考察重点", expectation: "说明关键判断的依据。" },
+    ]
     data.session.question.referenceAnswer = "后端返回的参考答案"
 
     renderReadyView(data)
 
     const card = await screen.findByTestId("practice-question-card")
     expect(card).toHaveTextContent("后端新增模板返回的问题正文")
-    expect(card).toHaveTextContent("后端返回的能力")
-    expect(card).toHaveTextContent("后端返回的材料")
+    expect(within(card).getByText("后端返回的考察重点")).toHaveAttribute("data-slot", "badge")
     expect(screen.queryByText("后端返回的参考答案")).toBeNull()
     expect(screen.queryByText("backend.new-question-template")).not.toBeInTheDocument()
+  })
+
+  it("hides assessment focus when the question has no criteria", async () => {
+    const data = createPracticeScenario("answeringQuestion")
+    if (data.session.status !== "answering") return
+    data.session.question.criteria = []
+    renderReadyView(data)
+
+    const card = await screen.findByTestId("practice-question-card")
+    expect(
+      within(card).queryByRole("heading", { name: i18n.t("practice.question.focus") }),
+    ).not.toBeInTheDocument()
+    expect(within(card).queryByRole("list")).not.toBeInTheDocument()
   })
 
   it("only gives the answering view fixed actions and responsive bottom clearance", async () => {

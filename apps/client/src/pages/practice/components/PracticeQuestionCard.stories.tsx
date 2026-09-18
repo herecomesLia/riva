@@ -30,8 +30,8 @@ export const LongQuestion = meta.story({
   },
 })
 
-export const WithRecommendedMaterial = meta.story({
-  args: { question: getQuestion("answeringQuestion") },
+export const WithoutCriteria = meta.story({
+  args: { question: { ...getQuestion("answeringQuestion"), criteria: [] } },
 })
 
 export const SavedQuestion = meta.story({

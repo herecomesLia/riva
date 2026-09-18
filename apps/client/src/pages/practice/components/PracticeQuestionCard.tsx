@@ -38,35 +38,24 @@ export function PracticeQuestionCard({ question }: PracticeQuestionCardProps) {
           </CardAction>
         ) : null}
       </CardHeader>
-      <CardContent className="flex flex-col gap-5">
-        <QuestionMetadata
-          items={question.assessedCapabilities}
-          title={t("practice.question.capabilities")}
-        />
-        {question.recommendedMaterials.length > 0 ? (
-          <QuestionMetadata
-            items={question.recommendedMaterials}
-            title={t("practice.question.recommendedMaterials")}
-          />
-        ) : null}
-      </CardContent>
+      {question.criteria.length > 0 ? (
+        <CardContent>
+          <section className="flex flex-col gap-2">
+            <h4 className="text-sm font-medium text-muted-foreground">
+              {t("practice.question.focus")}
+            </h4>
+            <ul className="flex flex-wrap gap-2">
+              {question.criteria.map(({ dimension }) => (
+                <li key={dimension}>
+                  <Badge className="max-w-full whitespace-normal wrap-break-word" variant="outline">
+                    {dimension}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </CardContent>
+      ) : null}
     </Card>
-  )
-}
-
-function QuestionMetadata({ items, title }: { items: string[]; title: string }) {
-  return (
-    <section className="flex flex-col gap-2">
-      <h4 className="text-sm font-medium text-muted-foreground">{title}</h4>
-      <ul className="flex flex-wrap gap-2">
-        {items.map((item) => (
-          <li key={item}>
-            <Badge className="max-w-full whitespace-normal wrap-break-word" variant="outline">
-              {item}
-            </Badge>
-          </li>
-        ))}
-      </ul>
-    </section>
   )
 }

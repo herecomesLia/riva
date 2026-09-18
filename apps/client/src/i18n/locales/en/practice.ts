@@ -85,8 +85,7 @@ export const practice = {
     unknownRole: "Unknown target role",
   },
   question: {
-    capabilities: "Assessed capabilities",
-    recommendedMaterials: "Recommended projects or experiences",
+    focus: "Assessment focus",
     saved: "Saved",
     weak: "Weak question",
   },

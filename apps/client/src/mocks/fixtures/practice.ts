@@ -25,8 +25,11 @@ export const practiceFixture = {
   } satisfies PracticeSelection,
   question: {
     prompt: "请结合一个真实经历，说明你如何分析问题、做出关键判断、推动行动并验证最终结果。",
-    assessedCapabilities: ["问题分析"],
-    recommendedMaterials: ["一个由你推动解决问题的经历"],
+    criteria: [
+      { dimension: "个人贡献", expectation: "说明你亲自采取的关键行动及其作用。" },
+      { dimension: "结果与证据", expectation: "提供可验证的结果，并说明验证依据。" },
+      { dimension: "技术决策", expectation: "说明方案取舍、关键判断及其依据。" },
+    ],
     guidance: {
       hints: ["说明你的关键判断和验证依据。"],
       framework: ["背景、目标、行动与结果"],
