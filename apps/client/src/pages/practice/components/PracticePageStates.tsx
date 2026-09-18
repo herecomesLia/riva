@@ -1,5 +1,10 @@
 import { Link } from "@tanstack/react-router"
-import { AlertCircleIcon, BriefcaseBusinessIcon, LoaderCircleIcon } from "lucide-react"
+import {
+  AlertCircleIcon,
+  BriefcaseBusinessIcon,
+  LoaderCircleIcon,
+  UserRoundPenIcon,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
@@ -109,6 +114,27 @@ export function PracticeNoRolesState() {
           </EmptyContent>
         </Empty>
       </CardContent>
+    </Card>
+  )
+}
+
+export function PracticeNoProfileState() {
+  const { t } = useTranslation()
+
+  return (
+    <Card data-testid="practice-profile-required-state">
+      <CardHeader className="border-b">
+        <CardTitle>
+          <h2>{t("practice.profileRequired.title")}</h2>
+        </CardTitle>
+        <CardDescription>{t("practice.profileRequired.description")}</CardDescription>
+      </CardHeader>
+      <CardFooter>
+        <Button nativeButton={false} render={<Link to="/profile" />}>
+          <UserRoundPenIcon aria-hidden="true" data-icon="inline-start" />
+          {t("practice.profileRequired.action")}
+        </Button>
+      </CardFooter>
     </Card>
   )
 }

@@ -417,6 +417,18 @@ describe("PracticeView", () => {
     expect(screen.getByTestId("practice-loading-state")).toHaveAttribute("aria-busy", "true")
   })
 
+  it("renders the profile prerequisite without exposing setup controls", async () => {
+    renderWithProviders(<PracticeView variant="profileRequired" />, {
+      router: { initialEntries: ["/practice"] },
+    })
+
+    expect(await screen.findByTestId("practice-profile-required-state")).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.profileRequired.action") }),
+    ).toHaveAttribute("href", "/profile")
+    expect(screen.queryByTestId("practice-setup-state")).not.toBeInTheDocument()
+  })
+
   it("moves focus to the current practice region after a session phase changes", async () => {
     const answering = createPracticeScenario("answeringQuestion")
     const review = createPracticeScenario("reviewBalanced")

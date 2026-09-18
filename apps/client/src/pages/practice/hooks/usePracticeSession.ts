@@ -12,7 +12,9 @@ import {
   resolvePracticeTrainingEntry,
   type PracticeTrainingEntryResolution,
 } from "@/models/training-entry"
+import { careerProfileQueryKey } from "@/pages/profile/hooks/useCareerProfileQueries"
 import { createPractice, getActivePractice, getPractice } from "@/services/practices"
+import { getCareerProfile } from "@/services/profile"
 import { listRoles } from "@/services/roles"
 import { rolesQueryKey } from "@/pages/roles/queries"
 import { practiceTaskOptions, usePracticeTask } from "./usePracticeTask"
@@ -42,6 +44,11 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
   const lock = useRef(false)
   const historyKey = entrySearch.entry === "history" ? JSON.stringify(entrySearch) : null
   const roles = useQuery({ queryKey: rolesQueryKey, queryFn: listRoles, retry: false })
+  const profileQuery = useQuery({
+    queryKey: careerProfileQueryKey,
+    queryFn: ({ signal }) => getCareerProfile(signal),
+    retry: false,
+  })
   const practiceQuery = useQuery({ ...practiceSessionOptions(selectedId), enabled: !busy })
   const practice = practiceQuery.data
   const task = usePracticeTask(practice, !busy && !refreshRequired)
@@ -50,7 +57,17 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
   let historyEntryResolution: PracticeTrainingEntryResolution | undefined
   if (roles.data && practice !== undefined) {
     const setupContext = toPracticeSetupContext(roles.data)
-    if (!practice) {
+    if (practice) {
+      if (practice.endedAt !== null) {
+        data = {
+          setupContext,
+          session: toPracticeSession(practice, { status: "idle", error: null }),
+        }
+      } else if (task.data) {
+        const snapshot = { ...practice, rounds: [...practice.rounds.slice(0, -1), task.data.round] }
+        data = { setupContext, session: toPracticeSession(snapshot, task.data.task) }
+      }
+    } else if (profileQuery.data !== undefined && profileQuery.data !== null) {
       let configuration = toPracticeSetupSelection(roles.data, selection)
       if (historyKey !== null && historyConsumed !== historyKey) {
         const input = toPracticeEntryParameters(entrySearch)
@@ -68,11 +85,6 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
         configuration = historyEntryResolution.configuration
       }
       data = { setupContext, session: { status: "setup", selection: configuration } }
-    } else if (practice.endedAt !== null) {
-      data = { setupContext, session: toPracticeSession(practice, { status: "idle", error: null }) }
-    } else if (task.data) {
-      const snapshot = { ...practice, rounds: [...practice.rounds.slice(0, -1), task.data.round] }
-      data = { setupContext, session: toPracticeSession(snapshot, task.data.task) }
     }
   }
 
@@ -88,6 +100,14 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
     setRefreshFailed(false)
     if (refreshTarget.current === null) setSelectedId(null)
     refreshTarget.current = undefined
+  }
+
+  async function refreshPrerequisites() {
+    await Promise.all([
+      roles.refetch({ throwOnError: true }),
+      profileQuery.refetch({ throwOnError: true }),
+      refresh(),
+    ])
   }
 
   async function runAction(operation: () => Promise<string | null | void>) {
@@ -114,7 +134,7 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
       ) {
         setRefreshRequired(true)
         try {
-          await refresh()
+          await refreshPrerequisites()
         } catch {
           setRefreshFailed(true)
         }
@@ -138,8 +158,7 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
   })
   const retryRead = useMutation({
     mutationFn: async () => {
-      await roles.refetch({ throwOnError: true })
-      await refresh()
+      await refreshPrerequisites()
     },
   })
   async function prepareNextRound() {
@@ -152,15 +171,20 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
     })
   }
 
+  const profileReadError = practice === null && profileQuery.isError
   const readError =
     refreshFailed ||
     roles.isError ||
+    profileReadError ||
     practiceQuery.isError ||
     (practice?.endedAt === null && task.isError)
   const taskStatus = task.data?.task.status
   const taskBusy = taskStatus === "queued" || taskStatus === "running" || taskStatus === "aborting"
+  const profileRequired =
+    practice === null && roles.data !== undefined && profileQuery.data === null
   return {
     data,
+    prerequisite: profileRequired ? "profileMissing" : "ready",
     practice,
     task,
     busy,
@@ -169,7 +193,11 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
     readError,
     retryRead: () => retryRead.mutate(),
     isRetrying:
-      retryRead.isPending || practiceQuery.isFetching || roles.isFetching || task.isFetching,
+      retryRead.isPending ||
+      practiceQuery.isFetching ||
+      roles.isFetching ||
+      profileQuery.isFetching ||
+      task.isFetching,
     start: (input: ActiveSelection) => startMutation.mutateAsync(input),
     isStarting: startMutation.isPending,
     prepareNextRound,

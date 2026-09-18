@@ -32,8 +32,14 @@ export const practice = {
     description:
       "Targeted practice needs a role for question context. Add one to start single-question training.",
   },
+  profileRequired: {
+    title: "Create a career profile before starting practice",
+    description:
+      "Riva uses your experience and target role to generate personalized practice questions.",
+    action: "Go to career profile",
+  },
   loading: {
-    cardDescription: "Loading target roles and practice settings.",
+    cardDescription: "Loading your career profile, target roles, and practice settings.",
   },
   errors: {
     startTitle: "Unable to start practice",

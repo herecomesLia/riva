@@ -41,6 +41,7 @@ import {
   PracticeGeneratingState,
   PracticeLoadErrorState,
   PracticeLoadingState,
+  PracticeNoProfileState,
   PracticeNoRolesState,
 } from "./components/PracticePageStates"
 import { PracticeSetupForm } from "./components/PracticeSetupForm"
@@ -111,6 +112,9 @@ type PracticeViewProps =
       variant: "historyEntryError"
       isRetrying: boolean
       onRetry: () => void
+    }
+  | {
+      variant: "profileRequired"
     }
   | {
       variant: "default"
@@ -189,6 +193,7 @@ export function PracticeView(props: PracticeViewProps) {
 function getPracticeStateKey(props: PracticeViewProps) {
   if (props.variant === "error") return "load-error"
   if (props.variant === "historyEntryError") return "history-entry-error"
+  if (props.variant === "profileRequired") return "profile-required"
   if (props.content.status === "loading") return "loading"
   const session = props.content.data.session
   if (session.status === "setup") return JSON.stringify(["setup", session.selection])
@@ -233,6 +238,7 @@ function PracticeViewContent(props: PracticeViewProps) {
       </Card>
     )
   }
+  if (props.variant === "profileRequired") return <PracticeNoProfileState />
 
   if (props.content.status === "loading") return <PracticeLoadingState />
   if (!("taskError" in props)) return <PracticeLoadingState />

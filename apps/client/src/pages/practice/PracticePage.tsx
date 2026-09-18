@@ -19,6 +19,9 @@ export function PracticePage() {
         />
       )
     }
+    if (state.prerequisite === "profileMissing") {
+      return <PracticeView variant="profileRequired" />
+    }
     return <PracticeView content={{ status: "loading" }} variant="default" />
   }
 

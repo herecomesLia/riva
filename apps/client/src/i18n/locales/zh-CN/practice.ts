@@ -30,8 +30,13 @@ export const practice = {
     title: "请先添加目标岗位",
     description: "专项练习需要目标岗位作为出题上下文。添加岗位后即可开始单题训练。",
   },
+  profileRequired: {
+    title: "开始专项练习前需要先建立求职档案",
+    description: "Riva 会结合你的求职经历和目标岗位生成个性化练习题。",
+    action: "前往求职档案",
+  },
   loading: {
-    cardDescription: "正在加载岗位和练习设置。",
+    cardDescription: "正在加载求职档案、岗位和练习设置。",
   },
   errors: {
     startTitle: "暂时无法开始练习",

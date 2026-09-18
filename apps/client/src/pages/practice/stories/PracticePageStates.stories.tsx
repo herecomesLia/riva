@@ -22,6 +22,8 @@ export const LoadError = meta.story({
 
 export const NoRoles = meta.story({ args: createPracticeViewArgs("noRoles") })
 
+export const ProfileRequired = meta.story({ args: { variant: "profileRequired" } })
+
 export const DefaultSetup = meta.story({ args: createPracticeViewArgs("setupReady") })
 
 export const HistoricalConfigurationAvailable = meta.story({
