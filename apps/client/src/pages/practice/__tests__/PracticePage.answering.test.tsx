@@ -9,31 +9,6 @@ import * as api from "./practice-page-test-api"
 import * as context from "./practice-page-test-utils"
 
 describe("PracticePage: answering", () => {
-  it("updates review saved state only from the returned service snapshot", async () => {
-    const user = userEvent.setup()
-    const review = api.createPracticeScenario("reviewBalanced")
-    const saved = structuredClone(review)
-    if (review.session.status !== "review" || saved.session.status !== "review") {
-      throw new Error("Review fixtures are required.")
-    }
-
-    saved.session.question.isSaved = true
-    vi.mocked(api.getPracticePage).mockResolvedValue(review)
-    vi.mocked(api.setQuestionSaved).mockResolvedValue(saved.session)
-
-    context.renderPracticePage()
-
-    await user.click(
-      await testing.screen.findByRole("button", { name: i18n.t("practice.questionActions.save") }),
-    )
-    expect(vi.mocked(api.setQuestionSaved).mock.calls[0]?.[0]).toEqual(true)
-    expect(
-      await testing.screen.findByRole("button", {
-        name: i18n.t("practice.questionActions.unsave"),
-      }),
-    ).toHaveAttribute("aria-pressed", "true")
-  })
-
   it("navigates to the existing training-history page without preparing another round", async () => {
     const user = userEvent.setup()
     vi.mocked(api.getPracticePage).mockResolvedValue(api.createPracticeScenario("completedSession"))
@@ -81,12 +56,7 @@ describe("PracticePage: answering", () => {
     })
     expect(pendingButton).toBeDisabled()
     expect(testing.screen.getByLabelText(i18n.t("practice.answer.label"))).toBeDisabled()
-    expect(
-      testing.screen.getByRole("button", { name: i18n.t("practice.questionActions.save") }),
-    ).toBeDisabled()
-    expect(
-      testing.screen.getByRole("button", { name: i18n.t("practice.questionActions.markWeak") }),
-    ).toBeDisabled()
+
     expect(
       testing.screen.getByRole("button", { name: i18n.t("practice.questionActions.skip") }),
     ).toBeDisabled()
@@ -95,8 +65,7 @@ describe("PracticePage: answering", () => {
     ).toBeNull()
     await user.click(pendingButton)
     expect(api.submitPrimaryAnswer).toHaveBeenCalledTimes(1)
-    expect(api.setQuestionSaved).not.toHaveBeenCalled()
-    expect(api.setQuestionWeak).not.toHaveBeenCalled()
+
     expect(api.skipPracticeQuestion).not.toHaveBeenCalled()
     expect(api.endPracticeSession).not.toHaveBeenCalled()
 
@@ -118,83 +87,6 @@ describe("PracticePage: answering", () => {
     expect(
       await testing.screen.findByTestId("practice-answering-follow-up-state"),
     ).toBeInTheDocument()
-  })
-
-  it("does not start a weak mutation while saving is pending", async () => {
-    const user = userEvent.setup()
-    const answering = api.createPracticeScenario("answeringQuestion")
-    const saved = api.createPracticeScenario("answeringSavedQuestion")
-    if (answering.session.status !== "answering" || saved.session.status !== "answering") {
-      throw new Error("Answering fixtures are required.")
-    }
-
-    const request = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
-    vi.mocked(api.getPracticePage).mockResolvedValue(answering)
-    vi.mocked(api.setQuestionSaved).mockReturnValue(request.promise)
-
-    context.renderPracticePage()
-
-    await user.click(
-      await testing.screen.findByRole("button", { name: i18n.t("practice.questionActions.save") }),
-    )
-    const weakButton = testing.screen.getByRole("button", {
-      name: i18n.t("practice.questionActions.markWeak"),
-    })
-    expect(weakButton).toBeDisabled()
-    await user.click(weakButton)
-    expect(api.setQuestionWeak).not.toHaveBeenCalled()
-
-    await testing.act(async () => {
-      request.resolve(saved.session)
-      await request.promise
-    })
-    expect(
-      await testing.screen.findByRole("button", {
-        name: i18n.t("practice.questionActions.unsave"),
-      }),
-    ).toBeEnabled()
-  })
-
-  it("keeps an unsubmitted draft when a same-frame mutation is ignored", async () => {
-    const user = userEvent.setup()
-    const answering = api.createPracticeScenario("answeringQuestion")
-    const saved = api.createPracticeScenario("answeringSavedQuestion")
-    if (answering.session.status !== "answering" || saved.session.status !== "answering") {
-      throw new Error("Answering fixtures are required.")
-    }
-
-    const saving = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
-    vi.mocked(api.getPracticePage).mockResolvedValue(answering)
-    vi.mocked(api.setQuestionSaved).mockReturnValue(saving.promise)
-    const { router } = context.renderPracticePage()
-    const answer = "这段回答不能因为同步锁忽略提交而被清空。"
-    const textarea = await testing.screen.findByLabelText(i18n.t("practice.answer.label"))
-    await user.type(textarea, answer)
-
-    testing.act(() => {
-      testing.fireEvent.click(
-        testing.screen.getByRole("button", { name: i18n.t("practice.questionActions.save") }),
-      )
-      testing.fireEvent.click(
-        testing.screen.getByRole("button", { name: i18n.t("practice.answer.submit") }),
-      )
-    })
-
-    await testing.waitFor(() => expect(api.setQuestionSaved).toHaveBeenCalledTimes(1))
-    expect(api.submitPrimaryAnswer).not.toHaveBeenCalled()
-    expect(textarea).toHaveValue(answer)
-    testing.act(() => {
-      void router?.navigate({ to: "/profile" })
-    })
-    expect(
-      await testing.screen.findByText(i18n.t("practice.dialog.leaveTitle")),
-    ).toBeInTheDocument()
-    expect(router?.state.location.pathname).toBe("/practice")
-
-    await testing.act(async () => {
-      saving.resolve(saved.session)
-      await saving.promise
-    })
   })
 
   it("keeps the draft and route blocker after same-frame duplicate submission fails", async () => {
@@ -236,45 +128,6 @@ describe("PracticePage: answering", () => {
       await testing.screen.findByText(i18n.t("practice.dialog.leaveTitle")),
     ).toBeInTheDocument()
     expect(router?.state.location.pathname).toBe("/practice")
-  })
-
-  it("updates saved and weak question state from mutation snapshots", async () => {
-    const user = userEvent.setup()
-    const answering = api.createPracticeScenario("answeringQuestion")
-    const saved = api.createPracticeScenario("answeringSavedQuestion")
-    const weak = api.createPracticeScenario("answeringWeakQuestion")
-    if (
-      answering.session.status !== "answering" ||
-      saved.session.status !== "answering" ||
-      weak.session.status !== "answering"
-    ) {
-      throw new Error("Answering fixtures are required.")
-    }
-
-    weak.session.question.isSaved = true
-    vi.mocked(api.getPracticePage).mockResolvedValue(answering)
-    vi.mocked(api.setQuestionSaved).mockResolvedValue(saved.session)
-    vi.mocked(api.setQuestionWeak).mockResolvedValue(weak.session)
-
-    context.renderPracticePage()
-
-    await user.click(
-      await testing.screen.findByRole("button", { name: i18n.t("practice.questionActions.save") }),
-    )
-    expect(
-      await testing.screen.findByRole("button", {
-        name: i18n.t("practice.questionActions.unsave"),
-      }),
-    ).toHaveAttribute("aria-pressed", "true")
-
-    await user.click(
-      testing.screen.getByRole("button", { name: i18n.t("practice.questionActions.markWeak") }),
-    )
-    expect(
-      await testing.screen.findByRole("button", {
-        name: i18n.t("practice.questionActions.unmarkWeak"),
-      }),
-    ).toHaveAttribute("aria-pressed", "true")
   })
 
   it("submits a follow-up once, keeps the failed draft, and keeps route blocking active", async () => {

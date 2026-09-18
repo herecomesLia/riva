@@ -57,15 +57,12 @@ import { PracticeProcessingState } from "./components/PracticeProcessingState"
 import { PracticeTaskFailure } from "./components/PracticeTaskFailure"
 import { PracticeScoreOverview } from "./components/PracticeScoreOverview"
 import { PracticeDimensionScores } from "./components/PracticeDimensionScores"
-import { PracticeReviewSummary, PracticeWeaknesses } from "./components/PracticeReviewDetails"
-import { PracticeRecommendationCard } from "./components/PracticeRecommendationCard"
+import { PracticeReviewSummary } from "./components/PracticeReviewDetails"
 import { PracticeReviewActions } from "./components/PracticeReviewActions"
 import { PracticeReferenceAnswer } from "./components/PracticeReferenceAnswer"
 import type { PracticeInteractionResult } from "./practice-interaction"
 
 export type PracticeAnsweringActions = {
-  onSetSaved: (value: boolean) => Promise<PracticeInteractionResult>
-  onSetWeak: (value: boolean) => Promise<PracticeInteractionResult>
   onSkip: () => Promise<PracticeInteractionResult>
   onSubmitAnswer: (content: string) => Promise<PracticeInteractionResult>
 }
@@ -83,18 +80,14 @@ export type PracticeFollowUpPending = {
 
 export type PracticeAnsweringPending = {
   interactionLocked: boolean
-  saved: boolean
   skip: boolean
   submitAnswer: boolean
-  weak: boolean
 }
 
 export type PracticeReviewActions = {
   onEndSession: () => Promise<PracticeInteractionResult>
   onNextQuestion: () => Promise<PracticeInteractionResult>
   onRetryCurrent: () => Promise<PracticeInteractionResult>
-  onSetSaved: (value: boolean) => Promise<PracticeInteractionResult>
-  onSetWeak: (value: boolean) => Promise<PracticeInteractionResult>
 }
 
 export type PracticeReviewPending = {
@@ -102,8 +95,6 @@ export type PracticeReviewPending = {
   interactionLocked: boolean
   next: boolean
   retry: boolean
-  saved: boolean
-  weak: boolean
 }
 
 export type PracticeCompletedActions = {
@@ -391,7 +382,6 @@ function PracticeProcessingView({
     <div className="flex flex-col gap-5" data-testid="practice-processing-state">
       <PracticeSessionHeader context={context} selection={session.selection} />
       <PracticeConversationTimeline
-        followUpCompletion={session.followUpCompletion}
         followUps={session.followUps}
         mainAnswer={session.mainAnswer}
         question={session.question}
@@ -419,10 +409,7 @@ function PracticeReviewView({
   const { t } = useTranslation()
 
   return (
-    <div
-      className="flex flex-col gap-5 pb-80 min-[360px]:pb-52 sm:pb-40 lg:pb-28"
-      data-testid="practice-review-state"
-    >
+    <div className="flex flex-col gap-5 pb-52 sm:pb-28" data-testid="practice-review-state">
       <div className="@container">
         <div className="grid items-start gap-5 @2xl:grid-cols-[minmax(0,1fr)_minmax(14rem,1fr)]">
           <div className="flex min-w-0 flex-col gap-3 break-words [overflow-wrap:anywhere]">
@@ -434,7 +421,6 @@ function PracticeReviewView({
       <PracticeReviewWorkspace
         mainAnswer={session.mainAnswer}
         question={session.question}
-        followUpCompletion={session.followUpCompletion}
         followUps={session.followUps}
       />
       <PracticeDimensionScores scores={session.evaluation.dimensionScores}>
@@ -446,22 +432,14 @@ function PracticeReviewView({
         </section>
       </PracticeDimensionScores>
       <PracticeReviewSummary review={session.review} />
-      <PracticeWeaknesses items={session.review.exposedWeaknesses} />
-      <PracticeRecommendationCard recommendation={session.review.recommendation} />
       <PracticeReviewActions
         interactionLocked={pending.interactionLocked}
-        isWeak={session.question.isWeak}
-        isSaved={session.question.isSaved}
-        isSavedPending={pending.saved}
-        isWeakPending={pending.weak}
         isEndPending={pending.end}
         isNextPending={pending.next}
         isRetryPending={pending.retry}
         onEndSession={() => actions.onEndSession()}
         onNextQuestion={() => actions.onNextQuestion()}
         onRetryCurrent={() => actions.onRetryCurrent()}
-        onSetSaved={(isSaved) => actions.onSetSaved(isSaved)}
-        onSetWeak={(isWeak) => actions.onSetWeak(isWeak)}
       />
     </div>
   )
@@ -497,14 +475,11 @@ function PracticeCompletedView({
       </CardHeader>
       <CardContent className="flex flex-col gap-3 text-sm">
         <p>{t("practice.completed.questions", { count: session.questionsCompleted })}</p>
-        <p>{t("practice.completed.saved", { count: session.savedQuestionCount })}</p>
-        <p>{t("practice.completed.markedWeak", { count: session.weakQuestionCount })}</p>
         <p>
           {t("practice.completed.finalAttemptAverage", {
             score: session.finalAttemptAverageScore,
           })}
         </p>
-        <p className="text-muted-foreground">{session.nextStepSuggestion}</p>
         {error && (
           <Alert variant="destructive">
             <AlertTitle>{t("practice.errors.prepareNextRoundTitle")}</AlertTitle>
@@ -571,13 +546,7 @@ function PracticeAnsweringView({
       </div>
       <PracticeQuestionActions
         interactionLocked={pending.interactionLocked}
-        isWeak={session.question.isWeak}
-        isSaved={session.question.isSaved}
-        isSavedPending={pending.saved}
         isSkipPending={pending.skip}
-        isWeakPending={pending.weak}
-        onSetSaved={(isSaved) => actions.onSetSaved(isSaved)}
-        onSetWeak={(isWeak) => actions.onSetWeak(isWeak)}
         onSkip={() => actions.onSkip()}
       />
 

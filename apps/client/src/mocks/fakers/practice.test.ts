@@ -9,8 +9,6 @@ const selection: ActiveSelection = {
   roleId: "role-id",
   questionType: "motivation",
   difficulty: "hard",
-  source: "history",
-  prioritizeWeaknesses: true,
 }
 
 describe("practiceFaker", () => {
@@ -32,12 +30,10 @@ describe("practiceFaker", () => {
     await expect(faker.get()).resolves.toEqual(answering)
   })
 
-  it("preserves complete question content, answers and flags through review", async () => {
+  it("preserves complete question content, answers through review", async () => {
     const faker = createPracticeFaker()
     await faker.start(selection)
     await faker.pollTask()
-    await faker.save(true)
-    await faker.weak(true)
     expect(await faker.answer("  Main answer  ")).toMatchObject({
       status: "processing",
       mainAnswer: { content: "Main answer" },
@@ -49,7 +45,7 @@ describe("practiceFaker", () => {
     await faker.answerFollowUp("  Follow-up answer  ")
     expect(await faker.pollTask()).toMatchObject({
       status: "review",
-      question: { ...practiceFixture.question, isSaved: true, isWeak: true },
+      question: { ...practiceFixture.question },
       mainAnswer: { content: "Main answer" },
       followUps: [
         { question: practiceFixture.followUp.question, answer: { content: "Follow-up answer" } },
@@ -65,7 +61,6 @@ describe("practiceFaker", () => {
     expect(await faker.pollTask()).toMatchObject({
       status: "review",
       question: practiceFixture.question,
-      followUpCompletion: { status: "endedEarly", unanswered: practiceFixture.followUp.question },
     })
   })
 
@@ -112,8 +107,6 @@ describe("practiceFaker", () => {
     await faker.pollTask()
     await faker.answerFollowUp("Follow-up")
     await faker.pollTask()
-    await faker.save(true)
-    await faker.weak(true)
     expect(await faker.endSession()).toMatchObject({
       status: "completed",
       ...practiceFixture.completion,

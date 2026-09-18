@@ -14,8 +14,6 @@ import {
   continueToNextPracticeQuestion,
   prepareNextPracticeSession,
   preparePracticeTrainingEntry,
-  setQuestionSaved,
-  setQuestionWeak,
   skipPracticeQuestion,
   startPracticeSession,
   submitFollowUpAnswer,
@@ -50,8 +48,6 @@ beforeEach(async () => {
   vi.mocked(continueToNextPracticeQuestion).mockReset()
   vi.mocked(prepareNextPracticeSession).mockReset()
   vi.mocked(preparePracticeTrainingEntry).mockReset()
-  vi.mocked(setQuestionSaved).mockReset()
-  vi.mocked(setQuestionWeak).mockReset()
   vi.mocked(skipPracticeQuestion).mockReset()
   vi.mocked(startPracticeSession).mockReset()
   vi.mocked(submitFollowUpAnswer).mockReset()
@@ -69,8 +65,6 @@ export {
   continueToNextPracticeQuestion,
   prepareNextPracticeSession,
   preparePracticeTrainingEntry,
-  setQuestionSaved,
-  setQuestionWeak,
   skipPracticeQuestion,
   startPracticeSession,
   submitFollowUpAnswer,

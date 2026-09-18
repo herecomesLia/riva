@@ -9,7 +9,7 @@ import type { ReviewSession } from "@/models/practice-workflow"
 import { CandidateMessage, CoachMessage } from "./PracticeConversationTimeline"
 import { PracticeQuestionReview } from "./PracticeQuestionReview"
 
-type Props = Pick<ReviewSession, "question" | "mainAnswer" | "followUps" | "followUpCompletion">
+type Props = Pick<ReviewSession, "question" | "mainAnswer" | "followUps">
 type View = "record" | "review"
 
 export function PracticeReviewWorkspace(props: Props) {
@@ -30,9 +30,6 @@ export function PracticeReviewWorkspace(props: Props) {
       question: exchange.question,
       answer: exchange.answer.content,
     })),
-    ...(props.followUpCompletion.status === "endedEarly"
-      ? [{ question: props.followUpCompletion.unanswered, answer: undefined }]
-      : []),
   ]
 
   function navigate(next: View, index?: number) {
@@ -134,19 +131,10 @@ export function PracticeReviewWorkspace(props: Props) {
                     }
                     text={entry.question.prompt}
                   />
-                  {entry.answer !== undefined ? (
-                    <CandidateMessage
-                      label={t("practice.followUpReview.yourAnswer")}
-                      text={entry.answer}
-                    />
-                  ) : (
-                    <p
-                      className="text-sm text-muted-foreground"
-                      data-testid="practice-follow-up-incomplete"
-                    >
-                      {t("practice.followUpAssistance.unanswered")}
-                    </p>
-                  )}
+                  <CandidateMessage
+                    label={t("practice.followUpReview.yourAnswer")}
+                    text={entry.answer}
+                  />
                 </div>
               ))}
             </CardContent>

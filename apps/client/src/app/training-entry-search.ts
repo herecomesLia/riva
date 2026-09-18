@@ -1,7 +1,6 @@
 import { interviewTypes } from "@/models/interview-workflow"
 import type { InterviewDifficulty, InterviewDurationMinutes } from "@/models/interview-workflow"
 import { PracticeDifficulty, PracticeQuestionType } from "@/api/generated/models"
-import type { QuestionSource } from "@/models/practice-workflow"
 import type {
   InterviewTrainingEntryParameters,
   PracticeTrainingEntryParameters,
@@ -10,7 +9,6 @@ import type {
 
 const practiceQuestionTypes = Object.values(PracticeQuestionType)
 const practiceDifficulties = Object.values(PracticeDifficulty)
-const practiceSources: QuestionSource[] = ["personalized", "saved", "history"]
 const interviewDifficulties: InterviewDifficulty[] = ["basic", "pressure"]
 const interviewDurations: InterviewDurationMinutes[] = [15, 30, 45]
 
@@ -30,8 +28,6 @@ export function parsePracticeEntrySearch(search: Record<string, unknown>): Pract
       ? search.questionType
       : undefined,
     difficulty: includes(practiceDifficulties, search.difficulty) ? search.difficulty : undefined,
-    source: includes(practiceSources, search.source) ? search.source : undefined,
-    prioritizeWeaknesses: booleanValue(search.prioritizeWeaknesses),
   })
 }
 
@@ -76,12 +72,6 @@ function nonEmptyString(value: unknown): string | undefined {
 function positiveInteger(value: unknown): number | undefined {
   const number = typeof value === "string" ? Number(value) : value
   return typeof number === "number" && Number.isInteger(number) && number > 0 ? number : undefined
-}
-
-function booleanValue(value: unknown): boolean | undefined {
-  if (value === true || value === "true") return true
-  if (value === false || value === "false") return false
-  return undefined
 }
 
 function compact<T extends Record<string, unknown>>(value: T): T {

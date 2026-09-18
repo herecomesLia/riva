@@ -3,10 +3,8 @@ import {
   AlertCircleIcon,
   BriefcaseBusinessIcon,
   ClipboardListIcon,
-  DatabaseIcon,
   GaugeIcon,
   PlayIcon,
-  TargetIcon,
 } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -15,16 +13,7 @@ import { z } from "zod"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { TrainingEntryPreparationAlert } from "@/components/training-entry-preparation-alert"
 import { Button } from "@/components/ui/button"
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldLegend,
-  FieldSet,
-  FieldTitle,
-} from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
 import {
   Select,
   SelectContent,
@@ -34,12 +23,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
-import { Switch } from "@/components/ui/switch"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { PracticeDifficulty, PracticeQuestionType } from "@/api/generated/models"
 import type {
   ActiveSelection,
-  QuestionSource,
   PracticeSetupContext,
   PracticeSelection,
 } from "@/models/practice-workflow"
@@ -49,12 +36,9 @@ const setupSchema = z.object({
   roleId: z.string().min(1),
   questionType: z.enum(PracticeQuestionType),
   difficulty: z.enum(PracticeDifficulty),
-  source: z.enum(["personalized", "saved", "history"]),
-  prioritizeWeaknesses: z.boolean(),
 })
 
 const questionTypes = Object.values(PracticeQuestionType)
-const sources: QuestionSource[] = ["personalized", "saved", "history"]
 
 type PracticeSetupFormProps = {
   context: PracticeSetupContext
@@ -209,10 +193,10 @@ export function PracticeSetupForm({
           </form.Subscribe>
         </div>
 
-        <div className="grid gap-5 border-t border-border py-5 @2xl/setup:grid-cols-2 @2xl/setup:gap-0">
+        <div className="border-t border-border py-5">
           <form.Field name="difficulty">
             {(field) => (
-              <FieldSet className="@2xl/setup:pr-6" data-disabled={pending}>
+              <FieldSet data-disabled={pending}>
                 <FieldLegend
                   className="flex items-center gap-2 [&>svg]:size-4 [&>svg]:text-primary"
                   variant="label"
@@ -241,95 +225,8 @@ export function PracticeSetupForm({
               </FieldSet>
             )}
           </form.Field>
-
-          <div className="border-t border-border pt-5 @2xl/setup:border-t-0 @2xl/setup:border-l @2xl/setup:pt-0 @2xl/setup:pl-6">
-            <form.Field name="source">
-              {(field) => (
-                <FieldSet data-disabled={pending}>
-                  <FieldLegend
-                    className="flex items-center gap-2 [&>svg]:size-4 [&>svg]:text-primary"
-                    variant="label"
-                  >
-                    <DatabaseIcon aria-hidden="true" />
-                    {t("practice.setup.fields.source")}
-                  </FieldLegend>
-                  <ToggleGroup
-                    aria-label={t("practice.setup.fields.source")}
-                    className="flex w-full flex-wrap justify-start"
-                    disabled={pending}
-                    onValueChange={(values) => {
-                      const value = values[0]
-                      if (value) field.handleChange(value as QuestionSource)
-                    }}
-                    spacing={2}
-                    value={[field.state.value]}
-                    variant="outline"
-                  >
-                    {sources.map((source) => (
-                      <ToggleGroupItem key={source} value={source}>
-                        {t(`practice.sources.${source}`)}
-                      </ToggleGroupItem>
-                    ))}
-                  </ToggleGroup>
-                </FieldSet>
-              )}
-            </form.Field>
-          </div>
         </div>
-
-        <form.Field name="prioritizeWeaknesses">
-          {(field) => (
-            <Field
-              className="w-full items-start gap-3 border-t border-border pt-5"
-              data-disabled={pending}
-              orientation="horizontal"
-            >
-              <FieldContent className="flex-none">
-                <FieldTitle className="[&>svg]:size-4 [&>svg]:text-primary">
-                  <TargetIcon aria-hidden="true" />
-                  {t("practice.setup.fields.prioritizeWeaknesses")}
-                </FieldTitle>
-                <FieldDescription>{t("practice.setup.weaknessDescription")}</FieldDescription>
-              </FieldContent>
-              <Switch
-                aria-label={t("practice.setup.fields.prioritizeWeaknesses")}
-                checked={field.state.value}
-                className="mt-0.5"
-                disabled={pending}
-                onCheckedChange={field.handleChange}
-              />
-            </Field>
-          )}
-        </form.Field>
       </FieldGroup>
-
-      <form.Subscribe selector={(state) => state.values.source}>
-        {(source) => {
-          const unavailable =
-            (source === "saved" && context.eligibleQuestionCounts.saved === 0) ||
-            (source === "history" && context.eligibleQuestionCounts.history === 0)
-          if (!unavailable) return null
-
-          return (
-            <Alert data-testid={`practice-no-${source}-questions`}>
-              <AlertCircleIcon />
-              <AlertTitle>{t(`practice.availability.${source}.title`)}</AlertTitle>
-              <AlertDescription className="flex flex-col items-start gap-3">
-                <span>{t(`practice.availability.${source}.description`)}</span>
-                <Button
-                  disabled={pending}
-                  onClick={() => form.setFieldValue("source", "personalized")}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  {t("practice.actions.usePersonalized")}
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )
-        }}
-      </form.Subscribe>
 
       {submitError && (
         <Alert variant="destructive">
@@ -339,16 +236,12 @@ export function PracticeSetupForm({
         </Alert>
       )}
 
-      <form.Subscribe selector={(state) => [state.values.source, state.values.roleId] as const}>
-        {([source, roleId]) => {
-          const sourceUnavailable =
-            (source === "saved" && context.eligibleQuestionCounts.saved === 0) ||
-            (source === "history" && context.eligibleQuestionCounts.history === 0)
-
+      <form.Subscribe selector={(state) => state.values.roleId}>
+        {(roleId) => {
           return (
             <Button
               className="w-full sm:w-fit"
-              disabled={pending || sourceUnavailable || !roleId || !adjustmentConfirmed}
+              disabled={pending || !roleId || !adjustmentConfirmed}
               type="submit"
             >
               {!pending && <PlayIcon aria-hidden="true" data-icon="inline-start" />}

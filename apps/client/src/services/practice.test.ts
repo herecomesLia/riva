@@ -43,7 +43,6 @@ describe("Practice service", () => {
     })
     expect(page.setupContext).toMatchObject({
       availableDifficulties: ["basic", "hard"],
-      eligibleQuestionCounts: { saved: 1, history: 1 },
     })
     expect(page.session).toEqual({
       status: "setup",
@@ -80,7 +79,7 @@ describe("Practice service", () => {
     ["archived", "roleUnavailable", "roleArchived"],
     ["deleted", "roleUnavailable", "roleDeleted"],
   ] as const)("resolves history entry for %s into setup data", async (roleId, status, reason) => {
-    const response = await preparePracticeTrainingEntry({ roleId, source: "history" })
+    const response = await preparePracticeTrainingEntry({ roleId })
     expect(response.resolution).toMatchObject({ status, ...(reason ? { reason } : {}) })
     expect(response.page.session).toEqual({
       status: "setup",

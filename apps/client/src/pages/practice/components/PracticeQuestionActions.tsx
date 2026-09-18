@@ -18,56 +18,23 @@ import { Spinner } from "@/components/ui/spinner"
 
 import type { PracticeInteractionResult } from "../practice-interaction"
 import { PracticeActionErrorAlert, PracticeBottomActionBar } from "./PracticeBottomActionBar"
-import { PracticeFlagActions } from "./PracticeFlagActions"
 
 type PracticeQuestionActionsProps = {
   interactionLocked: boolean
-  isWeak: boolean
-  isSaved: boolean
-  isSavedPending: boolean
   isSkipPending: boolean
-  isWeakPending: boolean
-  onSetSaved: (isSaved: boolean) => Promise<PracticeInteractionResult>
-  onSetWeak: (isWeak: boolean) => Promise<PracticeInteractionResult>
   onSkip: () => Promise<PracticeInteractionResult>
 }
 
-type ActionError = "saved" | "weak" | "skip" | null
+type ActionError = "skip" | null
 
 export function PracticeQuestionActions({
   interactionLocked,
-  isWeak,
-  isSaved,
-  isSavedPending,
   isSkipPending,
-  isWeakPending,
-  onSetSaved,
-  onSetWeak,
   onSkip,
 }: PracticeQuestionActionsProps) {
   const { t } = useTranslation()
   const [actionError, setActionError] = useState<ActionError>(null)
   const [skipOpen, setSkipOpen] = useState(false)
-
-  async function setSaved() {
-    if (interactionLocked) return
-    setActionError(null)
-    try {
-      await onSetSaved(!isSaved)
-    } catch {
-      setActionError("saved")
-    }
-  }
-
-  async function setWeak() {
-    if (interactionLocked) return
-    setActionError(null)
-    try {
-      await onSetWeak(!isWeak)
-    } catch {
-      setActionError("weak")
-    }
-  }
 
   async function skip() {
     if (interactionLocked) return
@@ -84,29 +51,8 @@ export function PracticeQuestionActions({
     <PracticeBottomActionBar
       actionsTestId="practice-question-actions"
       ariaLabel={t("practice.questionActions.title")}
-      error={
-        actionError === "saved" || actionError === "weak" ? (
-          <PracticeActionErrorAlert
-            description={t(
-              actionError === "saved"
-                ? "practice.errors.savedDescription"
-                : "practice.errors.weakDescription",
-            )}
-          />
-        ) : undefined
-      }
       testId="practice-question-actions-bar"
     >
-      <PracticeFlagActions
-        disabled={interactionLocked}
-        isWeak={isWeak}
-        isSaved={isSaved}
-        isSavedPending={isSavedPending}
-        isWeakPending={isWeakPending}
-        onSavedClick={() => void setSaved()}
-        onWeakClick={() => void setWeak()}
-        variant="outline"
-      />
       <AlertDialog onOpenChange={setSkipOpen} open={skipOpen}>
         <AlertDialogTrigger
           render={

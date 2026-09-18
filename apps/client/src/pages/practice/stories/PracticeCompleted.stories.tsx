@@ -19,7 +19,7 @@ export const CompletedSession = meta.story({
     await expect(completed).toBeVisible()
     await expect(completed).toHaveTextContent(/完成题数：1|Questions completed: 1/i)
     await expect(completed).not.toHaveTextContent(/重练次数|Retries:/i)
-    await expect(completed).toHaveTextContent(/标记薄弱题数：0|Marked weak questions: 0/i)
+
     await expect(completed).toHaveTextContent(
       /最终作答平均分：85 分|Final-attempt average score: 85 points/i,
     )
@@ -65,14 +65,5 @@ export const CompletedNextRoundError = meta.story({
     await expect(canvas.getByRole("alert")).toBeVisible()
     await expect(canvas.queryByText(/internal next-round error/i)).not.toBeInTheDocument()
     await expect(canvas.getByTestId("practice-completed-state")).toBeVisible()
-  },
-})
-
-export const CompletedWithWeakQuestions = meta.story({
-  args: createPracticeViewArgs("completedWithWeakQuestions"),
-  play: async ({ canvas }) => {
-    const completed = canvas.getByTestId("practice-completed-state")
-    await expect(completed).toHaveTextContent(/完成题数：1|Questions completed: 1/i)
-    await expect(completed).toHaveTextContent(/标记薄弱题数：1|Marked weak questions: 1/i)
   },
 })

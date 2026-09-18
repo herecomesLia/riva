@@ -1,44 +1,26 @@
 import { useTranslation } from "react-i18next"
 
-import { Badge } from "@/components/ui/badge"
-import type {
-  ProcessingSession,
-  FollowUpCompletion,
-  PracticeFollowUp,
-} from "@/models/practice-workflow"
+import type { ProcessingSession, PracticeFollowUp } from "@/models/practice-workflow"
 
 import { PracticeReviewReferenceSections } from "./PracticeReviewReferenceSections"
 
 type Props = {
   exchanges: ProcessingSession["followUps"]
-  completion: FollowUpCompletion
 }
 
-export function PracticeFollowUpReview({ exchanges, completion }: Props) {
-  const unanswered = completion.status === "endedEarly" ? completion.unanswered : undefined
-  if (exchanges.length === 0 && !unanswered) return null
+export function PracticeFollowUpReview({ exchanges }: Props) {
+  if (exchanges.length === 0) return null
 
   return (
     <div className="flex min-w-0 shrink-0 flex-col gap-4" data-testid="practice-follow-up-review">
       {exchanges.map((exchange, index) => (
         <FollowUpReviewItem key={index} question={exchange.question} order={index + 1} />
       ))}
-      {unanswered && (
-        <FollowUpReviewItem question={unanswered} order={exchanges.length + 1} unanswered />
-      )}
     </div>
   )
 }
 
-function FollowUpReviewItem({
-  question,
-  order,
-  unanswered = false,
-}: {
-  order: number
-  question: PracticeFollowUp
-  unanswered?: boolean
-}) {
+function FollowUpReviewItem({ question, order }: { order: number; question: PracticeFollowUp }) {
   const { t } = useTranslation()
 
   return (
@@ -52,7 +34,6 @@ function FollowUpReviewItem({
           {t("practice.followUpReview.followUpNumber", { count: order })}
         </h3>
       </div>
-      {unanswered && <Badge variant="outline">{t("practice.followUpAssistance.unanswered")}</Badge>}
       <PracticeReviewReferenceSections question={question} />
     </article>
   )

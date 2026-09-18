@@ -5,7 +5,7 @@ import type {
   InterviewType,
   InterviewSetup,
 } from "./interview-workflow"
-import type { QuestionSource, PracticeSetupContext, PracticeSelection } from "./practice-workflow"
+import type { PracticeSetupContext, PracticeSelection } from "./practice-workflow"
 import type { TrainingRecordDifficulty, TrainingRecordQuestionType } from "./training-records"
 
 export type TrainingEntryOrigin = "history"
@@ -14,8 +14,6 @@ export type PracticeTrainingEntryParameters = {
   roleId?: string
   questionType?: PracticeQuestionType
   difficulty?: PracticeDifficulty
-  source?: QuestionSource
-  prioritizeWeaknesses?: boolean
 }
 
 export type InterviewTrainingEntryParameters = {
@@ -127,8 +125,6 @@ export function resolvePracticeTrainingEntry(
         )
           ? (parameters.difficulty ?? current.difficulty)
           : context.availableDifficulties[0],
-        source: parameters.source ?? current.source,
-        prioritizeWeaknesses: parameters.prioritizeWeaknesses ?? current.prioritizeWeaknesses,
       },
     }
   }
@@ -157,8 +153,6 @@ export function resolvePracticeTrainingEntry(
     roleId: selectedRole.id,
     questionType,
     difficulty,
-    source: parameters.source ?? current.source,
-    prioritizeWeaknesses: parameters.prioritizeWeaknesses ?? current.prioritizeWeaknesses,
   }
 
   return adjustments.length === 0

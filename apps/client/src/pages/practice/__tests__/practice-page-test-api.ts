@@ -9,8 +9,6 @@ export {
   prepareNextPracticeSession,
   preparePracticeTrainingEntry,
   retryCurrentPracticeQuestion,
-  setQuestionSaved,
-  setQuestionWeak,
   skipPracticeQuestion,
   startPracticeSession,
   submitFollowUpAnswer,

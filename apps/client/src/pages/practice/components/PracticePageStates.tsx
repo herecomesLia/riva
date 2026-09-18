@@ -152,11 +152,10 @@ export function PracticeSelectionSummary({
     [t("practice.summary.role"), role?.title ?? t("practice.session.unknownRole")],
     [t("practice.summary.questionType"), t(`practice.questionTypes.${selection.questionType}`)],
     [t("practice.summary.difficulty"), t(`practice.difficulty.${selection.difficulty}`)],
-    [t("practice.summary.source"), t(`practice.sources.${selection.source}`)],
   ]
 
   return (
-    <dl className="grid gap-4 rounded-xl bg-muted/60 p-4 sm:grid-cols-2">
+    <dl className="grid gap-4 rounded-xl bg-muted/60 p-4 sm:grid-cols-3">
       {items.map(([label, value]) => (
         <div className="flex min-w-0 flex-col gap-1" key={label}>
           <dt className="text-xs font-medium text-muted-foreground">{label}</dt>

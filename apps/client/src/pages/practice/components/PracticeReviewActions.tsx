@@ -16,19 +16,12 @@ import { Spinner } from "@/components/ui/spinner"
 
 import type { PracticeInteractionResult } from "../practice-interaction"
 import { PracticeActionErrorAlert, PracticeBottomActionBar } from "./PracticeBottomActionBar"
-import { PracticeFlagActions } from "./PracticeFlagActions"
 
 export function PracticeReviewActions({
   interactionLocked,
-  isWeak,
   isEndPending,
   isNextPending,
   isRetryPending,
-  isSaved,
-  isSavedPending,
-  isWeakPending,
-  onSetSaved,
-  onSetWeak,
   onEndSession,
   onNextQuestion,
   onRetryCurrent,
@@ -37,18 +30,12 @@ export function PracticeReviewActions({
   isEndPending: boolean
   isNextPending: boolean
   isRetryPending: boolean
-  isWeak: boolean
-  isSaved: boolean
-  isSavedPending: boolean
-  isWeakPending: boolean
-  onSetSaved: (value: boolean) => Promise<PracticeInteractionResult>
-  onSetWeak: (value: boolean) => Promise<PracticeInteractionResult>
   onEndSession: () => Promise<PracticeInteractionResult>
   onNextQuestion: () => Promise<PracticeInteractionResult>
   onRetryCurrent: () => Promise<PracticeInteractionResult>
 }) {
   const { t } = useTranslation()
-  const [error, setError] = useState<"retry" | "next" | "end" | "saved" | "weak" | null>(null)
+  const [error, setError] = useState<"retry" | "next" | "end" | null>(null)
   const [endOpen, setEndOpen] = useState(false)
 
   async function run(
@@ -62,24 +49,6 @@ export function PracticeReviewActions({
       if (action === "end") setEndOpen(false)
     } catch {
       setError(action)
-    }
-  }
-
-  async function updateSaved() {
-    setError(null)
-    try {
-      await onSetSaved(!isSaved)
-    } catch {
-      setError("saved")
-    }
-  }
-
-  async function updateWeak() {
-    setError(null)
-    try {
-      await onSetWeak(!isWeak)
-    } catch {
-      setError("weak")
     }
   }
 
@@ -126,16 +95,6 @@ export function PracticeReviewActions({
           {isEndPending && <Spinner aria-hidden="true" data-icon="inline-start" />}
           {t("practice.review.endSession")}
         </Button>
-        <PracticeFlagActions
-          disabled={interactionLocked}
-          isWeak={isWeak}
-          isSaved={isSaved}
-          isSavedPending={isSavedPending}
-          isWeakPending={isWeakPending}
-          onSavedClick={() => void updateSaved()}
-          onWeakClick={() => void updateWeak()}
-          variant="secondary"
-        />
       </PracticeBottomActionBar>
       <AlertDialog open={endOpen}>
         <AlertDialogContent>

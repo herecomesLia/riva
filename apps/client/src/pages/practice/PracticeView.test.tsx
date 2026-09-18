@@ -24,8 +24,6 @@ function createAnsweringActions(
   overrides: Partial<PracticeAnsweringActions> = {},
 ): PracticeAnsweringActions {
   return {
-    onSetSaved: vi.fn(async () => "executed" as const),
-    onSetWeak: vi.fn(async () => "executed" as const),
     onSkip: vi.fn(async () => "executed" as const),
     onSubmitAnswer: vi.fn(async () => "executed" as const),
     ...overrides,
@@ -34,10 +32,9 @@ function createAnsweringActions(
 
 const answeringPending: PracticeAnsweringPending = {
   interactionLocked: false,
-  saved: false,
+
   skip: false,
   submitAnswer: false,
-  weak: false,
 }
 
 function createFollowUpActions(
@@ -63,8 +60,7 @@ function createReviewActions(
     onEndSession: vi.fn(async () => "executed" as const),
     onNextQuestion: vi.fn(async () => "executed" as const),
     onRetryCurrent: vi.fn(async () => "executed" as const),
-    onSetSaved: vi.fn(async () => "executed" as const),
-    onSetWeak: vi.fn(async () => "executed" as const),
+
     ...overrides,
   }
 }
@@ -74,8 +70,6 @@ const reviewPending: PracticeReviewPending = {
   interactionLocked: false,
   next: false,
   retry: false,
-  saved: false,
-  weak: false,
 }
 
 function renderReadyView(
@@ -140,9 +134,6 @@ function getSetupSelectionControls() {
   return [
     screen.getByTestId("practice-role-trigger"),
     ...setup.querySelectorAll<HTMLElement>('[data-slot="toggle-group-item"]'),
-    screen.getByRole("switch", {
-      name: i18n.t("practice.setup.fields.prioritizeWeaknesses"),
-    }),
   ]
 }
 
@@ -214,9 +205,9 @@ describe("PracticeView", () => {
     renderReadyView(data)
 
     const completed = await screen.findByTestId("practice-completed-state")
+    expect(completed).not.toHaveTextContent(/收藏题数|标记薄弱题数/)
     expect(completed).toHaveTextContent(i18n.t("practice.completed.questions", { count: 1 }))
-    expect(completed).toHaveTextContent(i18n.t("practice.completed.saved", { count: 0 }))
-    expect(completed).toHaveTextContent(i18n.t("practice.completed.markedWeak", { count: 0 }))
+
     expect(completed).toHaveTextContent(
       i18n.t("practice.completed.finalAttemptAverage", {
         score: data.session.finalAttemptAverageScore,
@@ -253,7 +244,7 @@ describe("PracticeView", () => {
     renderReadyView(createPracticeScenario("reviewBalanced"))
 
     const review = await screen.findByTestId("practice-review-state")
-    expect(review).toHaveClass("pb-80", "min-[360px]:pb-52", "sm:pb-40", "lg:pb-28")
+    expect(review).toHaveClass("pb-52", "sm:pb-28")
 
     const actionBar = screen.getByTestId("practice-review-actions-bar")
     expect(actionBar.closest("[data-slot='card']")).not.toBeInTheDocument()
@@ -263,8 +254,6 @@ describe("PracticeView", () => {
       i18n.t("practice.review.retryCurrent"),
       i18n.t("practice.review.nextQuestion"),
       i18n.t("practice.review.endSession"),
-      i18n.t("practice.questionActions.save"),
-      i18n.t("practice.questionActions.markWeak"),
     ]) {
       expect(actions.getByRole("button", { name })).toBeInTheDocument()
     }
@@ -370,13 +359,7 @@ describe("PracticeView", () => {
       const pending = { ...reviewPending, interactionLocked: true, [pendingAction]: true }
       renderReadyView(createPracticeScenario("reviewBalanced"), { reviewPending: pending })
       await screen.findByTestId("practice-review-state")
-      for (const name of [
-        /重练当前题/i,
-        /继续下一题/i,
-        /结束本轮练习/i,
-        /收藏题目/i,
-        /标记(为)?薄弱题/i,
-      ]) {
+      for (const name of [/重练当前题/i, /继续下一题/i, /结束本轮练习/i]) {
         expect(screen.getByRole("button", { name })).toBeDisabled()
       }
     },
@@ -385,15 +368,9 @@ describe("PracticeView", () => {
   it("disables both end confirmation controls while ending is pending", async () => {
     const user = userEvent.setup()
     const props = {
-      isWeak: false,
-      isSaved: false,
-      isSavedPending: false,
-      isWeakPending: false,
       onEndSession: vi.fn(async () => "executed" as const),
       onNextQuestion: vi.fn(async () => "executed" as const),
       onRetryCurrent: vi.fn(async () => "executed" as const),
-      onSetSaved: vi.fn(async (_isSaved: boolean) => "executed" as const),
-      onSetWeak: vi.fn(async (_isWeak: boolean) => "executed" as const),
     }
     const { rerender } = renderWithProviders(
       <PracticeReviewActionsComponent
@@ -493,6 +470,8 @@ describe("PracticeView", () => {
   it("selects the current target role and recommended defaults", async () => {
     const data = createPracticeScenario("setupReady")
     renderReadyView(data)
+    expect(screen.queryByText("题目来源")).not.toBeInTheDocument()
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument()
 
     expect(await screen.findByTestId("practice-role-trigger")).toHaveTextContent(
       "Senior Frontend Engineer",
@@ -503,12 +482,6 @@ describe("PracticeView", () => {
     expect(
       screen.getByRole("button", { name: i18n.t("practice.difficulty.basic") }),
     ).toHaveAttribute("aria-pressed", "true")
-    expect(
-      screen.getByRole("button", { name: i18n.t("practice.sources.personalized") }),
-    ).toHaveAttribute("aria-pressed", "true")
-    expect(
-      screen.getByRole("switch", { name: i18n.t("practice.setup.fields.prioritizeWeaknesses") }),
-    ).not.toBeChecked()
   })
 
   it("keeps the selected option styling after focus moves away", async () => {
@@ -542,24 +515,6 @@ describe("PracticeView", () => {
       .closest('[data-slot="field-set"]')
     expect(questionTypeFieldSet).not.toHaveClass("border-t")
     expect(questionTypeFieldSet?.parentElement).toHaveClass("border-t", "border-border", "py-5")
-
-    const sourceFieldSet = screen
-      .getByText(i18n.t("practice.setup.fields.source"))
-      .closest('[data-slot="field-set"]')
-    expect(sourceFieldSet).not.toHaveClass("border-t")
-    expect(sourceFieldSet?.parentElement).toHaveClass(
-      "border-t",
-      "border-border",
-      "pt-5",
-      "@2xl/setup:border-t-0",
-      "@2xl/setup:border-l",
-      "@2xl/setup:pl-6",
-    )
-    expect(
-      screen
-        .getByRole("switch", { name: i18n.t("practice.setup.fields.prioritizeWeaknesses") })
-        .closest('[data-slot="field"]'),
-    ).toHaveClass("border-t", "border-border", "pt-5")
   })
 
   it("renders the setup selection returned by the service without reapplying a default", async () => {
@@ -572,7 +527,7 @@ describe("PracticeView", () => {
     expect(await screen.findByTestId("practice-role-trigger")).toHaveTextContent("Product Manager")
   })
 
-  it("submits changed question type, difficulty, source, and weakness preference", async () => {
+  it("submits changed question type and difficulty", async () => {
     const user = userEvent.setup()
     const onStart = vi.fn(async () => undefined)
     renderReadyView(createPracticeScenario("setupReady"), { onStart })
@@ -582,18 +537,13 @@ describe("PracticeView", () => {
       screen.getByRole("button", { name: i18n.t("practice.questionTypes.behavioral") }),
     )
     await user.click(screen.getByRole("button", { name: i18n.t("practice.difficulty.hard") }))
-    await user.click(screen.getByRole("button", { name: i18n.t("practice.sources.saved") }))
-    await user.click(
-      screen.getByRole("switch", { name: i18n.t("practice.setup.fields.prioritizeWeaknesses") }),
-    )
+
     await user.click(getStartButton())
 
     expect(onStart).toHaveBeenCalledWith({
       roleId: "role_frontend_bytedance",
       questionType: "behavioral",
       difficulty: "hard",
-      source: "saved",
-      prioritizeWeaknesses: true,
     })
   })
 
@@ -630,20 +580,13 @@ describe("PracticeView", () => {
       screen.getByRole("button", { name: i18n.t("practice.questionTypes.behavioral") }),
     )
     await user.click(screen.getByRole("button", { name: i18n.t("practice.difficulty.hard") }))
-    await user.click(screen.getByRole("button", { name: i18n.t("practice.sources.saved") }))
-    await user.click(
-      screen.getByRole("switch", {
-        name: i18n.t("practice.setup.fields.prioritizeWeaknesses"),
-      }),
-    )
+
     await user.click(getStartButton())
 
     expect(onStart).toHaveBeenCalledWith({
       roleId: "role_frontend_bytedance",
       questionType: "behavioral",
       difficulty: "hard",
-      source: "saved",
-      prioritizeWeaknesses: true,
     })
     const pendingButton = screen.getByRole("button", {
       name: i18n.t("practice.actions.starting"),
@@ -673,13 +616,11 @@ describe("PracticeView", () => {
       roleId: "role_frontend_bytedance",
       questionType: "behavioral",
       difficulty: "hard",
-      source: "saved",
-      prioritizeWeaknesses: true,
     })
   })
 
   it("disables every selection-changing action while external start state is pending", async () => {
-    renderReadyView(createPracticeScenario("noEligibleSavedQuestions"), {
+    renderReadyView(createPracticeScenario("setupReady"), {
       isStarting: true,
     })
     const setup = await screen.findByTestId("practice-setup-state")
@@ -692,27 +633,6 @@ describe("PracticeView", () => {
     expect(interactiveControls.length).toBeGreaterThan(0)
     for (const control of interactiveControls) expectControlDisabled(control)
     expect(within(setup).queryByRole("textbox")).not.toBeInTheDocument()
-    expect(
-      screen.getByRole("button", { name: i18n.t("practice.actions.usePersonalized") }),
-    ).toBeDisabled()
-  })
-
-  it.each([
-    ["noEligibleSavedQuestions", "saved"],
-    ["noEligibleHistoryQuestions", "history"],
-  ] as const)("explains and recovers from %s", async (scenario, source) => {
-    const user = userEvent.setup()
-    renderReadyView(createPracticeScenario(scenario))
-
-    const alert = await screen.findByTestId(`practice-no-${source}-questions`)
-    expect(alert).toBeInTheDocument()
-    expect(getStartButton()).toBeDisabled()
-    await user.click(
-      within(alert).getByRole("button", { name: i18n.t("practice.actions.usePersonalized") }),
-    )
-
-    expect(screen.queryByTestId(`practice-no-${source}-questions`)).not.toBeInTheDocument()
-    expect(getStartButton()).toBeEnabled()
   })
 
   it("preserves form input after a safe start error", async () => {
@@ -901,55 +821,6 @@ describe("PracticeView", () => {
     )
     expect(screen.getByText(data.session.question.guidance.framework[0])).toBeVisible()
     expect(textarea).toHaveValue("保留草稿")
-  })
-
-  it("requests saved and weak state changes without optimistic UI", async () => {
-    const user = userEvent.setup()
-    const data = createPracticeScenario("answeringQuestion")
-    const { actions } = renderReadyView(data)
-    if (data.session.status !== "answering") return
-
-    const saveButton = await screen.findByRole("button", {
-      name: i18n.t("practice.questionActions.save"),
-    })
-    const weakButton = screen.getByRole("button", {
-      name: i18n.t("practice.questionActions.markWeak"),
-    })
-    await user.click(saveButton)
-    await user.click(weakButton)
-
-    expect(actions.onSetSaved).toHaveBeenCalledWith(true)
-    expect(actions.onSetWeak).toHaveBeenCalledWith(true)
-    expect(saveButton).toHaveAttribute("aria-pressed", "false")
-    expect(weakButton).toHaveAttribute("aria-pressed", "false")
-  })
-
-  it("keeps server question states after save and weak actions fail", async () => {
-    const user = userEvent.setup()
-    const actions = createAnsweringActions({
-      onSetSaved: vi.fn(async () => {
-        throw new Error("unsafe saved details")
-      }),
-      onSetWeak: vi.fn(async () => {
-        throw new Error("unsafe weak details")
-      }),
-    })
-    renderReadyView(createPracticeScenario("answeringQuestion"), { answeringActions: actions })
-
-    const saveButton = await screen.findByRole("button", {
-      name: i18n.t("practice.questionActions.save"),
-    })
-    const weakButton = screen.getByRole("button", {
-      name: i18n.t("practice.questionActions.markWeak"),
-    })
-    await user.click(saveButton)
-    expect(await screen.findByText(i18n.t("practice.errors.savedDescription"))).toBeInTheDocument()
-    expect(saveButton).toHaveAttribute("aria-pressed", "false")
-
-    await user.click(weakButton)
-    expect(await screen.findByText(i18n.t("practice.errors.weakDescription"))).toBeInTheDocument()
-    expect(weakButton).toHaveAttribute("aria-pressed", "false")
-    expect(screen.queryByText(/unsafe saved details|unsafe weak details/)).not.toBeInTheDocument()
   })
 
   it("requires confirmation before skipping the current question", async () => {
@@ -1182,27 +1053,22 @@ describe("PracticeView", () => {
     expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
   })
 
-  it("shows the unanswered follow-up in order after follow-ups end early", async () => {
+  it("shows only answered turns after follow-ups end early", async () => {
     const data = createPracticeScenario("processingFollowUpEndedEarly")
     renderReadyView(data)
-    if (
-      data.session.status !== "processing" ||
-      data.session.followUpCompletion.status !== "endedEarly"
-    ) {
+    if (data.session.status !== "processing") {
       return
     }
 
     const timeline = await screen.findByTestId("practice-conversation-timeline")
+    expect(timeline).not.toHaveTextContent("如果验证结果不符合预期，你会如何调整行动？")
     const answered = data.session.followUps[0]
     if (!answered) throw new Error("The ended-early fixture must contain an answered follow-up.")
-    const unanswered = data.session.followUpCompletion.unanswered
     const orderedText = [
       data.session.question.prompt,
       data.session.mainAnswer.content,
       answered.question.prompt,
       answered.answer.content,
-      unanswered.prompt,
-      i18n.t("practice.followUp.endedEarly"),
     ]
     let previousIndex = -1
     for (const text of orderedText) {
@@ -1211,9 +1077,6 @@ describe("PracticeView", () => {
       previousIndex = index
     }
 
-    expect(timeline).toHaveTextContent(
-      i18n.t("practice.followUp.unansweredFollowUp", { count: data.session.followUps.length + 1 }),
-    )
     expect(timeline).not.toHaveTextContent(
       i18n.t("practice.followUp.yourFollowUpAnswer", { count: data.session.followUps.length + 1 }),
     )
@@ -1265,8 +1128,8 @@ describe("PracticeView", () => {
     }
   })
 
-  it("keeps highlights, issues, improvements, and weaknesses in distinct sections", async () => {
-    const data = createPracticeScenario("reviewRetryRecommended")
+  it("keeps highlights, issues, and improvements in distinct sections", async () => {
+    const data = createPracticeScenario("reviewBalanced")
     renderReadyView(data)
     if (data.session.status !== "review") return
 
@@ -1275,62 +1138,27 @@ describe("PracticeView", () => {
     for (const item of data.session.review.mainIssues) expect(review).toHaveTextContent(item)
     for (const item of data.session.review.improvementSuggestions)
       expect(review).toHaveTextContent(item)
-    for (const item of data.session.review.exposedWeaknesses) expect(review).toHaveTextContent(item)
   })
 
-  it("shows retry and next-question recommendations directly from the response", async () => {
-    const retry = createPracticeScenario("reviewRetryRecommended")
-    const { unmount } = renderReadyView(retry)
-    if (retry.session.status !== "review") return
-    expect(await screen.findByTestId("practice-recommendation")).toHaveTextContent(
-      retry.session.review.recommendation.reason,
-    )
-    expect(screen.getByTestId("practice-recommendation")).toHaveTextContent(
-      i18n.t("practice.review.retryRecommended"),
-    )
-    unmount()
-
-    const next = createPracticeScenario("reviewNextRecommended")
-    renderReadyView(next)
-    if (
-      next.session.status !== "review" ||
-      next.session.review.recommendation.action !== "nextQuestion"
-    )
-      return
-    const recommendation = await screen.findByTestId("practice-recommendation")
-    expect(recommendation).toHaveTextContent(next.session.review.recommendation.reason)
-    expect(recommendation).toHaveTextContent(
-      i18n.t(
-        `practice.questionTypes.${next.session.review.recommendation.nextQuestion.questionType}`,
-      ),
-    )
-  })
-
-  it("exposes implemented review lifecycle actions alongside saved and weak actions", async () => {
+  it("exposes implemented review lifecycle actions", async () => {
     const data = createPracticeScenario("reviewBalanced")
     renderReadyView(data)
 
     await screen.findByTestId("practice-review-state")
+    expect(screen.queryByRole("button", { name: /收藏|薄弱/ })).not.toBeInTheDocument()
+    expect(screen.queryByTestId("practice-recommendation")).not.toBeInTheDocument()
+    expect(screen.queryByText("本题暴露的薄弱项")).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: /重练当前题|retry current question/i })).toBeEnabled()
     expect(
       screen.getByRole("button", { name: /继续下一题|continue to next question/i }),
     ).toBeEnabled()
     expect(screen.getByRole("button", { name: /结束本轮练习|end this session/i })).toBeEnabled()
-    expect(
-      screen.getByRole("button", { name: i18n.t("practice.questionActions.save") }),
-    ).toBeEnabled()
-    expect(
-      screen.getByRole("button", { name: i18n.t("practice.questionActions.markWeak") }),
-    ).toBeEnabled()
   })
 
   it("keeps the complete conversation and navigates to the selected question review", async () => {
     const data = createPracticeScenario("reviewFollowUpEndedEarly")
     renderReadyView(data)
-    if (
-      data.session.status !== "review" ||
-      data.session.followUpCompletion.status !== "endedEarly"
-    ) {
+    if (data.session.status !== "review") {
       return
     }
 
@@ -1341,14 +1169,12 @@ describe("PracticeView", () => {
       expect(timeline).toHaveTextContent(exchange.question.prompt)
       expect(timeline).toHaveTextContent(exchange.answer.content)
     }
-    expect(timeline).toHaveTextContent(data.session.followUpCompletion.unanswered.prompt)
     expect(screen.queryByLabelText(i18n.t("practice.followUp.answerLabel"))).not.toBeInTheDocument()
     const review = screen.getByTestId("practice-follow-up-review")
     const questionReview = screen.getByTestId("practice-question-review")
     const questions = [
       data.session.question,
       ...data.session.followUps.map((exchange) => exchange.question),
-      data.session.followUpCompletion.unanswered,
     ]
     for (const [index, question] of questions.entries()) {
       const card = questionReview.querySelector<HTMLElement>(`[data-review-index="${index}"]`)!
@@ -1363,10 +1189,9 @@ describe("PracticeView", () => {
         for (const item of guidance) expect(card).toHaveTextContent(item)
       }
     }
-    expect(review).toHaveTextContent(i18n.t("practice.followUpAssistance.unanswered"))
 
     const target = review.querySelector<HTMLElement>(
-      `[data-review-index="${data.session.followUps.length + 1}"]`,
+      `[data-review-index="${data.session.followUps.length}"]`,
     )!
     target.scrollIntoView = vi.fn()
     const lastQuestion = within(timeline).getAllByRole("button").at(-1)!
@@ -1382,7 +1207,7 @@ describe("PracticeView", () => {
     expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "instant" })
   })
 
-  it("renders long review content and the no-new-weaknesses state", async () => {
+  it("renders long review content", async () => {
     const long = createPracticeScenario("reviewLongContent")
     const { unmount } = renderReadyView(long)
     if (long.session.status !== "review") return
@@ -1390,8 +1215,5 @@ describe("PracticeView", () => {
       long.session.review.overallPerformance,
     )
     unmount()
-
-    renderReadyView(createPracticeScenario("reviewNoNewWeaknesses"))
-    expect(await screen.findByText(i18n.t("practice.review.noNewWeaknesses"))).toBeVisible()
   })
 })

@@ -31,7 +31,7 @@ export const AnsweringActionsLocked = meta.story({
     ...createPracticeViewArgs("answeringQuestion"),
     answeringPending: {
       ...createPracticeViewArgs("answeringQuestion").answeringPending,
-      saved: true,
+
       interactionLocked: true,
     },
   },
@@ -40,8 +40,7 @@ export const AnsweringActionsLocked = meta.story({
     await expect(
       canvas.getByRole("button", { name: /查看答题框架|view answer framework/i }),
     ).toBeEnabled()
-    await expect(canvas.getByRole("button", { name: /收藏题目|save question/i })).toBeDisabled()
-    await expect(canvas.getByRole("button", { name: /标记为薄弱题|mark as weak/i })).toBeDisabled()
+
     await expect(canvas.getByRole("button", { name: /跳过本题|skip question/i })).toBeDisabled()
     await expect(canvas.getByRole("textbox")).toBeEnabled()
   },
@@ -53,11 +52,7 @@ export const AnsweringMobileFixedActions = meta.story({
   play: async ({ canvas }) => {
     const actionBar = canvas.getByTestId("practice-question-actions-bar")
     await expect(actionBar).toBeVisible()
-    for (const name of [
-      /收藏题目|save question/i,
-      /标记为薄弱题|mark as weak/i,
-      /跳过本题|skip question/i,
-    ]) {
+    for (const name of [/跳过本题|skip question/i]) {
       await expect(within(actionBar).getByRole("button", { name })).toBeVisible()
     }
   },

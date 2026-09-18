@@ -19,7 +19,6 @@ const meta = preview.meta({
 export const FollowUpReviewReadOnly = meta.story({
   args: {
     exchanges: complete.session.followUps,
-    completion: complete.session.followUpCompletion,
   },
   play: async ({ canvas }) => {
     await expect(
@@ -28,12 +27,11 @@ export const FollowUpReviewReadOnly = meta.story({
   },
 })
 
-export const FollowUpUnansweredReview = meta.story({
+export const FollowUpEndedEarlyReview = meta.story({
   args: {
     exchanges: ended.session.followUps,
-    completion: ended.session.followUpCompletion,
   },
   play: async ({ canvas }) => {
-    await expect(canvas.getByText(/未回答|Unanswered/i)).toBeVisible()
+    await expect(canvas.queryByText(/未回答|Unanswered/i)).not.toBeInTheDocument()
   },
 })

@@ -7,16 +7,11 @@ import type { ReviewSession } from "@/models/practice-workflow"
 import { PracticeFollowUpReview } from "./PracticeFollowUpReview"
 import { PracticeReviewReferenceSections } from "./PracticeReviewReferenceSections"
 
-type Props = Pick<ReviewSession, "question" | "followUps" | "followUpCompletion"> & {
+type Props = Pick<ReviewSession, "question" | "followUps"> & {
   scrollRef?: Ref<HTMLDivElement>
 }
 
-export function PracticeQuestionReview({
-  question,
-  followUps,
-  followUpCompletion,
-  scrollRef,
-}: Props) {
+export function PracticeQuestionReview({ question, followUps, scrollRef }: Props) {
   const { t } = useTranslation()
 
   return (
@@ -47,7 +42,7 @@ export function PracticeQuestionReview({
           </div>
           <PracticeReviewReferenceSections question={question} />
         </section>
-        <PracticeFollowUpReview completion={followUpCompletion} exchanges={followUps} />
+        <PracticeFollowUpReview exchanges={followUps} />
       </CardContent>
     </Card>
   )

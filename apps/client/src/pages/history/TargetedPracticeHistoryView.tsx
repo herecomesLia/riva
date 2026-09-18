@@ -20,7 +20,6 @@ import type {
   TargetedPracticeRecordDetailResponse,
   TrainingRecordStatus,
 } from "@/models/training-records"
-import { PracticeWeaknesses } from "@/pages/practice/components/PracticeReviewDetails"
 
 import { TargetedPracticeQuestionRecord } from "./components/TargetedPracticeQuestionRecord"
 import { TrainingRecommendationCard } from "./components/TrainingRecommendationCard"
@@ -83,8 +82,6 @@ export function TargetedPracticeHistoryView({
                     roleId: state.data.role.id,
                     questionType: toPracticeQuestionType(state.data.setup.questionType),
                     difficulty: toPracticeDifficulty(state.data.setup.difficulty),
-                    source: state.data.setup.source,
-                    prioritizeWeaknesses: state.data.setup.prioritizedWeaknesses,
                   }}
                   to="/practice"
                 />
@@ -308,4 +305,27 @@ function statusVariant(status: TrainingRecordStatus): "default" | "secondary" | 
   if (status === "completed") return "default"
   if (status === "partiallyCompleted") return "secondary"
   return "outline"
+}
+
+function PracticeWeaknesses({ items }: { items: string[] }) {
+  const { t } = useTranslation()
+
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>{t("practice.review.weaknesses")}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-wrap gap-2">
+        {items.length > 0 ? (
+          items.map((item) => (
+            <Badge key={item} variant="secondary">
+              {item}
+            </Badge>
+          ))
+        ) : (
+          <p className="text-sm text-muted-foreground">{t("practice.review.noNewWeaknesses")}</p>
+        )}
+      </CardContent>
+    </Card>
+  )
 }

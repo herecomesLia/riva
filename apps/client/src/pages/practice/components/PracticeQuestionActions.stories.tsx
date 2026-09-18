@@ -12,55 +12,13 @@ const meta = preview.meta({
 
 const defaultArgs = {
   interactionLocked: false,
-  isWeak: false,
-  isSaved: false,
-  isSavedPending: false,
+
   isSkipPending: false,
-  isWeakPending: false,
-  onSetSaved: fn(async () => "executed" as const),
-  onSetWeak: fn(async () => "executed" as const),
+
   onSkip: skip,
 }
 
 export const Default = meta.story({ args: defaultArgs })
-
-export const Saved = meta.story({
-  args: { ...defaultArgs, isSaved: true },
-  play: async ({ canvas }) => {
-    await expect(
-      canvas
-        .getByRole("button", { name: /取消收藏|remove from saved/i })
-        .querySelector(".lucide-bookmark"),
-    ).toHaveClass("fill-destructive", "text-destructive")
-  },
-})
-
-export const MarkedWeak = meta.story({
-  args: { ...defaultArgs, isWeak: true },
-  play: async ({ canvas }) => {
-    await expect(
-      canvas
-        .getByRole("button", { name: /取消薄弱标记|remove weak mark/i })
-        .querySelector(".lucide-brain"),
-    ).toHaveClass("text-amber-500")
-  },
-})
-
-export const FlagActionsPending = meta.story({
-  args: {
-    ...defaultArgs,
-    interactionLocked: true,
-    isSavedPending: true,
-    isWeakPending: true,
-  },
-  play: async ({ canvas }) => {
-    for (const name of [/收藏题目|save question/i, /标记为薄弱题|mark as weak/i]) {
-      const button = canvas.getByRole("button", { name })
-      await expect(button).toBeDisabled()
-      await expect(button.querySelector('[data-slot="spinner"]')).toBeVisible()
-    }
-  },
-})
 
 export const CollapsedSidebar = meta.story({
   args: defaultArgs,

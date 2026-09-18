@@ -90,20 +90,6 @@ export const HistoricalEntryFailure = meta.story({
   args: { isRetrying: false, onRetry: fn(), variant: "historyEntryError" },
 })
 
-export const NoSavedQuestions = meta.story({
-  args: createPracticeViewArgs("noEligibleSavedQuestions"),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByTestId("practice-no-saved-questions")).toBeVisible()
-  },
-})
-
-export const NoHistoryQuestions = meta.story({
-  args: createPracticeViewArgs("noEligibleHistoryQuestions"),
-  play: async ({ canvas }) => {
-    await expect(canvas.getByTestId("practice-no-history-questions")).toBeVisible()
-  },
-})
-
 export const GeneratingQuestion = meta.story({ args: createPracticeViewArgs("generatingQuestion") })
 
 export const TaskFailureBeforeQuestion = meta.story({

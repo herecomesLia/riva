@@ -24,8 +24,6 @@ describe("PracticePage: completion", () => {
         roleId: productRole.id,
         questionType: "behavioral",
         difficulty: "hard",
-        source: "history",
-        prioritizeWeaknesses: true,
       }
       vi.mocked(api.getPracticePage).mockResolvedValue(current)
       vi.mocked(api.preparePracticeTrainingEntry).mockResolvedValue({
@@ -46,8 +44,6 @@ describe("PracticePage: completion", () => {
         roleId: "role_product_manager_meituan",
         questionType: "behavioral",
         difficulty: "hard",
-        source: "history",
-        prioritizeWeaknesses: true,
       })
       expect(testing.screen.getByTestId("practice-role-trigger")).toHaveTextContent(
         "Product Manager",
@@ -60,14 +56,6 @@ describe("PracticePage: completion", () => {
       expect(
         testing.screen.getByRole("button", { name: i18n.t("practice.difficulty.hard") }),
       ).toHaveAttribute("aria-pressed", "true")
-      expect(
-        testing.screen.getByRole("button", { name: i18n.t("practice.sources.history") }),
-      ).toHaveAttribute("aria-pressed", "true")
-      expect(
-        testing.screen.getByRole("switch", {
-          name: i18n.t("practice.setup.fields.prioritizeWeaknesses"),
-        }),
-      ).toBeChecked()
     },
   )
 
@@ -83,7 +71,6 @@ describe("PracticePage: completion", () => {
       ...prepared.session.selection,
       roleId: productRole.id,
       questionType: productRole.supportedQuestionTypes[0],
-      source: "history",
     }
     const generating = api.createPracticeScenario("generatingQuestion")
     if (generating.session.status !== "generatingQuestion") {
@@ -103,6 +90,9 @@ describe("PracticePage: completion", () => {
       },
     })
     vi.mocked(api.startPracticeSession).mockResolvedValue(generating.session)
+    vi.mocked(api.getPracticeTaskStatus).mockResolvedValue(
+      api.createPracticeScenario("answeringQuestion").session,
+    )
 
     context.renderPracticePage(
       "/practice?entry=history&roleId=role_product_manager_meituan&questionType=technical_basics&difficulty=basic&source=history",
@@ -131,7 +121,6 @@ describe("PracticePage: completion", () => {
     prepared.session.selection = {
       ...prepared.session.selection,
       roleId: null,
-      source: "history",
     }
     const generating = api.createPracticeScenario("generatingQuestion")
     vi.mocked(api.getPracticePage).mockResolvedValue(current)
@@ -144,6 +133,9 @@ describe("PracticePage: completion", () => {
       },
     })
     vi.mocked(api.startPracticeSession).mockResolvedValue(generating.session)
+    vi.mocked(api.getPracticeTaskStatus).mockResolvedValue(
+      api.createPracticeScenario("answeringQuestion").session,
+    )
 
     context.renderPracticePage(
       "/practice?entry=history&roleId=role_deleted&questionType=project&difficulty=basic&source=history",
@@ -285,8 +277,6 @@ describe("PracticePage: completion", () => {
       ...completed.session.selection,
       difficulty: "hard",
       questionType: "behavioral",
-      prioritizeWeaknesses: true,
-      source: "saved",
     }
     prepared.setupContext = structuredClone(completed.setupContext)
     prepared.session.selection = structuredClone(completed.session.selection)
@@ -316,16 +306,7 @@ describe("PracticePage: completion", () => {
         name: i18n.t(`practice.difficulty.${completed.session.selection.difficulty}`),
       }),
     ).toHaveAttribute("aria-pressed", "true")
-    expect(
-      testing.screen.getByRole("button", {
-        name: i18n.t(`practice.sources.${completed.session.selection.source}`),
-      }),
-    ).toHaveAttribute("aria-pressed", "true")
-    expect(
-      testing.screen.getByRole("switch", {
-        name: i18n.t("practice.setup.fields.prioritizeWeaknesses"),
-      }),
-    ).toBeChecked()
+
     expect(testing.screen.queryByTestId("practice-completed-state")).not.toBeInTheDocument()
   })
 
@@ -428,25 +409,21 @@ describe("PracticePage: completion", () => {
     const nextButton = await testing.screen.findByRole("button", { name: /继续下一题/i })
     const retryButton = testing.screen.getByRole("button", { name: /重练当前题/i })
     const endButton = testing.screen.getByRole("button", { name: /结束本轮练习/i })
-    const savedButton = testing.screen.getByRole("button", { name: /收藏题目/i })
-    const weakButton = testing.screen.getByRole("button", { name: /标记(为)?薄弱题/i })
+
     testing.act(() => {
       testing.fireEvent.click(nextButton)
       testing.fireEvent.click(retryButton)
       testing.fireEvent.click(endButton)
-      testing.fireEvent.click(savedButton)
-      testing.fireEvent.click(weakButton)
     })
     await testing.waitFor(() => expect(api.continueToNextPracticeQuestion).toHaveBeenCalledTimes(1))
-    for (const name of [/重练当前题/i, /结束本轮练习/i, /收藏题目/i, /标记(为)?薄弱题/i]) {
+    for (const name of [/重练当前题/i, /结束本轮练习/i]) {
       for (const button of testing.screen.getAllByRole("button", { hidden: true, name })) {
         expect(button).toBeDisabled()
       }
     }
     expect(api.retryCurrentPracticeQuestion).not.toHaveBeenCalled()
     expect(api.endPracticeSession).not.toHaveBeenCalled()
-    expect(api.setQuestionSaved).not.toHaveBeenCalled()
-    expect(api.setQuestionWeak).not.toHaveBeenCalled()
+
     await testing.act(async () => {
       deferred.resolve(generating.session)
       await deferred.promise
@@ -466,25 +443,21 @@ describe("PracticePage: completion", () => {
     const retryButton = await testing.screen.findByRole("button", { name: /重练当前题/i })
     const nextButton = testing.screen.getByRole("button", { name: /继续下一题/i })
     const endButton = testing.screen.getByRole("button", { name: /结束本轮练习/i })
-    const savedButton = testing.screen.getByRole("button", { name: /收藏题目/i })
-    const weakButton = testing.screen.getByRole("button", { name: /标记(为)?薄弱题/i })
+
     testing.act(() => {
       testing.fireEvent.click(retryButton)
       testing.fireEvent.click(nextButton)
       testing.fireEvent.click(endButton)
-      testing.fireEvent.click(savedButton)
-      testing.fireEvent.click(weakButton)
     })
     await testing.waitFor(() => expect(api.retryCurrentPracticeQuestion).toHaveBeenCalledTimes(1))
-    for (const name of [/继续下一题/i, /结束本轮练习/i, /收藏题目/i, /标记(为)?薄弱题/i]) {
+    for (const name of [/继续下一题/i, /结束本轮练习/i]) {
       for (const button of testing.screen.getAllByRole("button", { hidden: true, name })) {
         expect(button).toBeDisabled()
       }
     }
     expect(api.continueToNextPracticeQuestion).not.toHaveBeenCalled()
     expect(api.endPracticeSession).not.toHaveBeenCalled()
-    expect(api.setQuestionSaved).not.toHaveBeenCalled()
-    expect(api.setQuestionWeak).not.toHaveBeenCalled()
+
     await testing.act(async () => {
       deferred.resolve(retrying.session)
       await deferred.promise

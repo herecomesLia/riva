@@ -1,5 +1,5 @@
 import preview from "#storybook/preview"
-import { expect, userEvent, within } from "storybook/test"
+import { expect, userEvent } from "storybook/test"
 
 import { withRouter } from "#storybook/decorators/with-router"
 import { createPracticeViewArgs, withReferenceAnswer } from "./practice-story-fixtures"
@@ -76,20 +76,11 @@ export const FollowUpReviewWithReferences = meta.story({
   },
 })
 
-export const FollowUpReviewWithUnansweredReference = meta.story({
-  args: createPracticeViewArgs("reviewFollowUpEndedEarly"),
-  play: async ({ canvas, userEvent }) => {
-    await userEvent.click(canvas.getAllByRole("button", { name: /^查看复盘：|^View review:/i })[0])
-    const review = canvas.getByTestId("practice-follow-up-review")
-    await expect(within(review).getByText(/未回答|Unanswered/i)).toBeVisible()
-  },
-})
-
 export const FollowUpEndedEarly = meta.story({
   args: createPracticeViewArgs("processingFollowUpEndedEarly"),
   play: async ({ canvas }) => {
     await expect(canvas.getByTestId("practice-processing-state")).toBeVisible()
-    await expect(canvas.getByTestId("practice-follow-up-incomplete")).toBeVisible()
+    await expect(canvas.queryByTestId("practice-follow-up-incomplete")).not.toBeInTheDocument()
     await expect(canvas.queryByRole("textbox")).not.toBeInTheDocument()
   },
 })

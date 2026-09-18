@@ -36,7 +36,6 @@ const defaultSetupContext: PracticeSetupContext = {
     },
   ],
   availableDifficulties: ["basic", "hard"],
-  eligibleQuestionCounts: { saved: 1, history: 1 },
 }
 
 const selection: ActiveSelection = {
@@ -88,7 +87,6 @@ const processing: ProcessingSession = {
     answeredFollowUp,
     { question: secondFollowUp, answer: { content: "我会缩小验证范围，重新检查假设并调整方案。" } },
   ],
-  followUpCompletion: { status: "completed" },
 }
 function review(overrides: Partial<ReviewSession> = {}): ReviewSession {
   return {
@@ -100,25 +98,12 @@ function review(overrides: Partial<ReviewSession> = {}): ReviewSession {
   }
 }
 
-const nextReview: ReviewSession["review"] = {
-  ...practiceFixture.review,
-  recommendation: {
-    action: "nextQuestion",
-    reason: "继续练习新的问题，巩固结果验证与沟通能力。",
-    nextQuestion: {
-      questionType: "behavioral",
-      difficulty: "hard",
-      focusAreas: ["结果验证"],
-    },
-  },
-}
 const completed: CompletedSession = {
   status: "completed",
   selection,
   ...practiceFixture.completion,
   questionsCompleted: 1,
-  savedQuestionCount: 0,
-  weakQuestionCount: 0,
+
   finalAttemptAverageScore: 85,
 }
 
@@ -127,20 +112,12 @@ const scenarios = {
   setupReady: data({ status: "setup", selection }),
   noRoles: data(
     { status: "setup", selection: practiceFixture.selection },
-    { ...defaultSetupContext, roles: [], eligibleQuestionCounts: { saved: 0, history: 0 } },
+    { ...defaultSetupContext, roles: [] },
   ),
-  noEligibleSavedQuestions: data(
-    { status: "setup", selection: { ...selection, source: "saved" } },
-    { ...defaultSetupContext, eligibleQuestionCounts: { saved: 0, history: 1 } },
-  ),
-  noEligibleHistoryQuestions: data(
-    { status: "setup", selection: { ...selection, source: "history" } },
-    { ...defaultSetupContext, eligibleQuestionCounts: { saved: 1, history: 0 } },
-  ),
+
   generatingQuestion: data({ status: "generatingQuestion", selection }),
   answeringQuestion: data(answering),
-  answeringSavedQuestion: data({ ...answering, question: question({ isSaved: true }) }),
-  answeringWeakQuestion: data({ ...answering, question: question({ isWeak: true }) }),
+
   answeringFirstFollowUp: data(firstFollowUp),
   answeringSingleFollowUp: data({
     ...firstFollowUp,
@@ -155,12 +132,10 @@ const scenarios = {
   processingFollowUpEndedEarly: data({
     ...processing,
     followUps: [answeredFollowUp],
-    followUpCompletion: { status: "endedEarly", unanswered: secondFollowUp },
   }),
   processingAnswer: data(processing),
-  reviewRetryRecommended: data(review()),
-  reviewNextRecommended: data(review({ review: nextReview })),
-  reviewBalanced: data(review({ review: nextReview })),
+
+  reviewBalanced: data(review()),
   reviewHighScore: data(
     review({
       evaluation: { ...practiceFixture.evaluation, overallScore: 94 },
@@ -184,11 +159,7 @@ const scenarios = {
       },
     }),
   ),
-  reviewNoNewWeaknesses: data(
-    review({
-      review: { ...practiceFixture.review, exposedWeaknesses: [] },
-    }),
-  ),
+
   reviewMotivation: data(
     review({
       selection: { ...selection, questionType: "motivation" },
@@ -206,23 +177,11 @@ const scenarios = {
           },
         },
       ],
-      followUpCompletion: {
-        status: "endedEarly",
-        unanswered: {
-          ...secondFollowUp,
-          referenceAnswer: practiceFixture.followUp.question.referenceAnswer,
-        },
-      },
     }),
   ),
   completedSession: data(completed),
   retryingCurrentQuestion: data(answering),
   generatingNextQuestion: data({ status: "generatingQuestion", selection }),
-  completedWithWeakQuestions: data({
-    ...completed,
-    weakQuestionCount: 1,
-    nextStepSuggestion: "优先复习本轮标记的薄弱题。",
-  }),
 } satisfies Record<string, PracticeData>
 
 export type PracticeScenario = keyof typeof scenarios

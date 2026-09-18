@@ -1,6 +1,5 @@
 import { useTranslation } from "react-i18next"
 
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { PracticeReview } from "@/models/practice-workflow"
 
@@ -37,29 +36,6 @@ function ReviewSection({ items, title }: { items: string[]; title: string }) {
       </CardHeader>
       <CardContent>
         <ReviewList items={items} />
-      </CardContent>
-    </Card>
-  )
-}
-
-export function PracticeWeaknesses({ items }: { items: string[] }) {
-  const { t } = useTranslation()
-
-  return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>{t("practice.review.weaknesses")}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
-        {items.length > 0 ? (
-          items.map((item) => (
-            <Badge key={item} variant="secondary">
-              {item}
-            </Badge>
-          ))
-        ) : (
-          <p className="text-sm text-muted-foreground">{t("practice.review.noNewWeaknesses")}</p>
-        )}
       </CardContent>
     </Card>
   )

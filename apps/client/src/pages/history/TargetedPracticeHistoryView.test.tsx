@@ -66,10 +66,8 @@ describe("TargetedPracticeHistoryView", () => {
     expect(retryHref).toContain(`roleId=${encodeURIComponent(record.role.id)}`)
     expect(retryHref).toContain("questionType=project")
     expect(retryHref).toContain("difficulty=hard")
-    expect(retryHref).toContain(`source=${record.setup.source}`)
-    expect(retryHref).toContain(
-      `prioritizeWeaknesses=${String(record.setup.prioritizedWeaknesses)}`,
-    )
+    expect(retryHref).not.toContain("source=")
+    expect(retryHref).not.toContain("prioritizeWeaknesses=")
     expect(retryHref).not.toMatch(/recordId=|sessionId=|version=|viewData=/)
     const recommendationLink = screen.getByRole("link", {
       name: i18n.t("history.detail.recommendationActions.mockInterview"),

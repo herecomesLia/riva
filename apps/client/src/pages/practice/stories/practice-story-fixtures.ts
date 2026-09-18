@@ -13,10 +13,7 @@ export type PracticeReviewStoryVariant =
   | "highScore"
   | "longDetails"
   | "longDimensions"
-  | "longFocusAreas"
   | "lowScore"
-  | "nextRecommendation"
-  | "retryRecommendation"
 
 export function createPracticeReviewStoryFixture(
   variant: PracticeReviewStoryVariant = "balanced",
@@ -26,13 +23,9 @@ export function createPracticeReviewStoryFixture(
       ? "reviewHighScore"
       : variant === "lowScore"
         ? "reviewLowScore"
-        : variant === "retryRecommendation"
-          ? "reviewRetryRecommended"
-          : variant === "nextRecommendation" || variant === "longFocusAreas"
-            ? "reviewNextRecommended"
-            : variant === "longDetails"
-              ? "reviewLongContent"
-              : "reviewBalanced"
+        : variant === "longDetails"
+          ? "reviewLongContent"
+          : "reviewBalanced"
   const response = createPracticeScenario(scenario)
   if (response.session.status !== "review") throw new Error("Review fixture required.")
   const session = response.session
@@ -65,19 +58,10 @@ export function createPracticeReviewStoryFixture(
       explanation: `${score.explanation} 同时需要结合岗位目标、候选人的个人职责边界、方案取舍依据、跨团队协作过程和最终验证周期，才能完整判断这项能力是否稳定可复用。`,
     }))
   }
-  if (variant === "longFocusAreas" && session.review.recommendation.action === "nextQuestion") {
-    session.review.recommendation.nextQuestion.focusAreas = [
-      "复杂约束下的技术方案比较与取舍依据",
-      "跨团队分歧处理、共识建立与持续推进",
-      "灰度验证指标、异常告警阈值和回滚条件",
-      "长期维护成本、业务收益与用户体验平衡",
-    ]
-  }
   if (variant === "emptyDetails") {
     session.review.highlights = []
     session.review.mainIssues = []
     session.review.improvementSuggestions = []
-    session.review.exposedWeaknesses = []
   }
   if (variant === "longDetails") {
     session.review.highlights = [
@@ -92,11 +76,6 @@ export function createPracticeReviewStoryFixture(
       "将回答压缩为目标与约束、个人判断、关键取舍、推动动作、量化验证和复盘沉淀六个连续部分，每一部分优先说明自己的具体贡献。",
       "补充优化前基线、实验组与对照组差异、持续观察周期、异常告警阈值和回滚条件，使收益归因与风险控制形成完整闭环。",
     ]
-    session.review.exposedWeaknesses = [
-      "复杂背景下快速突出个人贡献与关键判断",
-      "灰度发布期间的监控、告警、止损与回滚机制",
-      "技术收益、业务价值和长期维护成本的综合表达",
-    ]
   }
 
   return session
@@ -105,8 +84,6 @@ export function createPracticeReviewStoryFixture(
 export function createPracticeViewArgs(scenario: Parameters<typeof createPracticeScenario>[0]) {
   return {
     answeringActions: {
-      onSetSaved: fn(async () => "executed" as const),
-      onSetWeak: fn(async () => "executed" as const),
       onSkip: fn(async () => "executed" as const),
       onSubmitAnswer: fn(async () => "executed" as const),
     },
@@ -116,10 +93,9 @@ export function createPracticeViewArgs(scenario: Parameters<typeof createPractic
     completedPending: false,
     answeringPending: {
       interactionLocked: false,
-      saved: false,
+
       skip: false,
       submitAnswer: false,
-      weak: false,
     },
     followUpActions: {
       onEndFollowUps: fn(async () => "executed" as const),
@@ -134,16 +110,12 @@ export function createPracticeViewArgs(scenario: Parameters<typeof createPractic
       onEndSession: fn(async () => "executed" as const),
       onNextQuestion: fn(async () => "executed" as const),
       onRetryCurrent: fn(async () => "executed" as const),
-      onSetSaved: fn(async () => "executed" as const),
-      onSetWeak: fn(async () => "executed" as const),
     },
     reviewPending: {
       end: false,
       interactionLocked: false,
       next: false,
       retry: false,
-      saved: false,
-      weak: false,
     },
     content: { data: createPracticeScenario(scenario), status: "ready" as const },
     taskError: false,

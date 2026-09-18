@@ -22,7 +22,6 @@ function setupContext(roles: RoleListResponse["roles"]): PracticeSetupContext {
         supportedQuestionTypes,
       })),
     availableDifficulties: Object.values(PracticeDifficulty),
-    eligibleQuestionCounts: { saved: 1, history: 1 },
   }
 }
 
@@ -64,8 +63,6 @@ export async function preparePracticeTrainingEntry(
 export const startPracticeSession = practiceFaker.start
 export const getPracticeTaskStatus = practiceFaker.pollTask
 export const retryPracticeTask = practiceFaker.pollTask
-export const setQuestionSaved = practiceFaker.save
-export const setQuestionWeak = practiceFaker.weak
 export const submitPrimaryAnswer = practiceFaker.answer
 export const submitFollowUpAnswer = practiceFaker.answerFollowUp
 export const endPracticeFollowUps = practiceFaker.endFollowUps

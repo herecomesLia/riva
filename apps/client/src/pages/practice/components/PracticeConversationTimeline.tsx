@@ -7,7 +7,6 @@ import type {
   ProcessingSession,
   PracticeFollowUp,
   PracticeAnswer,
-  FollowUpCompletion,
   PracticeQuestion,
 } from "@/models/practice-workflow"
 
@@ -16,7 +15,6 @@ type PracticeConversationTimelineProps = {
   mainAnswer: PracticeAnswer
   followUps: ProcessingSession["followUps"]
   currentFollowUp?: PracticeFollowUp
-  followUpCompletion?: FollowUpCompletion
 }
 
 export function PracticeConversationTimeline({
@@ -24,7 +22,6 @@ export function PracticeConversationTimeline({
   mainAnswer,
   followUps,
   currentFollowUp,
-  followUpCompletion,
 }: PracticeConversationTimelineProps) {
   const { t } = useTranslation()
 
@@ -62,23 +59,6 @@ export function PracticeConversationTimeline({
             text={currentFollowUp.prompt}
           />
         ) : null}
-        {followUpCompletion?.status === "endedEarly" ? (
-          <>
-            <CoachMessage
-              incomplete
-              label={t("practice.followUp.unansweredFollowUp", {
-                count: followUps.length + 1,
-              })}
-              text={followUpCompletion.unanswered.prompt}
-            />
-            <p
-              className="text-sm text-muted-foreground"
-              data-testid="practice-follow-up-incomplete"
-            >
-              {t("practice.followUp.endedEarly")}
-            </p>
-          </>
-        ) : null}
       </CardContent>
     </Card>
   )
@@ -86,13 +66,11 @@ export function PracticeConversationTimeline({
 
 export function CoachMessage({
   current = false,
-  incomplete = false,
   label,
   text,
   onReview,
 }: {
   current?: boolean
-  incomplete?: boolean
   label: string
   text: string
   onReview?: () => void
@@ -102,7 +80,7 @@ export function CoachMessage({
     <Message align="start" aria-current={current ? "step" : undefined}>
       <MessageContent>
         <MessageHeader>{label}</MessageHeader>
-        <Bubble align="start" variant={current ? "tinted" : incomplete ? "secondary" : "muted"}>
+        <Bubble align="start" variant={current ? "tinted" : "muted"}>
           {onReview ? (
             <BubbleContent
               render={<button type="button" />}

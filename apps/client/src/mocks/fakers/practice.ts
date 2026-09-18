@@ -6,6 +6,8 @@ export function createPracticeFaker() {
     status: "setup",
     selection: structuredClone(practiceFixture.selection),
   }
+  let followUpsEnded = false
+
   function update(next: PracticeSession = session) {
     session = structuredClone(next)
     return structuredClone(session)
@@ -17,24 +19,11 @@ export function createPracticeFaker() {
     },
 
     async start(selection: ActiveSelection) {
+      followUpsEnded = false
       return update({
         status: "generatingQuestion",
         selection,
       })
-    },
-
-    async save(value: boolean) {
-      if (session.status !== "answering" && session.status !== "review") {
-        return structuredClone(session)
-      }
-      return update({ ...session, question: { ...session.question, isSaved: value } })
-    },
-
-    async weak(value: boolean) {
-      if (session.status !== "answering" && session.status !== "review") {
-        return structuredClone(session)
-      }
-      return update({ ...session, question: { ...session.question, isWeak: value } })
     },
 
     async answer(content: string) {
@@ -47,7 +36,6 @@ export function createPracticeFaker() {
         question: session.question,
         mainAnswer,
         followUps: [],
-        followUpCompletion: { status: "completed" },
       })
     },
 
@@ -66,12 +54,12 @@ export function createPracticeFaker() {
             answer: { content: content.trim() },
           },
         ],
-        followUpCompletion: { status: "completed" },
       })
     },
 
     async endFollowUps() {
       if (session.status !== "answeringFollowUp") return structuredClone(session)
+      followUpsEnded = true
 
       return update({
         status: "processing",
@@ -79,10 +67,6 @@ export function createPracticeFaker() {
         question: session.question,
         mainAnswer: session.mainAnswer,
         followUps: session.followUps,
-        followUpCompletion: {
-          status: "endedEarly",
-          unanswered: session.currentFollowUp,
-        },
       })
     },
 
@@ -97,7 +81,7 @@ export function createPracticeFaker() {
       }
       if (session.status !== "processing") return structuredClone(session)
 
-      if (session.followUps.length === 0 && session.followUpCompletion.status !== "endedEarly") {
+      if (session.followUps.length === 0 && !followUpsEnded) {
         return update({
           status: "answeringFollowUp",
           selection: session.selection,
@@ -118,6 +102,7 @@ export function createPracticeFaker() {
 
     async retryQuestion() {
       if (session.status !== "review") return structuredClone(session)
+      followUpsEnded = false
 
       return update({
         status: "answering",
@@ -128,6 +113,7 @@ export function createPracticeFaker() {
 
     async nextQuestion() {
       if (session.status !== "review") return structuredClone(session)
+      followUpsEnded = false
 
       return update({
         status: "generatingQuestion",

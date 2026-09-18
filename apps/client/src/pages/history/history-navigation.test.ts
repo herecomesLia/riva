@@ -59,8 +59,6 @@ describe("training history navigation contracts", () => {
       roleId: "role-1",
       questionType: "behavioral",
       difficulty: "hard",
-      source: "history",
-      prioritizeWeaknesses: true,
     })
     expect(
       parseInterviewEntrySearch({

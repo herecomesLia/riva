@@ -1,8 +1,7 @@
-import { BookmarkIcon, BrainIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { PracticeQuestion as PracticeQuestionCardModel } from "@/models/practice-workflow"
 
 type PracticeQuestionCardProps = {
@@ -18,25 +17,6 @@ export function PracticeQuestionCard({ question }: PracticeQuestionCardProps) {
         <CardTitle>
           <h3 className="wrap-break-word text-xl leading-8">{question.prompt}</h3>
         </CardTitle>
-        {question.isSaved || question.isWeak ? (
-          <CardAction
-            className="row-span-1 flex flex-wrap items-center justify-end gap-2"
-            data-testid="practice-question-statuses"
-          >
-            {question.isSaved ? (
-              <Badge variant="secondary">
-                <BookmarkIcon aria-hidden="true" />
-                {t("practice.question.saved")}
-              </Badge>
-            ) : null}
-            {question.isWeak ? (
-              <Badge variant="secondary">
-                <BrainIcon aria-hidden="true" />
-                {t("practice.question.weak")}
-              </Badge>
-            ) : null}
-          </CardAction>
-        ) : null}
       </CardHeader>
       {question.criteria.length > 0 ? (
         <CardContent>

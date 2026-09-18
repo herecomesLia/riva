@@ -9,10 +9,7 @@ export const practice = {
       role: "Target role",
       questionType: "Question type",
       difficulty: "Difficulty",
-      source: "Question source",
-      prioritizeWeaknesses: "Prioritize weak areas",
     },
-    weaknessDescription: "Use recent performance to focus on an area that needs improvement.",
   },
   questionTypes: {
     project: "Project deep dive",
@@ -25,28 +22,10 @@ export const practice = {
     basic: "Basic",
     hard: "Pressure",
   },
-  sources: {
-    personalized: "Personalized",
-    saved: "Saved questions",
-    history: "Practice history",
-  },
   actions: {
     start: "Start practice",
     starting: "Starting",
-    usePersonalized: "Switch to personalized",
     manageRoles: "Go to target roles",
-  },
-  availability: {
-    saved: {
-      title: "No eligible saved questions",
-      description:
-        "There are no saved questions for this role and question type. Switch to personalized questions to continue.",
-    },
-    history: {
-      title: "No eligible history questions",
-      description:
-        "There are no previous questions for this role and question type. Switch to personalized questions to continue.",
-    },
   },
   noRoles: {
     title: "Add a target role first",
@@ -54,7 +33,7 @@ export const practice = {
       "Targeted practice needs a role for question context. Add one to start single-question training.",
   },
   loading: {
-    cardDescription: "Loading target roles and available question sources.",
+    cardDescription: "Loading target roles and practice settings.",
   },
   errors: {
     startTitle: "Unable to start practice",
@@ -62,8 +41,6 @@ export const practice = {
     submitTitle: "Answer submission failed",
     submitDescription: "Your answer is still in the editor. Please try again.",
     actionTitle: "Action not completed",
-    savedDescription: "The saved state did not change. Please try again.",
-    weakDescription: "The weak-question state did not change. Please try again.",
     retryDescription: "Unable to retry this question right now. Please try again.",
     nextDescription: "Unable to generate the next question right now. Please try again.",
     reviewEndDescription: "Unable to end this session right now. Please try again.",
@@ -86,8 +63,6 @@ export const practice = {
   },
   question: {
     focus: "Assessment focus",
-    saved: "Saved",
-    weak: "Weak question",
   },
   answer: {
     title: "Build your answer",
@@ -106,7 +81,6 @@ export const practice = {
     followUpNumber: "Riva · Follow-up {{count}}",
     yourFollowUpAnswer: "Your follow-up answer {{count}}",
     currentFollowUp: "Riva · Current follow-up {{count}}",
-    unansweredFollowUp: "Riva · Unanswered follow-up {{count}}",
     composerTitle: "Answer the current follow-up",
     composerDescription:
       "Add the key details, then Riva will decide whether another follow-up is needed.",
@@ -117,15 +91,12 @@ export const practice = {
     endAnswering: "End this question",
     endDialogTitle: "End the current follow-up?",
     endDialogDescription:
-      "The current follow-up will be recorded as incomplete, then scoring will begin.",
+      "Score the answers already submitted. The current unanswered follow-up will not be retained.",
     confirmEnd: "End and start scoring",
     ending: "Ending",
-    endedEarly:
-      "You ended the follow-up early. The unanswered follow-up was recorded as incomplete.",
   },
   followUpAssistance: {
     title: "Need help?",
-    unanswered: "Unanswered",
   },
   questionReview: {
     recordTab: "Answers",
@@ -169,10 +140,6 @@ export const practice = {
   },
   questionActions: {
     title: "Question actions",
-    save: "Save question",
-    unsave: "Remove from saved",
-    markWeak: "Mark as weak",
-    unmarkWeak: "Remove weak mark",
     skip: "Skip question",
   },
   dialog: {
@@ -224,8 +191,6 @@ export const practice = {
     improvements: "Improvement plan",
     weaknesses: "Weak areas identified",
     noNewWeaknesses: "No new weak areas were identified for this question.",
-    retryRecommended: "Retry this question",
-    nextRecommended: "Next-question recommendation",
     actionsTitle: "Question status",
     retryCurrent: "Retry this question",
     nextQuestion: "Continue to next question",
@@ -237,8 +202,6 @@ export const practice = {
     title: "This targeted-practice session has ended",
     description: "This targeted-practice session is complete. Here is a concise summary.",
     questions: "Questions completed: {{count}}",
-    saved: "Saved questions: {{count}}",
-    markedWeak: "Marked weak questions: {{count}}",
     finalAttemptAverage: "Final-attempt average score: {{score}} points",
     startNextRound: "Start next round",
     preparingNextRound: "Preparing next round",
@@ -248,6 +211,5 @@ export const practice = {
     role: "Target role",
     questionType: "Question type",
     difficulty: "Difficulty",
-    source: "Question source",
   },
 } as const

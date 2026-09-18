@@ -23,8 +23,6 @@ describe("mapTrainingRecommendationToEntry", () => {
         roleId: "role-1",
         questionType: "technical_basics",
         difficulty: "hard",
-        source: "history",
-        prioritizeWeaknesses: true,
       },
     })
   })

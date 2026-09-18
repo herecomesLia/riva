@@ -23,7 +23,6 @@ const setupContext: PracticeSetupContext = {
     },
   ],
   availableDifficulties: ["basic"],
-  eligibleQuestionCounts: { saved: 1, history: 1 },
 }
 
 describe("training entry search application", () => {

@@ -11,17 +11,13 @@ export const practiceFixture = {
   // UI samples, intentionally independent of actions taken in the faker.
   completion: {
     questionsCompleted: 2,
-    savedQuestionCount: 1,
-    weakQuestionCount: 1,
+
     finalAttemptAverageScore: 78,
-    nextStepSuggestion: "继续练习，并优先补强复盘中暴露的薄弱能力。",
   } satisfies Omit<CompletedSession, "status" | "selection">,
   selection: {
     roleId: null,
     questionType: "project",
     difficulty: "basic",
-    source: "personalized",
-    prioritizeWeaknesses: false,
   } satisfies PracticeSelection,
   question: {
     prompt: "请结合一个真实经历，说明你如何分析问题、做出关键判断、推动行动并验证最终结果。",
@@ -35,8 +31,6 @@ export const practiceFixture = {
       framework: ["背景、目标、行动与结果"],
     },
     referenceAnswer: "我先明确目标和约束，再用小范围验证选择方案，推动落地后对比结果并复盘。",
-    isSaved: false,
-    isWeak: false,
   } satisfies PracticeQuestion,
   followUp: {
     question: {
@@ -57,7 +51,5 @@ export const practiceFixture = {
     highlights: ["能够说明个人采取的关键行动。"],
     mainIssues: ["结果的验证依据不够具体。"],
     improvementSuggestions: ["补充一个可比较的结果指标。"],
-    exposedWeaknesses: ["量化证据"],
-    recommendation: { action: "retryCurrent", reason: "结合复盘补充证据，再尝试一次。" },
   } satisfies PracticeReview,
 }

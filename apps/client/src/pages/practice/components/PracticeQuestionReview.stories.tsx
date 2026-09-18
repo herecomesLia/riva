@@ -19,7 +19,6 @@ export const Complete = meta.story({
   args: {
     question: complete.session.question,
     followUps: complete.session.followUps,
-    followUpCompletion: complete.session.followUpCompletion,
   },
 })
 
@@ -27,7 +26,6 @@ export const EndedEarly = meta.story({
   args: {
     question: ended.session.question,
     followUps: ended.session.followUps,
-    followUpCompletion: ended.session.followUpCompletion,
   },
 })
 
@@ -35,6 +33,5 @@ export const MainQuestionOnly = meta.story({
   args: {
     question: complete.session.question,
     followUps: [],
-    followUpCompletion: { status: "completed" },
   },
 })

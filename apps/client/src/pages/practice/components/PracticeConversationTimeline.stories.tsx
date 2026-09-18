@@ -35,7 +35,6 @@ export const MultipleFollowUps = meta.story({
 
 export const Completed = meta.story({
   args: {
-    followUpCompletion: completed.session.followUpCompletion,
     followUps: completed.session.followUps,
     mainAnswer: completed.session.mainAnswer,
     question: completed.session.question,
@@ -44,7 +43,6 @@ export const Completed = meta.story({
 
 export const FollowUpEndedEarly = meta.story({
   args: {
-    followUpCompletion: endedEarly.session.followUpCompletion,
     followUps: endedEarly.session.followUps,
     mainAnswer: endedEarly.session.mainAnswer,
     question: endedEarly.session.question,

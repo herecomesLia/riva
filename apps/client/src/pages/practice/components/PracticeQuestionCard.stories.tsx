@@ -1,5 +1,4 @@
 import preview from "#storybook/preview"
-import { expect, within } from "storybook/test"
 
 import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
 
@@ -32,28 +31,4 @@ export const LongQuestion = meta.story({
 
 export const WithoutCriteria = meta.story({
   args: { question: { ...getQuestion("answeringQuestion"), criteria: [] } },
-})
-
-export const SavedQuestion = meta.story({
-  args: { question: getQuestion("answeringSavedQuestion") },
-})
-
-export const WeakQuestion = meta.story({
-  args: { question: getQuestion("answeringWeakQuestion") },
-})
-
-export const SavedAndWeakQuestion = meta.story({
-  args: {
-    question: {
-      ...getQuestion("answeringQuestion"),
-      isWeak: true,
-      isSaved: true,
-    },
-  },
-  play: async ({ canvas }) => {
-    const statuses = canvas.getByTestId("practice-question-statuses")
-    await expect(statuses).toHaveAttribute("data-slot", "card-action")
-    await expect(within(statuses).getByText(/已收藏|saved/i)).toBeInTheDocument()
-    await expect(within(statuses).getByText(/薄弱题|weak/i)).toBeInTheDocument()
-  },
 })

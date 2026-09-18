@@ -1,28 +1,20 @@
 import preview from "#storybook/preview"
 import { expect, fn, userEvent, waitFor, within } from "storybook/test"
 
-import {
-  createPracticeReviewStoryFixture,
-  getVisiblePracticeEndDialog,
-} from "../stories/practice-story-fixtures"
+import { getVisiblePracticeEndDialog } from "../stories/practice-story-fixtures"
 import { PracticeReviewActions } from "./PracticeReviewActions"
 
 function createDefaultArgs() {
-  const question = createPracticeReviewStoryFixture("balanced").question
   return {
     interactionLocked: false,
     isEndPending: false,
-    isWeak: question.isWeak,
+
     isNextPending: false,
     isRetryPending: false,
-    isSaved: question.isSaved,
-    isSavedPending: false,
-    isWeakPending: false,
+
     onEndSession: fn(async () => "executed" as const),
     onNextQuestion: fn(async () => "executed" as const),
     onRetryCurrent: fn(async () => "executed" as const),
-    onSetSaved: fn(async () => "executed" as const),
-    onSetWeak: fn(async () => "executed" as const),
   }
 }
 
@@ -35,29 +27,6 @@ export const Default = meta.story({
   args: createDefaultArgs(),
 })
 
-export const SavedAndMarkedWeak = meta.story({
-  args: {
-    ...createDefaultArgs(),
-    isWeak: true,
-    isSaved: true,
-  },
-  play: async ({ canvas }) => {
-    const saved = canvas.getByRole("button", {
-      name: /取消收藏|remove from saved/i,
-    })
-    const weak = canvas.getByRole("button", {
-      name: /取消薄弱标记|remove weak mark/i,
-    })
-    await expect(saved).toHaveAttribute("aria-pressed", "true")
-    await expect(weak).toHaveAttribute("aria-pressed", "true")
-    await expect(saved.querySelector(".lucide-bookmark")).toHaveClass(
-      "fill-destructive",
-      "text-destructive",
-    )
-    await expect(weak.querySelector(".lucide-brain")).toHaveClass("text-amber-500")
-  },
-})
-
 export const Pending = meta.story({
   args: {
     ...createDefaultArgs(),
@@ -65,8 +34,6 @@ export const Pending = meta.story({
     isEndPending: true,
     isNextPending: true,
     isRetryPending: true,
-    isSavedPending: true,
-    isWeakPending: true,
   },
   play: async ({ canvas }) => {
     for (const button of canvas.getAllByRole("button")) {

@@ -5,14 +5,10 @@ import type {
   PracticeQuestionType,
 } from "@/api/generated/models"
 
-export type QuestionSource = "personalized" | "saved" | "history"
-
 export type PracticeSelection = {
   roleId: string | null
   questionType: PracticeQuestionType
   difficulty: PracticeDifficulty
-  source: QuestionSource
-  prioritizeWeaknesses: boolean
 }
 
 export type ActiveSelection = PracticeSelection & {
@@ -24,8 +20,6 @@ export type PracticeQuestion = {
   criteria: PracticeQuestionTurnResponse["criteria"]
   guidance: PracticeGuidance
   referenceAnswer: string
-  isSaved: boolean
-  isWeak: boolean
 }
 
 export type PracticeAnswer = {
@@ -62,13 +56,6 @@ export type AnsweringFollowUpSession = {
   currentFollowUp: PracticeFollowUp
 }
 
-export type FollowUpCompletion =
-  | { status: "completed" }
-  | {
-      status: "endedEarly"
-      unanswered: PracticeFollowUp
-    }
-
 export type ProcessingSession = {
   status: "processing"
   selection: ActiveSelection
@@ -78,7 +65,6 @@ export type ProcessingSession = {
     question: PracticeFollowUp
     answer: PracticeAnswer
   }[]
-  followUpCompletion: FollowUpCompletion
 }
 
 export type ScoreDimension =
@@ -102,28 +88,11 @@ export type PracticeEvaluation = {
   dimensionScores: DimensionScore[]
 }
 
-export type PracticeRecommendation =
-  | {
-      action: "retryCurrent"
-      reason: string
-    }
-  | {
-      action: "nextQuestion"
-      reason: string
-      nextQuestion: {
-        questionType: PracticeQuestionType
-        difficulty: PracticeDifficulty
-        focusAreas: string[]
-      }
-    }
-
 export type PracticeReview = {
   overallPerformance: string
   highlights: string[]
   mainIssues: string[]
   improvementSuggestions: string[]
-  exposedWeaknesses: string[]
-  recommendation: PracticeRecommendation
 }
 
 export type ReviewSession = Omit<ProcessingSession, "status"> & {
@@ -136,10 +105,7 @@ export type CompletedSession = {
   status: "completed"
   selection: ActiveSelection
   questionsCompleted: number
-  savedQuestionCount: number
-  weakQuestionCount: number
   finalAttemptAverageScore: number
-  nextStepSuggestion: string
 }
 
 export type PracticeSession =
@@ -161,7 +127,6 @@ export type PracticeRoleOption = {
 export type PracticeSetupContext = {
   roles: PracticeRoleOption[]
   availableDifficulties: PracticeDifficulty[]
-  eligibleQuestionCounts: { saved: number; history: number }
 }
 
 export type PracticeData = {

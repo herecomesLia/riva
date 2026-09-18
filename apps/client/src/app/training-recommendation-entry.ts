@@ -41,8 +41,6 @@ export function mapTrainingRecommendationToEntry(
       roleId,
       ...(questionType ? { questionType } : {}),
       difficulty: toPracticeDifficulty(recommendation.difficulty),
-      source: "history",
-      prioritizeWeaknesses: recommendation.focusAreas.length > 0,
     },
     to: "/practice",
   }

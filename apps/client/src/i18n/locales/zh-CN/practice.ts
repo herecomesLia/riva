@@ -8,10 +8,7 @@ export const practice = {
       role: "目标岗位",
       questionType: "题目类型",
       difficulty: "难度",
-      source: "题目来源",
-      prioritizeWeaknesses: "优先练习薄弱项",
     },
-    weaknessDescription: "结合近期表现，优先生成需要加强的题目。",
   },
   questionTypes: {
     project: "项目深挖",
@@ -24,33 +21,17 @@ export const practice = {
     basic: "基础",
     hard: "高压",
   },
-  sources: {
-    personalized: "个性化题目",
-    saved: "收藏题目",
-    history: "历史重练",
-  },
   actions: {
     start: "开始练习",
     starting: "正在开始",
-    usePersonalized: "切换到个性化题目",
     manageRoles: "前往目标岗位",
-  },
-  availability: {
-    saved: {
-      title: "暂无可练习的收藏题",
-      description: "当前岗位和题型下没有符合条件的收藏题，可以切换到个性化题目。",
-    },
-    history: {
-      title: "暂无可重练的历史题",
-      description: "当前岗位和题型下没有符合条件的历史题，可以切换到个性化题目。",
-    },
   },
   noRoles: {
     title: "请先添加目标岗位",
     description: "专项练习需要目标岗位作为出题上下文。添加岗位后即可开始单题训练。",
   },
   loading: {
-    cardDescription: "正在加载岗位和可用题目来源。",
+    cardDescription: "正在加载岗位和练习设置。",
   },
   errors: {
     startTitle: "暂时无法开始练习",
@@ -58,8 +39,6 @@ export const practice = {
     submitTitle: "回答提交失败",
     submitDescription: "你的回答仍保留在输入框中，请稍后重试。",
     actionTitle: "操作未完成",
-    savedDescription: "收藏状态没有改变，请稍后重试。",
-    weakDescription: "薄弱题状态没有改变，请稍后重试。",
     retryDescription: "暂时无法重练当前题，请稍后重试。",
     nextDescription: "暂时无法生成下一题，请稍后重试。",
     reviewEndDescription: "暂时无法结束本轮练习，请稍后重试。",
@@ -81,8 +60,6 @@ export const practice = {
   },
   question: {
     focus: "考察重点",
-    saved: "已收藏",
-    weak: "薄弱题",
   },
   answer: {
     title: "组织你的回答",
@@ -101,7 +78,6 @@ export const practice = {
     followUpNumber: "Riva · 追问 {{count}}",
     yourFollowUpAnswer: "你的追问回答 {{count}}",
     currentFollowUp: "Riva · 当前追问 {{count}}",
-    unansweredFollowUp: "Riva · 未回答追问 {{count}}",
     composerTitle: "回答当前追问",
     composerDescription: "补充关键细节后提交，Riva 会判断是否需要继续追问。",
     answerLabel: "当前追问回答",
@@ -110,14 +86,12 @@ export const practice = {
     submitting: "正在提交追问回答",
     endAnswering: "结束本题回答",
     endDialogTitle: "结束当前追问？",
-    endDialogDescription: "当前追问将记录为未完成，并直接进入本题评分。",
+    endDialogDescription: "结束后将根据已提交的回答评分，当前未回答的追问不会保留。",
     confirmEnd: "结束并进入评分",
     ending: "正在结束",
-    endedEarly: "本题追问由你提前结束，当前未回答追问已记录为未完成。",
   },
   followUpAssistance: {
     title: "需要帮助？",
-    unanswered: "未回答",
   },
   questionReview: {
     recordTab: "问答记录",
@@ -159,10 +133,6 @@ export const practice = {
   },
   questionActions: {
     title: "题目操作",
-    save: "收藏题目",
-    unsave: "取消收藏",
-    markWeak: "标记为薄弱题",
-    unmarkWeak: "取消薄弱标记",
     skip: "跳过本题",
   },
   dialog: {
@@ -211,8 +181,6 @@ export const practice = {
     improvements: "改进建议",
     weaknesses: "本题暴露的薄弱项",
     noNewWeaknesses: "本题没有识别出新的薄弱项。",
-    retryRecommended: "建议重练当前题",
-    nextRecommended: "下一题推荐",
     actionsTitle: "题目状态",
     retryCurrent: "重练当前题",
     nextQuestion: "继续下一题",
@@ -224,8 +192,6 @@ export const practice = {
     title: "本轮专项练习已结束",
     description: "本轮专项练习已完成，以下是轻量总结。",
     questions: "完成题数：{{count}}",
-    saved: "收藏题数：{{count}}",
-    markedWeak: "标记薄弱题数：{{count}}",
     finalAttemptAverage: "最终作答平均分：{{score}} 分",
     startNextRound: "开始下一轮",
     preparingNextRound: "正在准备下一轮",
@@ -235,6 +201,5 @@ export const practice = {
     role: "目标岗位",
     questionType: "题目类型",
     difficulty: "难度",
-    source: "题目来源",
   },
 } as const
