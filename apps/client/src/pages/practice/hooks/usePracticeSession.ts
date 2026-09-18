@@ -1,120 +1,183 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
+import { ApiError } from "@/api/error"
 import { toPracticeEntryParameters, type PracticeEntrySearch } from "@/app/training-entry-search"
-import type { ActiveSelection, PracticeData, PracticeSession } from "@/models/practice-workflow"
-import type { PracticeTrainingEntryResolution } from "@/models/training-entry"
 import {
-  getPracticePage,
-  prepareNextPracticeSession,
-  preparePracticeTrainingEntry,
-  startPracticeSession,
-} from "@/services/practice"
+  toPracticeSession,
+  toPracticeSetupContext,
+  toPracticeSetupSelection,
+} from "@/models/practice-response"
+import type { ActiveSelection, PracticeData, PracticeSelection } from "@/models/practice-workflow"
+import {
+  resolvePracticeTrainingEntry,
+  type PracticeTrainingEntryResolution,
+} from "@/models/training-entry"
+import { createPractice, getActivePractice, getPractice } from "@/services/practices"
+import { listRoles } from "@/services/roles"
+import { rolesQueryKey } from "@/pages/roles/queries"
+import { practiceTaskOptions, usePracticeTask } from "./usePracticeTask"
 
-export const PRACTICE_QUERY_KEY = ["practice"] as const
+export const practiceSessionOptions = (id: string | null) => ({
+  queryKey: ["practices", "session", id] as const,
+  queryFn: async ({ signal }: { signal: AbortSignal }) => {
+    const practice = id
+      ? await getPractice(id, { signal })
+      : ((await getActivePractice({ signal })) ?? null)
+    if (practice && practice.rounds.length === 0) throw new Error("Practice has no current round.")
+    return practice
+  },
+  retry: false as const,
+  staleTime: 0,
+})
 
 export function usePracticeSession(entrySearch: PracticeEntrySearch) {
   const queryClient = useQueryClient()
-  const prepareNextRoundLock = useRef(false)
-  const preparingEntryKey = useRef<string | null>(null)
-  const entryKey = entrySearch.entry === "history" ? JSON.stringify(entrySearch) : null
-  const [entryPreparation, setEntryPreparation] = useState<{
-    key: string | null
-    status: "idle" | "pending" | "success" | "error"
-    resolution?: PracticeTrainingEntryResolution
-  }>({ key: null, status: "idle" })
-  const practiceQuery = useQuery({
-    queryFn: getPracticePage,
-    queryKey: PRACTICE_QUERY_KEY,
-    retry: false,
-  })
-  const startMutation = usePracticeMutation(startPracticeSession)
-  const prepareNextRoundMutation = usePracticeMutation(prepareNextPracticeSession)
-  const prepareEntryMutation = useMutation({ mutationFn: preparePracticeTrainingEntry })
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selection, setSelection] = useState<PracticeSelection>()
+  const [historyConsumed, setHistoryConsumed] = useState<string | null>(null)
+  const [refreshRequired, setRefreshRequired] = useState(false)
+  const [refreshFailed, setRefreshFailed] = useState(false)
+  const refreshTarget = useRef<string | null | undefined>(undefined)
+  const [busy, setBusy] = useState(false)
+  const lock = useRef(false)
+  const historyKey = entrySearch.entry === "history" ? JSON.stringify(entrySearch) : null
+  const roles = useQuery({ queryKey: rolesQueryKey, queryFn: listRoles, retry: false })
+  const practiceQuery = useQuery({ ...practiceSessionOptions(selectedId), enabled: !busy })
+  const practice = practiceQuery.data
+  const task = usePracticeTask(practice, !busy && !refreshRequired)
 
-  useEffect(() => {
-    if (
-      entryKey === null ||
-      practiceQuery.data === undefined ||
-      preparingEntryKey.current === entryKey ||
-      (entryPreparation.key === entryKey && entryPreparation.status === "success")
-    ) {
-      return
+  let data: PracticeData | undefined
+  let historyEntryResolution: PracticeTrainingEntryResolution | undefined
+  if (roles.data && practice !== undefined) {
+    const setupContext = toPracticeSetupContext(roles.data)
+    if (!practice) {
+      let configuration = toPracticeSetupSelection(roles.data, selection)
+      if (historyKey !== null && historyConsumed !== historyKey) {
+        const input = toPracticeEntryParameters(entrySearch)
+        const role = roles.data.roles.find(({ id }) => id === input.roleId)
+        historyEntryResolution = resolvePracticeTrainingEntry(
+          setupContext,
+          configuration,
+          input,
+          !role
+            ? { status: "unavailable", reason: "roleDeleted" }
+            : role.isArchived
+              ? { status: "unavailable", reason: "roleArchived" }
+              : { status: "available" },
+        )
+        configuration = historyEntryResolution.configuration
+      }
+      data = { setupContext, session: { status: "setup", selection: configuration } }
+    } else if (practice.endedAt !== null) {
+      data = { setupContext, session: toPracticeSession(practice, { status: "idle", error: null }) }
+    } else if (task.data) {
+      const snapshot = { ...practice, rounds: [...practice.rounds.slice(0, -1), task.data.round] }
+      data = { setupContext, session: toPracticeSession(snapshot, task.data.task) }
     }
-
-    preparingEntryKey.current = entryKey
-    setEntryPreparation({ key: entryKey, status: "pending" })
-    void prepareEntryMutation
-      .mutateAsync(toPracticeEntryParameters(entrySearch))
-      .then(({ page, resolution }) => {
-        queryClient.setQueryData(PRACTICE_QUERY_KEY, page)
-        setEntryPreparation({ key: entryKey, status: "success", resolution })
-      })
-      .catch(() => setEntryPreparation({ key: entryKey, status: "error" }))
-  }, [
-    entryKey,
-    entryPreparation,
-    entrySearch,
-    practiceQuery.data,
-    prepareEntryMutation,
-    queryClient,
-  ])
-
-  async function start(input: ActiveSelection) {
-    await startMutation.mutateAsync(input)
   }
 
-  async function prepareNextRound() {
-    const session = practiceQuery.data?.session
-    if (
-      prepareNextRoundLock.current ||
-      session?.status !== "completed" ||
-      prepareNextRoundMutation.isPending
-    ) {
-      return "ignored" as const
+  // Accepted commands have no snapshot. Keep actions locked until read-back succeeds.
+  async function refresh(
+    id = refreshTarget.current === undefined ? selectedId : refreshTarget.current,
+  ) {
+    const result = await queryClient.fetchQuery(practiceSessionOptions(id))
+    if (result && result.endedAt === null) {
+      await queryClient.fetchQuery(practiceTaskOptions(result.id, result.rounds.at(-1)!.id))
     }
+    setRefreshRequired(false)
+    setRefreshFailed(false)
+    if (refreshTarget.current === null) setSelectedId(null)
+    refreshTarget.current = undefined
+  }
 
-    prepareNextRoundLock.current = true
+  async function runAction(operation: () => Promise<string | null | void>) {
+    if (lock.current) return "ignored" as const
+    lock.current = true
+    setBusy(true)
     try {
-      await prepareNextRoundMutation.mutateAsync()
+      await queryClient.cancelQueries({ queryKey: ["practices"] })
+      const target = await operation()
+      setRefreshRequired(true)
+      refreshTarget.current = target === undefined ? selectedId : target
+      if (typeof target === "string") setSelectedId(target)
+      try {
+        await refresh(target === undefined ? selectedId : target)
+      } catch {
+        setRefreshFailed(true)
+        // Query error remains visible; never resubmit an accepted command as a read retry.
+      }
       return "executed" as const
+    } catch (error) {
+      if (
+        error instanceof ApiError &&
+        (error.code === "resource.conflict" || error.code === "resource.not_found")
+      ) {
+        setRefreshRequired(true)
+        try {
+          await refresh()
+        } catch {
+          setRefreshFailed(true)
+        }
+      }
+      throw error
     } finally {
-      prepareNextRoundLock.current = false
+      lock.current = false
+      setBusy(false)
     }
   }
 
+  const startMutation = useMutation({
+    mutationFn: async (input: ActiveSelection) => {
+      await runAction(async () => {
+        const created = await createPractice(input)
+        setSelection(input)
+        setHistoryConsumed(historyKey)
+        return created.id
+      })
+    },
+  })
+  const retryRead = useMutation({
+    mutationFn: async () => {
+      await roles.refetch({ throwOnError: true })
+      await refresh()
+    },
+  })
+  async function prepareNextRound() {
+    if (data?.session.status !== "completed") return "ignored" as const
+    return runAction(async () => {
+      setSelection(data.session.selection)
+      setHistoryConsumed(historyKey)
+      // Ending already cleared the backend active pointer; no additional mutation is needed.
+      return null
+    })
+  }
+
+  const readError =
+    refreshFailed ||
+    roles.isError ||
+    practiceQuery.isError ||
+    (practice?.endedAt === null && task.isError)
+  const taskStatus = task.data?.task.status
+  const taskBusy = taskStatus === "queued" || taskStatus === "running" || taskStatus === "aborting"
   return {
-    practiceQuery,
-    start,
+    data,
+    practice,
+    task,
+    busy,
+    runAction,
+    blocked: busy || refreshRequired || readError || taskBusy,
+    readError,
+    retryRead: () => retryRead.mutate(),
+    isRetrying:
+      retryRead.isPending || practiceQuery.isFetching || roles.isFetching || task.isFetching,
+    start: (input: ActiveSelection) => startMutation.mutateAsync(input),
     isStarting: startMutation.isPending,
     prepareNextRound,
-    isPreparingNextRound: prepareNextRoundMutation.isPending,
-    historyEntryStatus:
-      entryKey === null
-        ? "inactive"
-        : entryPreparation.key === entryKey
-          ? entryPreparation.status
-          : "pending",
-    historyEntryResolution:
-      entryPreparation.key === entryKey && entryPreparation.status === "success"
-        ? entryPreparation.resolution
-        : undefined,
-    retryHistoryEntry: () => {
-      preparingEntryKey.current = null
-      setEntryPreparation({ key: null, status: "idle" })
-    },
+    historyEntryResolution,
+    activeHistoryEntry:
+      historyKey !== null &&
+      historyConsumed !== historyKey &&
+      !!practice &&
+      practice.endedAt === null,
   }
-}
-
-export function usePracticeMutation<TInput = void>(
-  mutationFn: (input: TInput) => Promise<PracticeSession>,
-) {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (input: TInput) => mutationFn(input),
-    onSuccess: (response) => {
-      queryClient.setQueryData<PracticeData>(PRACTICE_QUERY_KEY, (current) =>
-        current ? { ...current, session: response } : current,
-      )
-    },
-  })
 }

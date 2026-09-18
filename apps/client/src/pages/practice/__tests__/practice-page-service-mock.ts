@@ -1,18 +1,18 @@
 import { vi } from "vitest"
 
-vi.mock("@/services/practice", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/services/practice")>()),
-  getPracticePage: vi.fn(),
-  getPracticeTaskStatus: vi.fn(),
-  retryPracticeTask: vi.fn(),
-  endPracticeFollowUps: vi.fn(),
+vi.mock("@/services/practices", () => ({
+  getActivePractice: vi.fn(),
+  getPractice: vi.fn(),
+  getPracticeRound: vi.fn(),
+  getPracticeTaskState: vi.fn(),
+  createPractice: vi.fn(),
+  submitPracticeAnswer: vi.fn(),
+  skipPracticeRound: vi.fn(),
+  finishPracticeRound: vi.fn(),
+  restartPracticeRound: vi.fn(),
+  startNextPracticeRound: vi.fn(),
   endPracticeSession: vi.fn(),
-  retryCurrentPracticeQuestion: vi.fn(),
-  continueToNextPracticeQuestion: vi.fn(),
-  prepareNextPracticeSession: vi.fn(),
-  preparePracticeTrainingEntry: vi.fn(),
-  skipPracticeQuestion: vi.fn(),
-  startPracticeSession: vi.fn(),
-  submitFollowUpAnswer: vi.fn(),
-  submitPrimaryAnswer: vi.fn(),
+  retryPracticeTask: vi.fn(),
+  deletePractice: vi.fn(),
 }))
+vi.mock("@/services/roles", () => ({ listRoles: vi.fn() }))

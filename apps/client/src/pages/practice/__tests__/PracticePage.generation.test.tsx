@@ -1,80 +1,46 @@
-import * as testing from "@testing-library/react"
+import { screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
-
 import "./practice-page-service-mock"
 import { i18n } from "@/i18n/i18n"
-
 import * as api from "./practice-page-test-api"
-import * as context from "./practice-page-test-utils"
+import { mockPractice, practiceAt, renderPracticePage } from "./practice-page-test-utils"
 
 describe("PracticePage: generation", () => {
-  it("polls question generation into an answering snapshot", async () => {
-    const generating = api.createPracticeScenario("generatingQuestion")
-    const answering = api.createPracticeScenario("answeringQuestion")
-    if (
-      generating.session.status !== "generatingQuestion" ||
-      answering.session.status !== "answering"
-    ) {
-      throw new Error("Generating and answering fixtures are required.")
-    }
-
-    answering.session.selection = structuredClone(generating.session.selection)
-
-    vi.mocked(api.getPracticePage).mockResolvedValue(generating)
-    vi.mocked(api.getPracticeTaskStatus).mockResolvedValue(answering.session)
-
-    context.renderPracticePage()
-
-    expect(await testing.screen.findByTestId("practice-answering-state")).toHaveTextContent(
-      answering.session.status === "answering" ? answering.session.question.prompt : "",
+  it("keeps polling queued and running tasks until the question is committed", async () => {
+    const generating = practiceAt("generating")
+    const answering = practiceAt("answering")
+    mockPractice(generating)
+    vi.mocked(api.getPracticeTaskState)
+      .mockResolvedValueOnce({ status: "queued", error: null })
+      .mockResolvedValueOnce({ status: "running", error: null })
+      .mockImplementation(async () => {
+        vi.mocked(api.getPracticeRound).mockResolvedValue(answering.rounds[0])
+        return { status: "idle", error: null }
+      })
+    renderPracticePage()
+    expect(await screen.findByTestId("practice-generating-state")).toBeInTheDocument()
+    expect(
+      await screen.findByTestId("practice-answering-state", {}, { timeout: 4000 }),
+    ).toHaveTextContent(answering.rounds[0].turns[0].content)
+    expect(api.getPracticeTaskState).toHaveBeenCalledWith(
+      generating.id,
+      generating.rounds[0].id,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
   })
-
-  it("retries a failed generation query without creating a new session", async () => {
-    const user = userEvent.setup()
-    const generating = api.createPracticeScenario("generatingQuestion")
-    const answering = api.createPracticeScenario("answeringQuestion")
-    if (
-      generating.session.status !== "generatingQuestion" ||
-      answering.session.status !== "answering"
-    ) {
-      throw new Error("Generating and answering fixtures are required.")
-    }
-    generating.session.selection.difficulty = "hard"
-
-    answering.session.selection = structuredClone(generating.session.selection)
-
-    const retryQuery =
-      context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
-    vi.mocked(api.getPracticePage).mockResolvedValue(generating)
-    vi.mocked(api.getPracticeTaskStatus).mockRejectedValueOnce(
+  it("retries a failed task read without posting a task retry or creating a session", async () => {
+    mockPractice(practiceAt("answering"))
+    vi.mocked(api.getPracticeTaskState).mockRejectedValueOnce(
       new Error("unsafe generation details"),
     )
-    vi.mocked(api.retryPracticeTask).mockReturnValueOnce(retryQuery.promise)
-
-    context.renderPracticePage()
-
-    const errorState = await testing.screen.findByTestId("practice-task-failure")
-    expect(errorState).toHaveTextContent(i18n.t("practice.taskFailure.description"))
-    expect(errorState).not.toHaveTextContent("unsafe generation details")
-    await user.click(
-      testing.screen.getByRole("button", { name: i18n.t("practice.taskFailure.retry") }),
+    renderPracticePage()
+    expect(await screen.findByRole("alert")).not.toHaveTextContent("unsafe generation details")
+    await userEvent.click(
+      screen.getByRole("button", { name: i18n.t("common.pageState.error.retry") }),
     )
-    expect(
-      testing.screen.getByRole("button", { name: i18n.t("practice.taskFailure.retrying") }),
-    ).toBeDisabled()
-
-    await testing.waitFor(() => expect(api.retryPracticeTask).toHaveBeenCalledTimes(1))
-    expect(api.getPracticeTaskStatus).toHaveBeenCalledTimes(1)
-    expect(api.retryPracticeTask).toHaveBeenCalledWith()
-    expect(api.startPracticeSession).not.toHaveBeenCalled()
-    await testing.act(async () => {
-      retryQuery.resolve(answering.session)
-      await retryQuery.promise
-    })
-    expect(await testing.screen.findByTestId("practice-answering-state")).toBeInTheDocument()
-
-    expect(answering.session.selection).toEqual(generating.session.selection)
+    expect(await screen.findByTestId("practice-answering-state")).toBeInTheDocument()
+    expect(api.retryPracticeTask).not.toHaveBeenCalled()
+    expect(api.createPractice).not.toHaveBeenCalled()
   })
 })

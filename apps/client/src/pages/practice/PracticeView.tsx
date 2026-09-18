@@ -133,9 +133,14 @@ type PracticeViewProps =
       onRetryTask: () => void
       onStart: (input: ActiveSelection) => Promise<void>
       historyEntryResolution?: PracticeTrainingEntryResolution
+      activeHistoryEntry?: boolean
+      refreshError?: boolean
+      isRefreshing?: boolean
+      onRefresh?: () => void
     }
 
 export function PracticeView(props: PracticeViewProps) {
+  const { t } = useTranslation()
   const stateRegionRef = useRef<HTMLDivElement>(null)
   const stateKey = getPracticeStateKey(props)
   const previousStateKey = useRef(stateKey)
@@ -150,6 +155,25 @@ export function PracticeView(props: PracticeViewProps) {
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6">
       <PracticeHeader />
+      {"activeHistoryEntry" in props && props.activeHistoryEntry && (
+        <Alert data-testid="practice-active-session-notice">
+          <AlertTitle>{t("practice.activeSession.title")}</AlertTitle>
+          <AlertDescription>{t("practice.activeSession.description")}</AlertDescription>
+        </Alert>
+      )}
+      {"refreshError" in props && props.refreshError && (
+        <Alert variant="destructive" data-testid="practice-refresh-error">
+          <AlertTitle>{t("common.pageState.error.title")}</AlertTitle>
+          <AlertDescription>
+            <p>{t("practice.refreshError")}</p>
+            <Button disabled={props.isRefreshing} onClick={props.onRefresh}>
+              {props.isRefreshing
+                ? t("common.pageState.error.retrying")
+                : t("common.pageState.error.retry")}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
       <div
         className="min-w-0 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         data-testid="practice-state-region"
@@ -167,7 +191,7 @@ function getPracticeStateKey(props: PracticeViewProps) {
   if (props.variant === "historyEntryError") return "history-entry-error"
   if (props.content.status === "loading") return "loading"
   const session = props.content.data.session
-  if (session.status === "setup") return "session:setup"
+  if (session.status === "setup") return JSON.stringify(["setup", session.selection])
   const questionId =
     session.status === "answeringFollowUp"
       ? session.currentFollowUp.id

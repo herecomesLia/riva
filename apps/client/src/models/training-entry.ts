@@ -62,11 +62,6 @@ export type InterviewTrainingEntryResolution = TrainingEntryResolution<
   InterviewSetup["defaultConfiguration"]
 >
 
-export type PracticeTrainingEntryPreparationResponse = {
-  page: import("./practice-workflow").PracticeData
-  resolution: PracticeTrainingEntryResolution
-}
-
 export type InterviewTrainingEntryPreparationResponse = {
   page: import("./interview-workflow").InterviewData
   resolution: InterviewTrainingEntryResolution

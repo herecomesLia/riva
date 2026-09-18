@@ -1,72 +1,66 @@
 import { beforeEach, vi } from "vitest"
-
-import { i18n } from "@/i18n/i18n"
-import { defaultLanguage } from "@/i18n/resources"
-import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
+import type {
+  PracticeResponse,
+  TaskFailureResponse,
+  TaskStatusResponse,
+} from "@/api/generated/models"
+import { practiceResponseFixture } from "@/mocks/fixtures/practice"
+import { roleFixture, roleListFixture } from "@/mocks/fixtures/role"
 import { PracticePage } from "@/pages/practice"
-import {
-  endPracticeFollowUps,
-  getPracticePage,
-  getPracticeTaskStatus,
-  retryPracticeTask,
-  endPracticeSession,
-  retryCurrentPracticeQuestion,
-  continueToNextPracticeQuestion,
-  prepareNextPracticeSession,
-  preparePracticeTrainingEntry,
-  skipPracticeQuestion,
-  startPracticeSession,
-  submitFollowUpAnswer,
-  submitPrimaryAnswer,
-} from "@/services/practice"
+import * as api from "./practice-page-test-api"
 import { renderWithProviders } from "@/test/render"
 
 export function createDeferred<T>() {
-  let resolve: (value: T | PromiseLike<T>) => void = () => undefined
-  let reject: (reason?: unknown) => void = () => undefined
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise
-    reject = rejectPromise
+  let resolve!: (value: T | PromiseLike<T>) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
   })
   return { promise, reject, resolve }
 }
 
-export function renderPracticePage(initialEntry = "/practice") {
-  return renderWithProviders(<PracticePage />, {
-    router: { initialEntries: [initialEntry] },
+export function practiceAt(
+  stage: "generating" | "answering" | "processing" | "followUp" | "review" | "completed",
+) {
+  const practice = structuredClone(practiceResponseFixture)
+  practice.role = { id: roleFixture.id, title: roleFixture.title, company: roleFixture.company }
+  const round = practice.rounds[0]
+  if (stage !== "review" && stage !== "completed") round.result = null
+  if (stage === "generating") round.turns = []
+  if (stage === "answering") round.turns = round.turns.slice(0, 1)
+  if (stage === "processing") round.turns = round.turns.slice(0, 2)
+  if (stage === "followUp") round.turns = round.turns.slice(0, 3)
+  if (stage === "completed") practice.endedAt = "2026-09-18T09:00:00Z"
+  return practice
+}
+
+export function mockPractice(
+  practice: PracticeResponse | null,
+  task: TaskStatusResponse | TaskFailureResponse = { status: "idle", error: null },
+) {
+  vi.mocked(api.getActivePractice).mockImplementation(async () =>
+    practice?.endedAt === null ? structuredClone(practice) : undefined,
+  )
+  vi.mocked(api.getPractice).mockImplementation(async () => {
+    if (!practice) throw new Error("Missing fixture.")
+    return structuredClone(practice)
   })
+  vi.mocked(api.getPracticeRound).mockImplementation(async () => {
+    if (!practice) throw new Error("Missing fixture.")
+    return structuredClone(practice.rounds.at(-1)!)
+  })
+  vi.mocked(api.getPracticeTaskState).mockResolvedValue(task)
 }
 
-beforeEach(async () => {
-  await i18n.changeLanguage(defaultLanguage)
-  vi.mocked(getPracticePage).mockReset()
-  vi.mocked(getPracticeTaskStatus).mockReset()
-  vi.mocked(retryPracticeTask).mockReset()
-  vi.mocked(endPracticeFollowUps).mockReset()
-  vi.mocked(endPracticeSession).mockReset()
-  vi.mocked(retryCurrentPracticeQuestion).mockReset()
-  vi.mocked(continueToNextPracticeQuestion).mockReset()
-  vi.mocked(prepareNextPracticeSession).mockReset()
-  vi.mocked(preparePracticeTrainingEntry).mockReset()
-  vi.mocked(skipPracticeQuestion).mockReset()
-  vi.mocked(startPracticeSession).mockReset()
-  vi.mocked(submitFollowUpAnswer).mockReset()
-  vi.mocked(submitPrimaryAnswer).mockReset()
+export function renderPracticePage(initialEntry = "/practice") {
+  return renderWithProviders(<PracticePage />, { router: { initialEntries: [initialEntry] } })
+}
+
+beforeEach(() => {
+  Object.values(api).forEach((value) => {
+    if (vi.isMockFunction(value)) value.mockReset()
+  })
+  vi.mocked(api.listRoles).mockResolvedValue(structuredClone(roleListFixture))
+  mockPractice(null)
 })
-
-export {
-  createPracticeScenario,
-  getPracticePage,
-  getPracticeTaskStatus,
-  retryPracticeTask,
-  endPracticeFollowUps,
-  endPracticeSession,
-  retryCurrentPracticeQuestion,
-  continueToNextPracticeQuestion,
-  prepareNextPracticeSession,
-  preparePracticeTrainingEntry,
-  skipPracticeQuestion,
-  startPracticeSession,
-  submitFollowUpAnswer,
-  submitPrimaryAnswer,
-}

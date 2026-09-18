@@ -169,6 +169,12 @@ export const practice = {
     retry: "Try again",
     retrying: "Retrying",
   },
+  activeSession: {
+    title: "Your active practice has been restored",
+    description: "Finish your active practice before starting a new one from history.",
+  },
+  refreshError:
+    "The latest practice state could not be loaded. Refresh to continue; there is no need to resubmit an accepted action.",
   scoreDimensions: {
     relevance: "Content relevance",
     structure: "Structural clarity",

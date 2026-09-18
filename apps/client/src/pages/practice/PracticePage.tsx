@@ -1,87 +1,49 @@
 import { useSearch } from "@tanstack/react-router"
-
 import { parsePracticeEntrySearch } from "@/app/training-entry-search"
-
-import {
-  usePracticeAnsweringActions,
-  usePracticeActionLock,
-} from "./hooks/usePracticeAnsweringActions"
-import { usePracticeFollowUpActions } from "./hooks/usePracticeFollowUpActions"
-import { usePracticeTask } from "./hooks/usePracticeTask"
-import { usePracticeReviewActions } from "./hooks/usePracticeReviewActions"
+import { usePracticeActions } from "./hooks/usePracticeActions"
 import { usePracticeSession } from "./hooks/usePracticeSession"
 import { PracticeView } from "./PracticeView"
 
 export function PracticePage() {
   const entrySearch = parsePracticeEntrySearch(useSearch({ strict: false }))
-  const {
-    practiceQuery,
-    start,
-    isStarting,
-    prepareNextRound,
-    isPreparingNextRound,
-    historyEntryStatus,
-    historyEntryResolution,
-    retryHistoryEntry,
-  } = usePracticeSession(entrySearch)
-  const task = usePracticeTask(
-    practiceQuery.data?.session.status === "generatingQuestion" ||
-      practiceQuery.data?.session.status === "processing",
+  const state = usePracticeSession(entrySearch)
+  const actions = usePracticeActions(state.data?.session, state.runAction, state.blocked)
+
+  if (!state.data) {
+    if (state.readError) {
+      return (
+        <PracticeView
+          variant={entrySearch.entry === "history" ? "historyEntryError" : "error"}
+          isRetrying={state.isRetrying}
+          onRetry={state.retryRead}
+        />
+      )
+    }
+    return <PracticeView content={{ status: "loading" }} variant="default" />
+  }
+
+  return (
+    <PracticeView
+      variant="default"
+      content={{ status: "ready", data: state.data }}
+      answeringActions={actions.answeringActions}
+      answeringPending={actions.answeringPending}
+      followUpActions={actions.followUpActions}
+      followUpPending={actions.followUpPending}
+      reviewActions={actions.reviewActions}
+      reviewPending={actions.reviewPending}
+      completedActions={{ onPrepareNextRound: state.prepareNextRound }}
+      completedPending={state.busy}
+      taskError={state.task.data?.task.status === "failed"}
+      isTaskRetrying={actions.isTaskRetrying || (state.readError && state.isRetrying)}
+      onRetryTask={state.readError ? state.retryRead : actions.retryTask}
+      isStarting={state.isStarting || state.blocked}
+      onStart={state.start}
+      historyEntryResolution={state.historyEntryResolution}
+      activeHistoryEntry={state.activeHistoryEntry}
+      refreshError={state.readError}
+      isRefreshing={state.isRetrying}
+      onRefresh={state.retryRead}
+    />
   )
-  const runAction = usePracticeActionLock()
-  const answering = usePracticeAnsweringActions(runAction)
-  const followUp = usePracticeFollowUpActions(runAction)
-  const review = usePracticeReviewActions(runAction)
-
-  if (historyEntryStatus === "pending") {
-    return <PracticeView content={{ status: "loading" }} variant="default" />
-  }
-
-  if (historyEntryStatus === "error") {
-    return (
-      <PracticeView isRetrying={false} onRetry={retryHistoryEntry} variant="historyEntryError" />
-    )
-  }
-
-  if (practiceQuery.data !== undefined) {
-    return (
-      <PracticeView
-        answeringActions={answering.actions}
-        answeringPending={answering.pending}
-        completedActions={{ onPrepareNextRound: prepareNextRound }}
-        completedPending={isPreparingNextRound}
-        content={{
-          status: "ready",
-          data: practiceQuery.data,
-        }}
-        followUpActions={followUp.actions}
-        followUpPending={followUp.pending}
-        taskError={task.error}
-        isTaskRetrying={task.isRetrying}
-        isStarting={isStarting}
-        historyEntryResolution={historyEntryResolution}
-        onRetryTask={task.retry}
-        onStart={start}
-        reviewActions={review.actions}
-        reviewPending={review.pending}
-        variant="default"
-      />
-    )
-  }
-
-  if (practiceQuery.isFetching) {
-    return <PracticeView content={{ status: "loading" }} variant="default" />
-  }
-
-  if (practiceQuery.isError) {
-    return (
-      <PracticeView
-        isRetrying={practiceQuery.isFetching}
-        onRetry={() => void practiceQuery.refetch()}
-        variant="error"
-      />
-    )
-  }
-
-  return <PracticeView content={{ status: "loading" }} variant="default" />
 }

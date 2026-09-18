@@ -11,7 +11,45 @@ import type {
   ProcessingSession,
   ScoreDimension,
   SetupSession,
+  PracticeSelection,
+  PracticeSetupContext,
 } from "./practice-workflow"
+import {
+  PracticeDifficulty,
+  PracticeQuestionType,
+  type RoleListResponse,
+} from "@/api/generated/models"
+
+export function toPracticeSetupContext({ roles }: RoleListResponse): PracticeSetupContext {
+  return {
+    roles: roles
+      .filter((role) => !role.isArchived)
+      .map(({ id, title, company }) => ({
+        id,
+        title,
+        company,
+        supportedQuestionTypes: Object.values(PracticeQuestionType),
+      })),
+    availableDifficulties: Object.values(PracticeDifficulty),
+  }
+}
+
+export function toPracticeSetupSelection(
+  roles: RoleListResponse,
+  previous?: PracticeSelection,
+): PracticeSelection {
+  const available = (id: string | null | undefined) =>
+    roles.roles.some((role) => role.id === id && !role.isArchived)
+  return {
+    roleId: available(previous?.roleId)
+      ? previous!.roleId
+      : available(roles.activeRoleId)
+        ? roles.activeRoleId
+        : (roles.roles.find((role) => !role.isArchived)?.id ?? null),
+    questionType: previous?.questionType ?? "project",
+    difficulty: previous?.difficulty ?? "basic",
+  }
+}
 
 const scoreDimensions = {
   relevance: "relevance",

@@ -1,66 +1,62 @@
-import * as testing from "@testing-library/react"
+import { act, fireEvent, screen, waitFor } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
-
 import "./practice-page-service-mock"
 import { i18n } from "@/i18n/i18n"
-
+import { practiceTaskFailureFixture } from "@/mocks/fixtures/practice"
 import * as api from "./practice-page-test-api"
-import * as context from "./practice-page-test-utils"
+import {
+  createDeferred,
+  mockPractice,
+  practiceAt,
+  renderPracticePage,
+} from "./practice-page-test-utils"
 
 describe("PracticePage: round task", () => {
-  it.each(["processingNoFollowUp", "processingAnswer", "processingFollowUpEndedEarly"] as const)(
-    "resolves %s directly into review without predicting the next step",
-    async (scenario) => {
-      const processing = api.createPracticeScenario(scenario)
-      const review = api.createPracticeScenario("reviewBalanced")
-      if (processing.session.status !== "processing" || review.session.status !== "review") {
-        throw new Error("Processing and review fixtures are required.")
-      }
-
-      vi.mocked(api.getPracticePage).mockResolvedValue(processing)
-      vi.mocked(api.getPracticeTaskStatus).mockResolvedValue(review.session)
-
-      context.renderPracticePage()
-
-      expect(await testing.screen.findByTestId("practice-review-state")).toHaveTextContent(
-        String(review.session.evaluation.overallScore),
-      )
+  it.each([0, 1, 2])(
+    "loads the committed review after %s follow-ups without predicting the next step",
+    async (count) => {
+      const processing = practiceAt("processing")
+      const review = practiceAt("review")
+      for (let n = 0; n < count; n++)
+        processing.rounds[0].turns.push(...structuredClone(review.rounds[0].turns.slice(2)))
+      mockPractice(processing, { status: "running", error: null })
+      vi.mocked(api.getPracticeTaskState)
+        .mockResolvedValueOnce({ status: "running", error: null })
+        .mockImplementation(async () => {
+          vi.mocked(api.getPracticeRound).mockResolvedValue(review.rounds[0])
+          return { status: "idle", error: null }
+        })
+      renderPracticePage()
+      expect(await screen.findByTestId("practice-processing-status")).toBeInTheDocument()
+      expect(
+        await screen.findByTestId("practice-review-state", {}, { timeout: 3000 }),
+      ).toHaveTextContent("78")
     },
   )
-
-  it("retries the round task while preserving the conversation", async () => {
-    const processing = api.createPracticeScenario("processingAnswer")
-    const review = api.createPracticeScenario("reviewBalanced")
-    const retry = context.createDeferred<import("@/models/practice-workflow").PracticeSession>()
-    vi.mocked(api.getPracticePage).mockResolvedValue(processing)
-    vi.mocked(api.getPracticeTaskStatus).mockRejectedValueOnce(new Error("unsafe task details"))
-    vi.mocked(api.retryPracticeTask).mockReturnValueOnce(retry.promise)
-    context.renderPracticePage()
-    expect(await testing.screen.findByTestId("practice-task-failure")).not.toHaveTextContent(
-      "unsafe task details",
+  it("retries a failed backend task once while preserving the committed conversation", async () => {
+    const processing = practiceAt("processing")
+    mockPractice(processing, practiceTaskFailureFixture)
+    const retry = createDeferred<void>()
+    vi.mocked(api.retryPracticeTask).mockImplementation(async () => {
+      await retry.promise
+      mockPractice(practiceAt("review"))
+    })
+    renderPracticePage()
+    expect(await screen.findByTestId("practice-task-failure")).toBeInTheDocument()
+    expect(screen.getByTestId("practice-conversation-timeline")).toHaveTextContent(
+      processing.rounds[0].turns[1].content,
     )
-    if (processing.session.status !== "processing") throw new Error("Processing fixture required.")
-    const timeline = testing.screen.getByTestId("practice-conversation-timeline")
-    expect(timeline).toHaveTextContent(processing.session.mainAnswer.content)
-    for (const exchange of processing.session.followUps) {
-      expect(timeline).toHaveTextContent(exchange.question.prompt)
-      expect(timeline).toHaveTextContent(exchange.answer.content)
-    }
-    const retryButton = testing.screen.getByRole("button", {
-      name: i18n.t("practice.taskFailure.retry"),
+    const button = screen.getByRole("button", { name: i18n.t("practice.taskFailure.retry") })
+    act(() => {
+      fireEvent.click(button)
+      fireEvent.click(button)
     })
-    testing.act(() => {
-      testing.fireEvent.click(retryButton)
-      testing.fireEvent.click(retryButton)
-    })
-    expect(
-      await testing.screen.findByRole("button", { name: i18n.t("practice.taskFailure.retrying") }),
-    ).toBeDisabled()
-    expect(api.retryPracticeTask).toHaveBeenCalledTimes(1)
-    await testing.act(async () => {
-      retry.resolve(review.session)
+    await waitFor(() => expect(api.retryPracticeTask).toHaveBeenCalledTimes(1))
+    expect(api.retryPracticeTask).toHaveBeenCalledWith(processing.id, processing.rounds[0].id)
+    await act(async () => {
+      retry.resolve()
       await retry.promise
     })
-    expect(await testing.screen.findByTestId("practice-review-state")).toBeInTheDocument()
+    expect(await screen.findByTestId("practice-review-state")).toBeInTheDocument()
   })
 })

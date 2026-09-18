@@ -160,6 +160,11 @@ export const practice = {
     retry: "重新尝试",
     retrying: "正在重试",
   },
+  activeSession: {
+    title: "已恢复进行中的专项练习",
+    description: "你还有尚未结束的专项练习。请先完成当前练习，再从历史记录开始新的练习。",
+  },
+  refreshError: "暂时无法读取最新练习状态。请刷新状态后继续；无需重新提交已发送的操作。",
   scoreDimensions: {
     relevance: "内容相关性",
     structure: "结构清晰度",

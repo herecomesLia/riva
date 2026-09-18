@@ -1,38 +1,29 @@
-import { useEffect, useRef, useState } from "react"
-import { getPracticeTaskStatus, retryPracticeTask } from "@/services/practice"
-import { usePracticeMutation } from "./usePracticeSession"
+import { useQuery } from "@tanstack/react-query"
+import type { PracticeResponse } from "@/api/generated/models"
+import { getPracticeRound, getPracticeTaskState } from "@/services/practices"
 
-export function usePracticeTask(active: boolean) {
-  const requested = useRef(false)
-  const retryLock = useRef(false)
-  const [failed, setFailed] = useState(false)
-  const { mutate, reset, isError, isPending } = usePracticeMutation((retry: boolean) =>
-    retry ? retryPracticeTask() : getPracticeTaskStatus(),
-  )
-  useEffect(() => {
-    if (!active) {
-      requested.current = false
-      reset()
-      setFailed(false)
-    } else if (!requested.current) {
-      requested.current = true
-      mutate(false)
-    }
-  }, [active, mutate, reset])
-  useEffect(() => {
-    if (isError) setFailed(true)
-  }, [isError])
-  return {
-    error: failed || isError,
-    isRetrying: isPending,
-    retry: () => {
-      if (!active || isPending || retryLock.current) return
-      retryLock.current = true
-      mutate(true, {
-        onSettled: () => {
-          retryLock.current = false
-        },
-      })
+export const practiceTaskOptions = (practiceId?: string, roundId?: string) => ({
+  queryKey: ["practices", practiceId, "rounds", roundId, "task"] as const,
+  queryFn: async ({ signal }: { signal: AbortSignal }) => {
+    const task = await getPracticeTaskState(practiceId!, roundId!, { signal })
+    // Read after task state so idle exposes its committed question/result.
+    const round = await getPracticeRound(practiceId!, roundId!, { signal })
+    return { task, round }
+  },
+  retry: false as const,
+  staleTime: 0,
+})
+
+export function usePracticeTask(practice: PracticeResponse | null | undefined, enabled: boolean) {
+  return useQuery({
+    ...practiceTaskOptions(practice?.id, practice?.rounds.at(-1)?.id),
+    enabled: enabled && !!practice && practice.endedAt === null,
+    refetchInterval: (query) => {
+      const status = query.state.data?.task.status
+      return query.state.status !== "error" &&
+        (status === "queued" || status === "running" || status === "aborting")
+        ? 1000
+        : false
     },
-  }
+  })
 }

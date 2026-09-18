@@ -1,5 +1,5 @@
 import preview from "#storybook/preview"
-import { expect, userEvent } from "storybook/test"
+import { expect, fn, userEvent } from "storybook/test"
 
 import { withRouter } from "#storybook/decorators/with-router"
 import type {
@@ -49,6 +49,23 @@ function backendArgs(practice: PracticeResponse, task: TaskStatusResponse | Task
 
 export const BackendResponse = meta.story({
   args: backendArgs(practiceResponseFixture, { status: "idle", error: null }),
+})
+
+export const ResumedActiveSession = meta.story({
+  args: {
+    ...backendArgs(practiceResponseFixture, { status: "idle", error: null }),
+    activeHistoryEntry: true,
+  },
+})
+
+export const RefreshFailed = meta.story({
+  args: {
+    ...backendArgs(practiceResponseFixture, { status: "idle", error: null }),
+    refreshError: true,
+    isRefreshing: false,
+    onRefresh: fn().mockName("refreshPractice"),
+    reviewPending: { interactionLocked: true, end: false, next: false, retry: false },
+  },
 })
 
 export const DeletedRoleSnapshot = meta.story({

@@ -2,6 +2,7 @@ import type {
   PracticeQuestionTurnResponse,
   PracticeResponse,
   PracticeResultResponse,
+  TaskFailureResponse,
 } from "@/api/generated/models"
 import { toPracticeQuestion, toPracticeSession } from "@/models/practice-response"
 import type { PracticeSelection } from "@/models/practice-workflow"
@@ -92,7 +93,13 @@ export const practiceResponseFixture: PracticeResponse = {
 const review = toPracticeSession(practiceResponseFixture, { status: "idle", error: null })
 if (review.status !== "review") throw new Error("Practice response fixture must contain a result.")
 
-// Display samples for the provisional service faker; HTTP mocking is a later phase.
+export const practiceTaskFailureInput = "__RIVA_MOCK_PRACTICE_TASK_FAILURE__"
+export const practiceTaskFailureFixture: TaskFailureResponse = {
+  status: "failed",
+  error: { code: "llm_unavailable", message: "LLM service is temporarily unavailable." },
+}
+
+// Display samples for isolated component tests and stories. Runtime mocks use the API fixtures.
 export const practiceFixture = {
   context: review.context,
   completion: { questionsCompleted: 1, finalAttemptAverageScore: practiceResultFixture.score },
