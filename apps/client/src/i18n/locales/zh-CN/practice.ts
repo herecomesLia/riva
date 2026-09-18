@@ -50,6 +50,8 @@ export const practice = {
     prepareNextRoundDescription: "本轮总结仍然保留，请稍后重试。",
   },
   generation: {
+    restartTitle: "正在准备重新作答",
+    restartDescription: "Riva 正在准备当前题目的新一轮作答，请稍候。",
     title: "正在生成本题",
     description: "Riva 正在结合目标岗位、题型和难度准备一道针对性问题。",
     progress: "通常只需要片刻，请保持此页面打开。",

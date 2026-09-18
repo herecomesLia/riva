@@ -2,6 +2,13 @@ import preview from "#storybook/preview"
 import { expect, userEvent } from "storybook/test"
 
 import { withRouter } from "#storybook/decorators/with-router"
+import type {
+  PracticeResponse,
+  TaskFailureResponse,
+  TaskStatusResponse,
+} from "@/api/generated/models"
+import { practiceResponseFixture } from "@/mocks/fixtures/practice"
+import { toPracticeSession } from "@/models/practice-response"
 import { createPracticeViewArgs, withReferenceAnswer } from "./practice-story-fixtures"
 import { PracticeView } from "../PracticeView"
 
@@ -26,6 +33,52 @@ export const TaskFailureWithConversation = meta.story({
 
 export const BalancedReview = meta.story({
   args: createPracticeViewArgs("reviewBalanced"),
+})
+
+function backendArgs(practice: PracticeResponse, task: TaskStatusResponse | TaskFailureResponse) {
+  const args = createPracticeViewArgs("reviewBalanced")
+  return {
+    ...args,
+    content: {
+      status: "ready" as const,
+      data: { ...args.content.data, session: toPracticeSession(practice, task) },
+    },
+    taskError: task.status === "failed",
+  }
+}
+
+export const BackendResponse = meta.story({
+  args: backendArgs(practiceResponseFixture, { status: "idle", error: null }),
+})
+
+export const DeletedRoleSnapshot = meta.story({
+  args: backendArgs(
+    { ...practiceResponseFixture, role: { ...practiceResponseFixture.role, id: null } },
+    { status: "idle", error: null },
+  ),
+})
+
+const restartingResponse: PracticeResponse = {
+  ...practiceResponseFixture,
+  rounds: [
+    {
+      ...practiceResponseFixture.rounds[0],
+      id: "10000000-0000-4000-8000-000000000020",
+      turns: practiceResponseFixture.rounds[0].turns.slice(0, 1),
+      result: null,
+    },
+  ],
+}
+
+export const RestartPreparing = meta.story({
+  args: backendArgs(restartingResponse, { status: "running", error: null }),
+})
+
+export const RestartFailed = meta.story({
+  args: backendArgs(restartingResponse, {
+    status: "failed",
+    error: { code: "internal_error", message: "Unable to complete the task." },
+  }),
 })
 
 export const ReviewWithPersonalizedExample = meta.story({

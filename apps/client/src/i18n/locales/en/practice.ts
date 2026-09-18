@@ -52,6 +52,8 @@ export const practice = {
     prepareNextRoundDescription: "Your session summary is still here. Please try again shortly.",
   },
   generation: {
+    restartTitle: "Preparing to retry",
+    restartDescription: "Riva is preparing a new attempt at this question. Please wait.",
     title: "Generating your question",
     description:
       "Riva is preparing one focused question from your target role, question type, and difficulty.",

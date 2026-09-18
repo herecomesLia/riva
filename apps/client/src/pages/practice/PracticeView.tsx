@@ -156,7 +156,7 @@ export function PracticeView(props: PracticeViewProps) {
         ref={stateRegionRef}
         tabIndex={-1}
       >
-        <PracticeViewContent {...props} />
+        <PracticeViewContent key={stateKey} {...props} />
       </div>
     </div>
   )
@@ -166,7 +166,15 @@ function getPracticeStateKey(props: PracticeViewProps) {
   if (props.variant === "error") return "load-error"
   if (props.variant === "historyEntryError") return "history-entry-error"
   if (props.content.status === "loading") return "loading"
-  return `session:${props.content.data.session.status}`
+  const session = props.content.data.session
+  if (session.status === "setup") return "session:setup"
+  const questionId =
+    session.status === "answeringFollowUp"
+      ? session.currentFollowUp.id
+      : "question" in session
+        ? session.question?.id
+        : undefined
+  return `session:${session.context.practiceId}:${session.context.roundId}:${session.status}:${questionId ?? ""}`
 }
 
 function PracticeHeader() {
@@ -240,17 +248,25 @@ function PracticeViewContent(props: PracticeViewProps) {
     }
 
     case "generatingQuestion":
-      if (props.taskError) {
-        return <PracticeTaskFailure isRetrying={props.isTaskRetrying} onRetry={props.onRetryTask} />
-      }
-
-      return <PracticeGeneratingState context={setupContext} selection={session.selection} />
+      return (
+        <div className="flex flex-col gap-5">
+          {session.question && <PracticeQuestionCard question={session.question} />}
+          {props.taskError ? (
+            <PracticeTaskFailure isRetrying={props.isTaskRetrying} onRetry={props.onRetryTask} />
+          ) : (
+            <PracticeGeneratingState
+              role={session.context.role}
+              selection={session.selection}
+              restarting={session.question !== null}
+            />
+          )}
+        </div>
+      )
 
     case "answering":
       return (
         <PracticeAnsweringView
           actions={props.answeringActions}
-          context={setupContext}
           pending={props.answeringPending}
           session={session}
         />
@@ -260,7 +276,6 @@ function PracticeViewContent(props: PracticeViewProps) {
       return (
         <PracticeFollowUpView
           actions={props.followUpActions}
-          context={setupContext}
           pending={props.followUpPending}
           session={session}
         />
@@ -269,7 +284,6 @@ function PracticeViewContent(props: PracticeViewProps) {
     case "processing":
       return (
         <PracticeProcessingView
-          context={setupContext}
           taskError={props.taskError}
           isTaskRetrying={props.isTaskRetrying}
           onRetryTask={props.onRetryTask}
@@ -281,7 +295,6 @@ function PracticeViewContent(props: PracticeViewProps) {
       return (
         <PracticeReviewView
           actions={props.reviewActions}
-          context={setupContext}
           pending={props.reviewPending}
           session={session}
         />
@@ -302,12 +315,10 @@ function PracticeViewContent(props: PracticeViewProps) {
 
 function PracticeFollowUpView({
   actions,
-  context,
   pending,
   session,
 }: {
   actions: PracticeFollowUpActions
-  context: PracticeData["setupContext"]
   pending: PracticeFollowUpPending
   session: AnsweringFollowUpSession
 }) {
@@ -322,7 +333,7 @@ function PracticeFollowUpView({
 
   return (
     <div className="flex flex-col gap-5" data-testid="practice-answering-follow-up-state">
-      <PracticeSessionHeader context={context} selection={session.selection} />
+      <PracticeSessionHeader role={session.context.role} selection={session.selection} />
       <PracticeConversationTimeline
         currentFollowUp={session.currentFollowUp}
         followUps={session.followUps}
@@ -330,7 +341,6 @@ function PracticeFollowUpView({
         question={session.question}
       />
       <PracticeFollowUpComposer
-        key={`composer:${session.followUps.length}`}
         interactionLocked={pending.interactionLocked}
         isEndPending={pending.end}
         isPending={pending.submit}
@@ -338,10 +348,7 @@ function PracticeFollowUpView({
         onEnd={() => actions.onEndFollowUps()}
         onSubmit={(content) => actions.onSubmitFollowUp(content)}
       />
-      <PracticeFollowUpAssistance
-        key={session.followUps.length}
-        question={session.currentFollowUp}
-      />
+      <PracticeFollowUpAssistance question={session.currentFollowUp} />
 
       <AlertDialog open={blocker.status === "blocked"}>
         <AlertDialogContent>
@@ -366,13 +373,11 @@ function PracticeFollowUpView({
 }
 
 function PracticeProcessingView({
-  context,
   taskError,
   isTaskRetrying,
   onRetryTask,
   session,
 }: {
-  context: PracticeData["setupContext"]
   session: ProcessingSession
   taskError: boolean
   isTaskRetrying: boolean
@@ -380,7 +385,7 @@ function PracticeProcessingView({
 }) {
   return (
     <div className="flex flex-col gap-5" data-testid="practice-processing-state">
-      <PracticeSessionHeader context={context} selection={session.selection} />
+      <PracticeSessionHeader role={session.context.role} selection={session.selection} />
       <PracticeConversationTimeline
         followUps={session.followUps}
         mainAnswer={session.mainAnswer}
@@ -397,12 +402,10 @@ function PracticeProcessingView({
 
 function PracticeReviewView({
   actions,
-  context,
   pending,
   session,
 }: {
   actions: PracticeReviewActions
-  context: PracticeData["setupContext"]
   pending: PracticeReviewPending
   session: ReviewSession
 }) {
@@ -413,7 +416,7 @@ function PracticeReviewView({
       <div className="@container">
         <div className="grid items-start gap-5 @2xl:grid-cols-[minmax(0,1fr)_minmax(14rem,1fr)]">
           <div className="flex min-w-0 flex-col gap-3 break-words [overflow-wrap:anywhere]">
-            <PracticeSessionHeader context={context} selection={session.selection} />
+            <PracticeSessionHeader role={session.context.role} selection={session.selection} />
           </div>
           <PracticeScoreOverview evaluation={session.evaluation} />
         </div>
@@ -509,12 +512,10 @@ function PracticeCompletedView({
 
 function PracticeAnsweringView({
   actions,
-  context,
   pending,
   session,
 }: {
   actions: PracticeAnsweringActions
-  context: PracticeData["setupContext"]
   pending: PracticeAnsweringPending
   session: AnsweringSession
 }) {
@@ -533,7 +534,7 @@ function PracticeAnsweringView({
         className="flex flex-col gap-5 pb-56 min-[360px]:pb-40 sm:pb-28"
         data-testid="practice-answering-state"
       >
-        <PracticeSessionHeader context={context} selection={session.selection} />
+        <PracticeSessionHeader role={session.context.role} selection={session.selection} />
         <PracticeQuestionCard question={session.question} />
         <PracticeAnswerComposer
           interactionLocked={pending.interactionLocked}

@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import type { ActiveSelection, PracticeSetupContext } from "@/models/practice-workflow"
+import type { PracticeRoleResponse } from "@/api/generated/models"
+import type { PracticeSelection } from "@/models/practice-workflow"
 
 export function PracticeLoadingState() {
   const { t } = useTranslation()
@@ -113,11 +114,13 @@ export function PracticeNoRolesState() {
 }
 
 export function PracticeGeneratingState({
-  context,
+  role,
   selection,
+  restarting,
 }: {
-  context: PracticeSetupContext
-  selection: ActiveSelection
+  role: PracticeRoleResponse
+  selection: PracticeSelection
+  restarting: boolean
 }) {
   const { t } = useTranslation()
 
@@ -126,12 +129,18 @@ export function PracticeGeneratingState({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <LoaderCircleIcon className="animate-spin motion-reduce:animate-none" />
-          {t("practice.generation.title")}
+          {t(restarting ? "practice.generation.restartTitle" : "practice.generation.title")}
         </CardTitle>
-        <CardDescription>{t("practice.generation.description")}</CardDescription>
+        <CardDescription>
+          {t(
+            restarting
+              ? "practice.generation.restartDescription"
+              : "practice.generation.description",
+          )}
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        <PracticeSelectionSummary context={context} selection={selection} />
+        <PracticeSelectionSummary role={role} selection={selection} />
         <p className="text-sm text-muted-foreground">{t("practice.generation.progress")}</p>
       </CardContent>
     </Card>
@@ -139,17 +148,16 @@ export function PracticeGeneratingState({
 }
 
 export function PracticeSelectionSummary({
-  context,
+  role,
   selection,
 }: {
-  context: PracticeSetupContext
-  selection: ActiveSelection
+  role: PracticeRoleResponse
+  selection: PracticeSelection
 }) {
   const { t } = useTranslation()
-  const role = context.roles.find((candidate) => candidate.id === selection.roleId)
 
   const items = [
-    [t("practice.summary.role"), role?.title ?? t("practice.session.unknownRole")],
+    [t("practice.summary.role"), role.title],
     [t("practice.summary.questionType"), t(`practice.questionTypes.${selection.questionType}`)],
     [t("practice.summary.difficulty"), t(`practice.difficulty.${selection.difficulty}`)],
   ]

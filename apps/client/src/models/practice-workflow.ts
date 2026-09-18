@@ -1,52 +1,63 @@
 import type {
+  CreatePracticeRequest,
   PracticeDifficulty,
   PracticeGuidance,
   PracticeQuestionTurnResponse,
   PracticeQuestionType,
+  PracticeRoleResponse,
+  PracticeAnswerTurnResponse,
 } from "@/api/generated/models"
 
-export type PracticeSelection = {
+export type PracticeSelection = Omit<CreatePracticeRequest, "roleId"> & {
   roleId: string | null
-  questionType: PracticeQuestionType
-  difficulty: PracticeDifficulty
 }
 
-export type ActiveSelection = PracticeSelection & {
-  roleId: string
-}
+export type ActiveSelection = CreatePracticeRequest
 
 export type PracticeQuestion = {
+  id: PracticeQuestionTurnResponse["id"]
   prompt: string
   criteria: PracticeQuestionTurnResponse["criteria"]
   guidance: PracticeGuidance
   referenceAnswer: string
 }
 
-export type PracticeAnswer = {
-  content: string
+export type PracticeAnswer = Pick<PracticeAnswerTurnResponse, "id" | "content">
+
+export type PracticeFollowUp = Pick<
+  PracticeQuestion,
+  "id" | "prompt" | "guidance" | "referenceAnswer"
+>
+
+export type PracticeSessionContext = {
+  practiceId: string
+  roundId: string
+  role: PracticeRoleResponse
 }
 
-export type PracticeFollowUp = Pick<PracticeQuestion, "prompt" | "guidance" | "referenceAnswer">
+type CreatedSession = {
+  context: PracticeSessionContext
+  selection: PracticeSelection
+}
 
 export type SetupSession = {
   status: "setup"
   selection: PracticeSelection
 }
 
-export type GeneratingSession = {
+export type GeneratingSession = CreatedSession & {
   status: "generatingQuestion"
-  selection: ActiveSelection
+  // A restarted round keeps its main question while its task initializes.
+  question: PracticeQuestion | null
 }
 
-export type AnsweringSession = {
+export type AnsweringSession = CreatedSession & {
   status: "answering"
-  selection: ActiveSelection
   question: PracticeQuestion
 }
 
-export type AnsweringFollowUpSession = {
+export type AnsweringFollowUpSession = CreatedSession & {
   status: "answeringFollowUp"
-  selection: ActiveSelection
   question: PracticeQuestion
   mainAnswer: PracticeAnswer
   followUps: {
@@ -56,9 +67,8 @@ export type AnsweringFollowUpSession = {
   currentFollowUp: PracticeFollowUp
 }
 
-export type ProcessingSession = {
+export type ProcessingSession = CreatedSession & {
   status: "processing"
-  selection: ActiveSelection
   question: PracticeQuestion
   mainAnswer: PracticeAnswer
   followUps: {
@@ -101,9 +111,8 @@ export type ReviewSession = Omit<ProcessingSession, "status"> & {
   review: PracticeReview
 }
 
-export type CompletedSession = {
+export type CompletedSession = CreatedSession & {
   status: "completed"
-  selection: ActiveSelection
   questionsCompleted: number
   finalAttemptAverageScore: number
 }

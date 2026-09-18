@@ -6,6 +6,7 @@ import type {
   CompletedSession,
   ProcessingSession,
   PracticeData,
+  PracticeSessionContext,
   PracticeFollowUp,
   PracticeQuestion,
   PracticeSession,
@@ -43,6 +44,11 @@ const selection: ActiveSelection = {
   roleId: "role_frontend_bytedance",
 }
 
+const context: PracticeSessionContext = {
+  ...practiceFixture.context,
+  role: { ...practiceFixture.context.role, id: selection.roleId },
+}
+
 function question(overrides: Partial<PracticeQuestion> = {}): PracticeQuestion {
   return { ...structuredClone(practiceFixture.question), ...overrides }
 }
@@ -54,24 +60,33 @@ function data(session: PracticeSession, setupContext = defaultSetupContext): Pra
 const answering: AnsweringSession = {
   status: "answering",
   selection,
+  context,
   question: question(),
 }
 const firstFollowUp: AnsweringFollowUpSession = {
   status: "answeringFollowUp",
   selection,
+  context,
   question: question(),
-  mainAnswer: { content: "我明确了目标和约束，比较方案后推动落地，并用结果验证判断。" },
+  mainAnswer: {
+    id: "10000000-0000-4000-8000-000000000004",
+    content: "我明确了目标和约束，比较方案后推动落地，并用结果验证判断。",
+  },
   followUps: [],
   currentFollowUp: practiceFixture.followUp.question,
 }
 // Only the second prompt/answer differs, to exercise multi-turn timeline layout.
 const secondFollowUp: PracticeFollowUp = {
   ...practiceFixture.followUp.question,
+  id: "10000000-0000-4000-8000-000000000007",
   prompt: "如果验证结果不符合预期，你会如何调整行动？",
 }
 const answeredFollowUp = {
   question: practiceFixture.followUp.question,
-  answer: { content: "我对比了行动前后的指标，并排查同期变化带来的影响。" },
+  answer: {
+    id: "10000000-0000-4000-8000-000000000006",
+    content: "我对比了行动前后的指标，并排查同期变化带来的影响。",
+  },
 }
 const followUp: AnsweringFollowUpSession = {
   ...firstFollowUp,
@@ -81,11 +96,18 @@ const followUp: AnsweringFollowUpSession = {
 const processing: ProcessingSession = {
   status: "processing",
   selection,
+  context,
   question: question(),
   mainAnswer: firstFollowUp.mainAnswer,
   followUps: [
     answeredFollowUp,
-    { question: secondFollowUp, answer: { content: "我会缩小验证范围，重新检查假设并调整方案。" } },
+    {
+      question: secondFollowUp,
+      answer: {
+        id: "10000000-0000-4000-8000-000000000008",
+        content: "我会缩小验证范围，重新检查假设并调整方案。",
+      },
+    },
   ],
 }
 function review(overrides: Partial<ReviewSession> = {}): ReviewSession {
@@ -100,6 +122,7 @@ function review(overrides: Partial<ReviewSession> = {}): ReviewSession {
 
 const completed: CompletedSession = {
   status: "completed",
+  context,
   selection,
   ...practiceFixture.completion,
   questionsCompleted: 1,
@@ -115,7 +138,7 @@ const scenarios = {
     { ...defaultSetupContext, roles: [] },
   ),
 
-  generatingQuestion: data({ status: "generatingQuestion", selection }),
+  generatingQuestion: data({ status: "generatingQuestion", selection, context, question: null }),
   answeringQuestion: data(answering),
 
   answeringFirstFollowUp: data(firstFollowUp),
@@ -181,7 +204,12 @@ const scenarios = {
   ),
   completedSession: data(completed),
   retryingCurrentQuestion: data(answering),
-  generatingNextQuestion: data({ status: "generatingQuestion", selection }),
+  generatingNextQuestion: data({
+    status: "generatingQuestion",
+    selection,
+    context,
+    question: null,
+  }),
 } satisfies Record<string, PracticeData>
 
 export type PracticeScenario = keyof typeof scenarios

@@ -13,5 +13,5 @@ const meta = preview.meta({
 })
 
 export const Default = meta.story({
-  args: { context: response.setupContext, selection: response.session.selection },
+  args: { role: response.session.context.role, selection: response.session.selection },
 })

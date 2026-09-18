@@ -68,6 +68,8 @@ describe("Practice service", () => {
 
     const session = {
       status: "generatingQuestion" as const,
+      context: practiceFixture.context,
+      question: null,
       selection: { ...practiceFixture.selection, roleId: "active" },
     }
     vi.mocked(practiceFaker.get).mockResolvedValue(session)

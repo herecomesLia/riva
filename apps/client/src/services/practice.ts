@@ -1,6 +1,10 @@
 import { practiceFaker } from "@/mocks/fakers/practice"
 import { PracticeDifficulty, PracticeQuestionType } from "@/api/generated/models"
-import type { PracticeData, PracticeSetupContext } from "@/models/practice-workflow"
+import type {
+  ActiveSelection,
+  PracticeData,
+  PracticeSetupContext,
+} from "@/models/practice-workflow"
 import { resolvePracticeTrainingEntry } from "@/models/training-entry"
 import type {
   PracticeTrainingEntryParameters,
@@ -60,7 +64,12 @@ export async function preparePracticeTrainingEntry(
   }
 }
 
-export const startPracticeSession = practiceFaker.start
+export async function startPracticeSession(input: ActiveSelection) {
+  const { roles } = await listRoles()
+  const role = roles.find(({ id }) => id === input.roleId)
+  if (!role) throw new Error("Practice target role was not found.")
+  return practiceFaker.start(input, { id: role.id, title: role.title, company: role.company })
+}
 export const getPracticeTaskStatus = practiceFaker.pollTask
 export const retryPracticeTask = practiceFaker.pollTask
 export const submitPrimaryAnswer = practiceFaker.answer

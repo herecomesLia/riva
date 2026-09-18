@@ -1,5 +1,6 @@
 import { practiceFixture } from "@/mocks/fixtures/practice"
 import type { ActiveSelection, PracticeSession } from "@/models/practice-workflow"
+import type { PracticeRoleResponse } from "@/api/generated/models"
 
 export function createPracticeFaker() {
   let session: PracticeSession = {
@@ -7,6 +8,11 @@ export function createPracticeFaker() {
     selection: structuredClone(practiceFixture.selection),
   }
   let followUpsEnded = false
+  let sequence = 0
+  function nextId() {
+    sequence += 1
+    return `20000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`
+  }
 
   function update(next: PracticeSession = session) {
     session = structuredClone(next)
@@ -18,10 +24,12 @@ export function createPracticeFaker() {
       return update()
     },
 
-    async start(selection: ActiveSelection) {
+    async start(selection: ActiveSelection, role: PracticeRoleResponse) {
       followUpsEnded = false
       return update({
         status: "generatingQuestion",
+        context: { practiceId: nextId(), roundId: nextId(), role },
+        question: null,
         selection,
       })
     },
@@ -29,9 +37,10 @@ export function createPracticeFaker() {
     async answer(content: string) {
       if (session.status !== "answering") return structuredClone(session)
 
-      const mainAnswer = { content: content.trim() }
+      const mainAnswer = { id: nextId(), content: content.trim() }
       return update({
         status: "processing",
+        context: session.context,
         selection: session.selection,
         question: session.question,
         mainAnswer,
@@ -44,6 +53,7 @@ export function createPracticeFaker() {
 
       return update({
         status: "processing",
+        context: session.context,
         selection: session.selection,
         question: session.question,
         mainAnswer: session.mainAnswer,
@@ -51,7 +61,7 @@ export function createPracticeFaker() {
           ...session.followUps,
           {
             question: session.currentFollowUp,
-            answer: { content: content.trim() },
+            answer: { id: nextId(), content: content.trim() },
           },
         ],
       })
@@ -63,6 +73,7 @@ export function createPracticeFaker() {
 
       return update({
         status: "processing",
+        context: session.context,
         selection: session.selection,
         question: session.question,
         mainAnswer: session.mainAnswer,
@@ -75,8 +86,9 @@ export function createPracticeFaker() {
       if (session.status === "generatingQuestion") {
         return update({
           status: "answering",
+          context: session.context,
           selection: session.selection,
-          question: practiceFixture.question,
+          question: { ...practiceFixture.question, id: nextId() },
         })
       }
       if (session.status !== "processing") return structuredClone(session)
@@ -84,11 +96,12 @@ export function createPracticeFaker() {
       if (session.followUps.length === 0 && !followUpsEnded) {
         return update({
           status: "answeringFollowUp",
+          context: session.context,
           selection: session.selection,
           question: session.question,
           mainAnswer: session.mainAnswer,
           followUps: session.followUps,
-          currentFollowUp: practiceFixture.followUp.question,
+          currentFollowUp: { ...practiceFixture.followUp.question, id: nextId() },
         })
       }
 
@@ -106,6 +119,7 @@ export function createPracticeFaker() {
 
       return update({
         status: "answering",
+        context: { ...session.context, roundId: nextId() },
         selection: session.selection,
         question: session.question,
       })
@@ -117,6 +131,8 @@ export function createPracticeFaker() {
 
       return update({
         status: "generatingQuestion",
+        context: { ...session.context, roundId: nextId() },
+        question: null,
         selection: session.selection,
       })
     },
@@ -126,6 +142,8 @@ export function createPracticeFaker() {
 
       return update({
         status: "generatingQuestion",
+        context: { ...session.context, roundId: nextId() },
+        question: null,
         selection: session.selection,
       })
     },
@@ -138,6 +156,7 @@ export function createPracticeFaker() {
       return update({
         ...practiceFixture.completion,
         status: "completed",
+        context: session.context,
         selection: session.selection,
       })
     },

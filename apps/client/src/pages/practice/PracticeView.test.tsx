@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { i18n } from "@/i18n/i18n"
+import { practiceResponseFixture } from "@/mocks/fixtures/practice"
+import { toPracticeSession } from "@/models/practice-response"
 import { defaultLanguage } from "@/i18n/resources"
 import { createPracticeScenario } from "@/pages/practice/stories/practice-scenarios"
 import type { ActiveSelection, PracticeData, PracticeSession } from "@/models/practice-workflow"
@@ -184,19 +186,20 @@ describe("PracticeView", () => {
     },
   )
 
-  it("shows a safe label instead of an internal role ID when selection metadata is missing", async () => {
+  it("shows the session role snapshot when the original role has been deleted", async () => {
     const data = createPracticeScenario("generatingQuestion")
     if (data.session.status !== "generatingQuestion") {
       throw new Error("Generating fixture required.")
     }
-    const internalRoleId = data.session.selection.roleId
+    data.session.selection.roleId = null
+    data.session.context.role.id = null
     data.setupContext.roles = []
 
     renderReadyView(data)
 
     const generating = await screen.findByTestId("practice-generating-state")
-    expect(generating).toHaveTextContent(i18n.t("practice.session.unknownRole"))
-    expect(generating).not.toHaveTextContent(internalRoleId)
+    expect(generating).toHaveTextContent(data.session.context.role.title)
+    expect(generating).not.toHaveTextContent(i18n.t("practice.session.unknownRole"))
   })
 
   it("renders the completed summary with next-round and training-history actions", async () => {
@@ -1103,19 +1106,19 @@ describe("PracticeView", () => {
   it("renders all eight score dimensions with response explanations", async () => {
     const data = createPracticeScenario("reviewBalanced")
     if (data.session.status !== "review") throw new Error("Expected review fixture.")
-    const score = data.session.evaluation.dimensionScores[0]!
-    data.session.evaluation.dimensionScores = (
-      [
-        "relevance",
-        "structure",
-        "specificity",
-        "personalContribution",
-        "resultsAndEvidence",
-        "roleAlignment",
-        "communication",
-        "riskControl",
-      ] as const
-    ).map((dimension) => ({ ...score, dimension }))
+    data.session = toPracticeSession(practiceResponseFixture, { status: "idle", error: null })
+    if (data.session.status !== "review") throw new Error("Expected converted review.")
+    expect(data.session.evaluation.dimensionScores).toHaveLength(8)
+    expect(data.session.evaluation.dimensionScores.map(({ dimension }) => dimension)).toEqual([
+      "relevance",
+      "structure",
+      "specificity",
+      "personalContribution",
+      "resultsAndEvidence",
+      "roleAlignment",
+      "communication",
+      "riskControl",
+    ])
     renderReadyView(data)
 
     const dimensions = await screen.findByTestId("practice-dimension-scores")

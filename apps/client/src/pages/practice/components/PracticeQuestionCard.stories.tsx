@@ -6,7 +6,9 @@ import { PracticeQuestionCard } from "./PracticeQuestionCard"
 
 function getQuestion(scenario: Parameters<typeof createPracticeScenario>[0]) {
   const response = createPracticeScenario(scenario)
-  if (!("question" in response.session)) throw new Error("A question fixture is required.")
+  if (!("question" in response.session) || response.session.question === null) {
+    throw new Error("A question fixture is required.")
+  }
   return response.session.question
 }
 
