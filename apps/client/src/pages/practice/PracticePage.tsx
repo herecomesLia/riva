@@ -7,7 +7,12 @@ import { PracticeView } from "./PracticeView"
 export function PracticePage() {
   const entrySearch = parsePracticeEntrySearch(useSearch({ strict: false }))
   const state = usePracticeSession(entrySearch)
-  const actions = usePracticeActions(state.data?.session, state.runAction, state.blocked)
+  const actions = usePracticeActions(
+    state.data?.session,
+    state.runAction,
+    state.blocked,
+    state.abandonBlocked,
+  )
 
   if (!state.data) {
     if (state.readError) {
@@ -31,6 +36,8 @@ export function PracticePage() {
       content={{ status: "ready", data: state.data }}
       answeringActions={actions.answeringActions}
       answeringPending={actions.answeringPending}
+      sessionActions={actions.sessionActions}
+      sessionPending={actions.sessionPending}
       followUpActions={actions.followUpActions}
       followUpPending={actions.followUpPending}
       reviewActions={actions.reviewActions}

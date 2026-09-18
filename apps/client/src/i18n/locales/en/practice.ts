@@ -38,6 +38,13 @@ export const practice = {
       "Riva uses your experience and target role to generate personalized practice questions.",
     action: "Go to career profile",
   },
+  abandon: {
+    action: "Abandon practice",
+    confirmTitle: "Abandon this practice?",
+    confirmDescription: "Your current practice progress will not be kept.",
+    confirm: "Abandon practice",
+    cancel: "Continue practice",
+  },
   loading: {
     cardDescription: "Loading your career profile, target roles, and practice settings.",
   },
@@ -51,6 +58,7 @@ export const practice = {
     nextDescription: "Unable to generate the next question right now. Please try again.",
     reviewEndDescription: "Unable to end this session right now. Please try again.",
     skipDescription: "The question was not skipped. Please try again.",
+    abandonDescription: "Unable to abandon this practice right now. Please try again.",
     followUpSubmitTitle: "Follow-up answer not submitted",
     followUpSubmitDescription: "Your follow-up draft is still here. Please try again.",
     endFollowUpDescription: "The follow-up is still active. Please try again.",
@@ -68,6 +76,9 @@ export const practice = {
   session: {
     eyebrow: "Current targeted practice",
     unknownRole: "Unknown target role",
+  },
+  sessionActions: {
+    title: "Practice actions",
   },
   question: {
     focus: "Assessment focus",

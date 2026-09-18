@@ -5,16 +5,25 @@ import type { PracticeInteractionResult } from "../practice-interaction"
 
 type Action =
   | { type: "answer"; content: string }
-  | { type: "skip" | "finish" | "restart" | "next" | "end" | "retryTask" }
+  | {
+      type: "skip" | "finish" | "restart" | "next" | "end" | "retryTask" | "abandon"
+    }
 
 export function usePracticeActions(
   session: PracticeSession | undefined,
   runAction: (operation: () => Promise<string | null | void>) => Promise<PracticeInteractionResult>,
   blocked: boolean,
+  abandonBlocked: boolean,
 ) {
   const mutation = useMutation({
     mutationFn: (action: Action) => {
-      if (blocked || !session || session.status === "setup" || session.status === "completed") {
+      const actionBlocked = action.type === "abandon" ? abandonBlocked : blocked
+      if (
+        actionBlocked ||
+        !session ||
+        session.status === "setup" ||
+        session.status === "completed"
+      ) {
         return Promise.resolve("ignored" as const)
       }
       const { practiceId, roundId } = session.context
@@ -50,6 +59,9 @@ export function usePracticeActions(
             await api.endPracticeSession(practiceId, roundId)
             // Keep the ended detail visible although /active now returns 204.
             return practiceId
+          case "abandon":
+            await api.deletePractice(practiceId)
+            return null
           case "retryTask": {
             const state = await api.getPracticeTaskState(practiceId, roundId)
             if (state.status === "failed") await api.retryPracticeTask(practiceId, roundId)
@@ -82,6 +94,13 @@ export function usePracticeActions(
       retry: pending("restart"),
       next: pending("next"),
       end: pending("end"),
+    },
+    sessionActions: {
+      onAbandon: () => mutation.mutateAsync({ type: "abandon" }),
+    },
+    sessionPending: {
+      abandon: pending("abandon"),
+      interactionLocked: abandonBlocked || mutation.isPending,
     },
     retryTask: () => mutation.mutate({ type: "retryTask" }),
     isTaskRetrying: pending("retryTask"),

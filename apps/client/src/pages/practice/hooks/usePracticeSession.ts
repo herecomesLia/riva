@@ -180,6 +180,7 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
     (practice?.endedAt === null && task.isError)
   const taskStatus = task.data?.task.status
   const taskBusy = taskStatus === "queued" || taskStatus === "running" || taskStatus === "aborting"
+  const abandonBlocked = busy || refreshRequired || readError
   const profileRequired =
     practice === null && roles.data !== undefined && profileQuery.data === null
   return {
@@ -190,6 +191,7 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
     busy,
     runAction,
     blocked: busy || refreshRequired || readError || taskBusy,
+    abandonBlocked,
     readError,
     retryRead: () => retryRead.mutate(),
     isRetrying:

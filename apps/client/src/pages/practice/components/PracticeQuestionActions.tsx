@@ -17,19 +17,26 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 
 import type { PracticeInteractionResult } from "../practice-interaction"
+import { PracticeAbandonAction } from "./PracticeAbandonAction"
 import { PracticeActionErrorAlert, PracticeBottomActionBar } from "./PracticeBottomActionBar"
 
 type PracticeQuestionActionsProps = {
+  abandonInteractionLocked: boolean
   interactionLocked: boolean
+  isAbandonPending: boolean
   isSkipPending: boolean
+  onAbandon: () => Promise<PracticeInteractionResult>
   onSkip: () => Promise<PracticeInteractionResult>
 }
 
 type ActionError = "skip" | null
 
 export function PracticeQuestionActions({
+  abandonInteractionLocked,
   interactionLocked,
+  isAbandonPending,
   isSkipPending,
+  onAbandon,
   onSkip,
 }: PracticeQuestionActionsProps) {
   const { t } = useTranslation()
@@ -53,6 +60,11 @@ export function PracticeQuestionActions({
       ariaLabel={t("practice.questionActions.title")}
       testId="practice-question-actions-bar"
     >
+      <PracticeAbandonAction
+        interactionLocked={abandonInteractionLocked}
+        isPending={isAbandonPending}
+        onAbandon={onAbandon}
+      />
       <AlertDialog onOpenChange={setSkipOpen} open={skipOpen}>
         <AlertDialogTrigger
           render={

@@ -35,6 +35,13 @@ export const practice = {
     description: "Riva 会结合你的求职经历和目标岗位生成个性化练习题。",
     action: "前往求职档案",
   },
+  abandon: {
+    action: "放弃练习",
+    confirmTitle: "放弃本次练习？",
+    confirmDescription: "放弃后，本次练习的当前进度将不会保留。",
+    confirm: "放弃练习",
+    cancel: "继续练习",
+  },
   loading: {
     cardDescription: "正在加载求职档案、岗位和练习设置。",
   },
@@ -48,6 +55,7 @@ export const practice = {
     nextDescription: "暂时无法生成下一题，请稍后重试。",
     reviewEndDescription: "暂时无法结束本轮练习，请稍后重试。",
     skipDescription: "当前题没有被跳过，请稍后重试。",
+    abandonDescription: "暂时无法放弃当前练习，请稍后重试。",
     followUpSubmitTitle: "追问回答提交失败",
     followUpSubmitDescription: "你的追问回答仍保留在输入框中，请稍后重试。",
     endFollowUpDescription: "追问尚未结束，请稍后重试。",
@@ -64,6 +72,9 @@ export const practice = {
   session: {
     eyebrow: "当前专项练习",
     unknownRole: "未知目标岗位",
+  },
+  sessionActions: {
+    title: "练习操作",
   },
   question: {
     focus: "考察重点",

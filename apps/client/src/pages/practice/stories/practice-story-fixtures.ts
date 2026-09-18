@@ -73,6 +73,13 @@ export function createPracticeViewArgs(scenario: Parameters<typeof createPractic
       onPrepareNextRound: fn(async () => "executed" as const),
     },
     completedPending: false,
+    sessionActions: {
+      onAbandon: fn(async () => "executed" as const),
+    },
+    sessionPending: {
+      abandon: false,
+      interactionLocked: false,
+    },
     answeringPending: {
       interactionLocked: false,
 

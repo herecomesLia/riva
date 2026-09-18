@@ -9,10 +9,13 @@ import { renderWithProviders } from "@/test/render"
 import { PracticeQuestionActions } from "./PracticeQuestionActions"
 
 const defaultProps = {
+  abandonInteractionLocked: false,
   interactionLocked: false,
 
+  isAbandonPending: false,
   isSkipPending: false,
 
+  onAbandon: vi.fn(async () => "executed" as const),
   onSkip: vi.fn(async () => "executed" as const),
 }
 
@@ -26,7 +29,10 @@ describe("PracticeQuestionActions", () => {
     renderWithProviders(<PracticeQuestionActions {...defaultProps} />, { router: false })
 
     const actionGroup = screen.getByTestId("practice-question-actions")
-    for (const name of [i18n.t("practice.questionActions.skip")]) {
+    for (const name of [
+      i18n.t("practice.questionActions.skip"),
+      i18n.t("practice.abandon.action"),
+    ]) {
       expect(within(actionGroup).getByRole("button", { name })).toBeInTheDocument()
     }
   })
@@ -36,15 +42,18 @@ describe("PracticeQuestionActions", () => {
     expect(screen.queryByRole("button", { name: i18n.t("practice.review.endSession") })).toBeNull()
   })
 
-  it("disables all actions while interactions are locked", () => {
+  it("locks question actions without locking abandon", () => {
     renderWithProviders(<PracticeQuestionActions {...defaultProps} interactionLocked />, {
       router: false,
     })
 
     const actionBar = screen.getByTestId("practice-question-actions-bar")
-    for (const name of [i18n.t("practice.questionActions.skip")]) {
-      expect(within(actionBar).getByRole("button", { name })).toBeDisabled()
-    }
+    expect(
+      within(actionBar).getByRole("button", { name: i18n.t("practice.questionActions.skip") }),
+    ).toBeDisabled()
+    expect(
+      within(actionBar).getByRole("button", { name: i18n.t("practice.abandon.action") }),
+    ).toBeEnabled()
   })
 
   it("keeps the skip dialog open when the interaction is ignored", async () => {

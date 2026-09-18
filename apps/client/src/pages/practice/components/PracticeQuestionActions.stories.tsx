@@ -4,6 +4,7 @@ import { expect, fn, screen, userEvent } from "storybook/test"
 import { PracticeQuestionActions } from "./PracticeQuestionActions"
 
 const skip = fn(async () => "executed" as const)
+const abandon = fn(async () => "executed" as const)
 
 const meta = preview.meta({
   component: PracticeQuestionActions,
@@ -11,10 +12,13 @@ const meta = preview.meta({
 })
 
 const defaultArgs = {
+  abandonInteractionLocked: false,
   interactionLocked: false,
 
+  isAbandonPending: false,
   isSkipPending: false,
 
+  onAbandon: abandon,
   onSkip: skip,
 }
 

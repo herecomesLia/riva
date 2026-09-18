@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -235,6 +235,73 @@ describe("PracticePage", () => {
       await queryClient.invalidateQueries({ queryKey: ["practices"] })
     })
     expect(await screen.findByTestId("practice-answering-follow-up-state")).toBeInTheDocument()
+  })
+
+  it("abandons an answering session through DELETE and returns to setup", async () => {
+    const user = userEvent.setup()
+    const active = practiceAt("answering")
+    mockPractice(active)
+    vi.mocked(practiceService.deletePractice).mockImplementation(async () => {
+      mockPractice(null)
+    })
+    renderPage()
+
+    expect(await screen.findByTestId("practice-answering-state")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.abandon.action") }))
+    const dialog = screen.getByRole("alertdialog")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("practice.abandon.confirm") }),
+    )
+
+    await waitFor(() => expect(practiceService.deletePractice).toHaveBeenCalledWith(active.id))
+    expect(await screen.findByTestId("practice-setup-state")).toBeInTheDocument()
+  })
+
+  it.each([
+    ["generating", "practice-generating-state"],
+    ["processing", "practice-processing-state"],
+  ] as const)("allows abandoning while the %s task is running", async (stage, testId) => {
+    const user = userEvent.setup()
+    const active = practiceAt(stage)
+    mockPractice(active, { status: "running", error: null })
+    vi.mocked(practiceService.deletePractice).mockImplementation(async () => {
+      mockPractice(null)
+    })
+    renderPage()
+
+    expect(await screen.findByTestId(testId)).toBeInTheDocument()
+    const abandon = screen.getByRole("button", { name: i18n.t("practice.abandon.action") })
+    expect(abandon).toBeEnabled()
+    await user.click(abandon)
+    const dialog = screen.getByRole("alertdialog")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("practice.abandon.confirm") }),
+    )
+
+    await waitFor(() => expect(practiceService.deletePractice).toHaveBeenCalledWith(active.id))
+    expect(await screen.findByTestId("practice-setup-state")).toBeInTheDocument()
+  })
+
+  it("keeps the active session when abandoning fails", async () => {
+    const user = userEvent.setup()
+    const active = practiceAt("answering")
+    mockPractice(active)
+    vi.mocked(practiceService.deletePractice).mockRejectedValue(new Error("private delete detail"))
+    renderPage()
+
+    expect(await screen.findByTestId("practice-answering-state")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: i18n.t("practice.abandon.action") }))
+    const dialog = screen.getByRole("alertdialog")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("practice.abandon.confirm") }),
+    )
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      i18n.t("practice.errors.abandonDescription"),
+    )
+    expect(within(dialog).queryByText("private delete detail")).not.toBeInTheDocument()
+    expect(screen.getByTestId("practice-answering-state")).toBeInTheDocument()
+    expect(practiceService.deletePractice).toHaveBeenCalledWith(active.id)
   })
 
   it.each([0, 1, 2])(

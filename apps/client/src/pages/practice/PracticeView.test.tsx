@@ -19,6 +19,8 @@ import {
   type PracticeFollowUpPending,
   type PracticeReviewActions,
   type PracticeReviewPending,
+  type PracticeSessionActions,
+  type PracticeSessionPending,
 } from "./PracticeView"
 import { PracticeReviewActions as PracticeReviewActionsComponent } from "./components/PracticeReviewActions"
 
@@ -74,6 +76,20 @@ const reviewPending: PracticeReviewPending = {
   retry: false,
 }
 
+function createSessionActions(
+  overrides: Partial<PracticeSessionActions> = {},
+): PracticeSessionActions {
+  return {
+    onAbandon: vi.fn(async () => "executed" as const),
+    ...overrides,
+  }
+}
+
+const sessionPending: PracticeSessionPending = {
+  abandon: false,
+  interactionLocked: false,
+}
+
 function renderReadyView(
   data: PracticeData,
   options: {
@@ -88,6 +104,8 @@ function renderReadyView(
     followUpPending?: PracticeFollowUpPending
     reviewActions?: PracticeReviewActions
     reviewPending?: PracticeReviewPending
+    sessionActions?: PracticeSessionActions
+    sessionPending?: PracticeSessionPending
     completedActions?: PracticeCompletedActions
     completedPending?: boolean
   } = {},
@@ -107,6 +125,8 @@ function renderReadyView(
       followUpPending={options.followUpPending ?? followUpPending}
       reviewActions={options.reviewActions ?? createReviewActions()}
       reviewPending={options.reviewPending ?? reviewPending}
+      sessionActions={options.sessionActions ?? createSessionActions()}
+      sessionPending={options.sessionPending ?? sessionPending}
       content={{ status: "ready", data: viewData }}
       taskError={options.taskError ?? false}
       isTaskRetrying={options.isTaskRetrying ?? false}
@@ -260,6 +280,98 @@ describe("PracticeView", () => {
     ]) {
       expect(actions.getByRole("button", { name })).toBeInTheDocument()
     }
+    expect(
+      actions.queryByRole("button", { name: i18n.t("practice.abandon.action") }),
+    ).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ["generatingQuestion", "practice-generating-state"],
+    ["answeringQuestion", "practice-answering-state"],
+    ["answeringFirstFollowUp", "practice-answering-follow-up-state"],
+    ["processingAnswer", "practice-processing-state"],
+  ] as const)("offers abandon for the unfinished %s session", async (scenario, testId) => {
+    renderReadyView(createPracticeScenario(scenario))
+
+    expect(await screen.findByTestId(testId)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: i18n.t("practice.abandon.action") })).toBeEnabled()
+    expect(
+      screen.getByTestId(
+        scenario === "answeringQuestion"
+          ? "practice-question-actions-bar"
+          : "practice-session-actions-bar",
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it.each(["setupReady", "completedSession"] as const)(
+    "does not offer abandon for the %s session state",
+    async (scenario) => {
+      renderReadyView(createPracticeScenario(scenario))
+
+      await screen.findByTestId(
+        scenario === "setupReady" ? "practice-setup-state" : "practice-completed-state",
+      )
+      expect(
+        screen.queryByRole("button", { name: i18n.t("practice.abandon.action") }),
+      ).not.toBeInTheDocument()
+      expect(screen.queryByTestId("practice-session-actions-bar")).not.toBeInTheDocument()
+    },
+  )
+
+  it("confirms abandoning an unfinished session before invoking the action", async () => {
+    const user = userEvent.setup()
+    const onAbandon = vi.fn(async () => "executed" as const)
+    renderReadyView(createPracticeScenario("answeringQuestion"), {
+      sessionActions: { onAbandon },
+    })
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("practice.abandon.action") }))
+    expect(onAbandon).not.toHaveBeenCalled()
+    const dialog = screen.getByRole("alertdialog")
+    expect(
+      within(dialog).getByRole("heading", { name: i18n.t("practice.abandon.confirmTitle") }),
+    ).toBeVisible()
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("practice.abandon.confirm") }),
+    )
+    expect(onAbandon).toHaveBeenCalledOnce()
+  })
+
+  it("keeps the abandon dialog open and shows a safe error when it fails", async () => {
+    const user = userEvent.setup()
+    const onAbandon = vi.fn(async () => {
+      throw new Error("private delete detail")
+    })
+    renderReadyView(createPracticeScenario("processingAnswer"), {
+      sessionActions: { onAbandon },
+    })
+
+    await user.click(await screen.findByRole("button", { name: i18n.t("practice.abandon.action") }))
+    const dialog = screen.getByRole("alertdialog")
+    await user.click(
+      within(dialog).getByRole("button", { name: i18n.t("practice.abandon.confirm") }),
+    )
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      i18n.t("practice.errors.abandonDescription"),
+    )
+    expect(within(dialog).queryByText("private delete detail")).not.toBeInTheDocument()
+    expect(screen.getByTestId("practice-processing-state")).toBeInTheDocument()
+  })
+
+  it("keeps abandon available when ordinary question interactions are locked", async () => {
+    renderReadyView(createPracticeScenario("answeringQuestion"), {
+      answeringPending: { ...answeringPending, interactionLocked: true },
+    })
+
+    expect(
+      await screen.findByRole("button", { name: i18n.t("practice.answer.submit") }),
+    ).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: i18n.t("practice.questionActions.skip") }),
+    ).toBeDisabled()
+    expect(screen.getByRole("button", { name: i18n.t("practice.abandon.action") })).toBeEnabled()
   })
 
   it("confirms ending a reviewed session before invoking the action", async () => {
@@ -451,6 +563,8 @@ describe("PracticeView", () => {
         onStart={vi.fn(async () => undefined)}
         reviewActions={reviewActions}
         reviewPending={reviewPending}
+        sessionActions={createSessionActions()}
+        sessionPending={sessionPending}
         variant="default"
       />,
       { router: { initialEntries: ["/practice"] } },
@@ -474,6 +588,8 @@ describe("PracticeView", () => {
         onStart={vi.fn(async () => undefined)}
         reviewActions={reviewActions}
         reviewPending={reviewPending}
+        sessionActions={createSessionActions()}
+        sessionPending={sessionPending}
         variant="default"
       />,
     )

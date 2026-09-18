@@ -44,6 +44,8 @@ import {
   PracticeNoProfileState,
   PracticeNoRolesState,
 } from "./components/PracticePageStates"
+import { PracticeAbandonAction } from "./components/PracticeAbandonAction"
+import { PracticeBottomActionBar } from "./components/PracticeBottomActionBar"
 import { PracticeSetupForm } from "./components/PracticeSetupForm"
 import { PracticeAnswerComposer } from "./components/PracticeAnswerComposer"
 import { PracticeQuestionActions } from "./components/PracticeQuestionActions"
@@ -102,6 +104,15 @@ export type PracticeCompletedActions = {
   onPrepareNextRound: () => Promise<PracticeInteractionResult>
 }
 
+export type PracticeSessionActions = {
+  onAbandon: () => Promise<PracticeInteractionResult>
+}
+
+export type PracticeSessionPending = {
+  abandon: boolean
+  interactionLocked: boolean
+}
+
 type PracticeViewProps =
   | {
       variant: "error"
@@ -125,6 +136,8 @@ type PracticeViewProps =
       content: { status: "ready"; data: PracticeData }
       completedActions: PracticeCompletedActions
       completedPending: boolean
+      sessionActions: PracticeSessionActions
+      sessionPending: PracticeSessionPending
       answeringActions: PracticeAnsweringActions
       answeringPending: PracticeAnsweringPending
       followUpActions: PracticeFollowUpActions
@@ -279,7 +292,7 @@ function PracticeViewContent(props: PracticeViewProps) {
 
     case "generatingQuestion":
       return (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-5 pb-28 sm:pb-24">
           {session.question && <PracticeQuestionCard question={session.question} />}
           {props.taskError ? (
             <PracticeTaskFailure isRetrying={props.isTaskRetrying} onRetry={props.onRetryTask} />
@@ -290,6 +303,17 @@ function PracticeViewContent(props: PracticeViewProps) {
               restarting={session.question !== null}
             />
           )}
+          <PracticeBottomActionBar
+            actionsTestId="practice-session-actions"
+            ariaLabel={t("practice.sessionActions.title")}
+            testId="practice-session-actions-bar"
+          >
+            <PracticeAbandonAction
+              interactionLocked={props.sessionPending.interactionLocked}
+              isPending={props.sessionPending.abandon}
+              onAbandon={() => props.sessionActions.onAbandon()}
+            />
+          </PracticeBottomActionBar>
         </div>
       )
 
@@ -298,6 +322,8 @@ function PracticeViewContent(props: PracticeViewProps) {
         <PracticeAnsweringView
           actions={props.answeringActions}
           pending={props.answeringPending}
+          sessionActions={props.sessionActions}
+          sessionPending={props.sessionPending}
           session={session}
         />
       )
@@ -307,6 +333,8 @@ function PracticeViewContent(props: PracticeViewProps) {
         <PracticeFollowUpView
           actions={props.followUpActions}
           pending={props.followUpPending}
+          sessionActions={props.sessionActions}
+          sessionPending={props.sessionPending}
           session={session}
         />
       )
@@ -317,6 +345,8 @@ function PracticeViewContent(props: PracticeViewProps) {
           taskError={props.taskError}
           isTaskRetrying={props.isTaskRetrying}
           onRetryTask={props.onRetryTask}
+          sessionActions={props.sessionActions}
+          sessionPending={props.sessionPending}
           session={session}
         />
       )
@@ -346,10 +376,14 @@ function PracticeViewContent(props: PracticeViewProps) {
 function PracticeFollowUpView({
   actions,
   pending,
+  sessionActions,
+  sessionPending,
   session,
 }: {
   actions: PracticeFollowUpActions
   pending: PracticeFollowUpPending
+  sessionActions: PracticeSessionActions
+  sessionPending: PracticeSessionPending
   session: AnsweringFollowUpSession
 }) {
   const { t } = useTranslation()
@@ -362,7 +396,10 @@ function PracticeFollowUpView({
   })
 
   return (
-    <div className="flex flex-col gap-5" data-testid="practice-answering-follow-up-state">
+    <div
+      className="flex flex-col gap-5 pb-28 sm:pb-24"
+      data-testid="practice-answering-follow-up-state"
+    >
       <PracticeSessionHeader role={session.context.role} selection={session.selection} />
       <PracticeConversationTimeline
         currentFollowUp={session.currentFollowUp}
@@ -379,6 +416,17 @@ function PracticeFollowUpView({
         onSubmit={(content) => actions.onSubmitFollowUp(content)}
       />
       <PracticeFollowUpAssistance question={session.currentFollowUp} />
+      <PracticeBottomActionBar
+        actionsTestId="practice-session-actions"
+        ariaLabel={t("practice.sessionActions.title")}
+        testId="practice-session-actions-bar"
+      >
+        <PracticeAbandonAction
+          interactionLocked={sessionPending.interactionLocked}
+          isPending={sessionPending.abandon}
+          onAbandon={() => sessionActions.onAbandon()}
+        />
+      </PracticeBottomActionBar>
 
       <AlertDialog open={blocker.status === "blocked"}>
         <AlertDialogContent>
@@ -406,15 +454,21 @@ function PracticeProcessingView({
   taskError,
   isTaskRetrying,
   onRetryTask,
+  sessionActions,
+  sessionPending,
   session,
 }: {
   session: ProcessingSession
   taskError: boolean
   isTaskRetrying: boolean
   onRetryTask: () => void
+  sessionActions: PracticeSessionActions
+  sessionPending: PracticeSessionPending
 }) {
+  const { t } = useTranslation()
+
   return (
-    <div className="flex flex-col gap-5" data-testid="practice-processing-state">
+    <div className="flex flex-col gap-5 pb-28 sm:pb-24" data-testid="practice-processing-state">
       <PracticeSessionHeader role={session.context.role} selection={session.selection} />
       <PracticeConversationTimeline
         followUps={session.followUps}
@@ -426,6 +480,17 @@ function PracticeProcessingView({
       ) : (
         <PracticeProcessingState />
       )}
+      <PracticeBottomActionBar
+        actionsTestId="practice-session-actions"
+        ariaLabel={t("practice.sessionActions.title")}
+        testId="practice-session-actions-bar"
+      >
+        <PracticeAbandonAction
+          interactionLocked={sessionPending.interactionLocked}
+          isPending={sessionPending.abandon}
+          onAbandon={() => sessionActions.onAbandon()}
+        />
+      </PracticeBottomActionBar>
     </div>
   )
 }
@@ -543,10 +608,14 @@ function PracticeCompletedView({
 function PracticeAnsweringView({
   actions,
   pending,
+  sessionActions,
+  sessionPending,
   session,
 }: {
   actions: PracticeAnsweringActions
   pending: PracticeAnsweringPending
+  sessionActions: PracticeSessionActions
+  sessionPending: PracticeSessionPending
   session: AnsweringSession
 }) {
   const { t } = useTranslation()
@@ -576,8 +645,11 @@ function PracticeAnsweringView({
         <PracticeReferenceAnswer referenceAnswer={session.question.referenceAnswer} />
       </div>
       <PracticeQuestionActions
+        abandonInteractionLocked={sessionPending.interactionLocked}
         interactionLocked={pending.interactionLocked}
+        isAbandonPending={sessionPending.abandon}
         isSkipPending={pending.skip}
+        onAbandon={() => sessionActions.onAbandon()}
         onSkip={() => actions.onSkip()}
       />
 
