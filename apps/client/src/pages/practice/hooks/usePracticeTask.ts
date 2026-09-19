@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query"
 import type { PracticeResponse } from "@/api/generated/models"
 import { getPracticeRound, getPracticeTaskState } from "@/services/practices"
+import { practiceQueryKeys } from "../queries"
 
 export const practiceTaskOptions = (practiceId?: string, roundId?: string) => ({
-  queryKey: ["practices", practiceId, "rounds", roundId, "task"] as const,
+  queryKey: practiceQueryKeys.task(practiceId!, roundId!),
   queryFn: async ({ signal }: { signal: AbortSignal }) => {
     const task = await getPracticeTaskState(practiceId!, roundId!, { signal })
     // Read after task state so idle exposes its committed question/result.

@@ -1,5 +1,6 @@
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import type { PracticeSession } from "@/models/practice-workflow"
+import { practiceQueryKeys } from "../queries"
 import * as api from "@/services/practices"
 import type { PracticeInteractionResult } from "../practice-interaction"
 
@@ -15,8 +16,9 @@ export function usePracticeActions(
   blocked: boolean,
   abandonBlocked: boolean,
 ) {
+  const queryClient = useQueryClient()
   const mutation = useMutation({
-    mutationFn: (action: Action) => {
+    mutationFn: async (action: Action) => {
       const actionBlocked = action.type === "abandon" ? abandonBlocked : blocked
       if (
         actionBlocked ||
@@ -27,7 +29,7 @@ export function usePracticeActions(
         return Promise.resolve("ignored" as const)
       }
       const { practiceId, roundId } = session.context
-      return runAction(async () => {
+      const result = await runAction(async () => {
         switch (action.type) {
           case "answer": {
             const question =
@@ -69,6 +71,18 @@ export function usePracticeActions(
           }
         }
       })
+      if (result === "executed") {
+        if (action.type === "end") {
+          await queryClient.invalidateQueries({
+            queryKey: practiceQueryKeys.active(),
+            exact: true,
+          })
+        }
+        if (action.type === "abandon") {
+          queryClient.removeQueries({ queryKey: practiceQueryKeys.detail(practiceId) })
+        }
+      }
+      return result
     },
   })
   const pending = (type: Action["type"]) => mutation.isPending && mutation.variables?.type === type

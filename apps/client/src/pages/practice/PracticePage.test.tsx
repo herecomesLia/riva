@@ -17,7 +17,7 @@ import {
 import { practiceResponseFixture, practiceTaskFailureFixture } from "@/mocks/fixtures/practice"
 import { roleFixture, roleListFixture, secondaryRoleFixture } from "@/mocks/fixtures/role"
 import { PracticePage } from "@/pages/practice"
-import { practiceSessionOptions } from "@/pages/practice/hooks/usePracticeSession"
+import { practiceQueryKeys } from "@/pages/practice/queries"
 import * as practiceService from "@/services/practices"
 import * as profileService from "@/services/profile"
 import * as roleService from "@/services/roles"
@@ -232,7 +232,7 @@ describe("PracticePage", () => {
     expect(screen.getByTestId("practice-conversation-timeline")).toHaveTextContent(content)
     mockPractice(following)
     await act(async () => {
-      await queryClient.invalidateQueries({ queryKey: ["practices"] })
+      await queryClient.invalidateQueries({ queryKey: practiceQueryKeys.all })
     })
     expect(await screen.findByTestId("practice-answering-follow-up-state")).toBeInTheDocument()
   })
@@ -244,7 +244,7 @@ describe("PracticePage", () => {
     vi.mocked(practiceService.deletePractice).mockImplementation(async () => {
       mockPractice(null)
     })
-    renderPage()
+    const { queryClient } = renderPage()
 
     expect(await screen.findByTestId("practice-answering-state")).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: i18n.t("practice.abandon.action") }))
@@ -255,6 +255,11 @@ describe("PracticePage", () => {
 
     await waitFor(() => expect(practiceService.deletePractice).toHaveBeenCalledWith(active.id))
     expect(await screen.findByTestId("practice-setup-state")).toBeInTheDocument()
+    expect(queryClient.getQueryData(practiceQueryKeys.active())).toBeNull()
+    expect(queryClient.getQueryData(practiceQueryKeys.detail(active.id))).toBeUndefined()
+    expect(
+      queryClient.getQueryData(practiceQueryKeys.task(active.id, active.rounds[0].id)),
+    ).toBeUndefined()
   })
 
   it.each([
@@ -382,11 +387,12 @@ describe("PracticePage", () => {
       mockPractice(generating, { status: "queued", error: null })
       return { id: generating.id }
     })
-    renderPage(
+    const { queryClient } = renderPage(
       "/practice?entry=history&roleId=" +
         roleFixture.id +
         "&questionType=behavioral&difficulty=hard",
     )
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries")
 
     expect(await screen.findByTestId("history-entry-available")).toBeInTheDocument()
     await userEvent.click(screen.getByRole("button", { name: i18n.t("practice.actions.start") }))
@@ -398,6 +404,10 @@ describe("PracticePage", () => {
       }),
     )
     expect(await screen.findByTestId("practice-generating-state")).toBeInTheDocument()
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: practiceQueryKeys.active(),
+      exact: true,
+    })
   })
 
   it.each([
@@ -489,7 +499,8 @@ describe("PracticePage", () => {
         await deferred.promise
         mockPractice(next, { status: action === "end" ? "idle" : "queued", error: null })
       })
-      renderPage()
+      const { queryClient } = renderPage()
+      const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries")
       const name = i18n.t(
         action === "restart"
           ? "practice.review.retryCurrent"
@@ -525,6 +536,12 @@ describe("PracticePage", () => {
             expect.anything(),
           ),
         )
+      }
+      if (action === "end") {
+        expect(invalidateQueries).toHaveBeenCalledWith({
+          queryKey: practiceQueryKeys.active(),
+          exact: true,
+        })
       }
     },
   )
@@ -563,7 +580,7 @@ describe("PracticePage", () => {
       await deferred.promise
     })
     expect(await screen.findByTestId("practice-setup-state")).toBeInTheDocument()
-    expect(queryClient.getQueryData(practiceSessionOptions(null).queryKey)).toBeNull()
+    expect(queryClient.getQueryData(practiceQueryKeys.active())).toBeNull()
     expect(
       screen.getByRole("button", { name: i18n.t("practice.questionTypes.behavioral") }),
     ).toHaveAttribute("aria-pressed", "true")

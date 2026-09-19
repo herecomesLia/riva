@@ -18,9 +18,10 @@ import { getCareerProfile } from "@/services/profile"
 import { listRoles } from "@/services/roles"
 import { rolesQueryKey } from "@/pages/roles/queries"
 import { practiceTaskOptions, usePracticeTask } from "./usePracticeTask"
+import { practiceQueryKeys } from "../queries"
 
 export const practiceSessionOptions = (id: string | null) => ({
-  queryKey: ["practices", "session", id] as const,
+  queryKey: id === null ? practiceQueryKeys.active() : practiceQueryKeys.detail(id),
   queryFn: async ({ signal }: { signal: AbortSignal }) => {
     const practice = id
       ? await getPractice(id, { signal })
@@ -115,7 +116,7 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
     lock.current = true
     setBusy(true)
     try {
-      await queryClient.cancelQueries({ queryKey: ["practices"] })
+      await queryClient.cancelQueries({ queryKey: practiceQueryKeys.all })
       const target = await operation()
       setRefreshRequired(true)
       refreshTarget.current = target === undefined ? selectedId : target
@@ -148,12 +149,18 @@ export function usePracticeSession(entrySearch: PracticeEntrySearch) {
 
   const startMutation = useMutation({
     mutationFn: async (input: ActiveSelection) => {
-      await runAction(async () => {
+      const result = await runAction(async () => {
         const created = await createPractice(input)
         setSelection(input)
         setHistoryConsumed(historyKey)
         return created.id
       })
+      if (result === "executed") {
+        await queryClient.invalidateQueries({
+          queryKey: practiceQueryKeys.active(),
+          exact: true,
+        })
+      }
     },
   })
   const retryRead = useMutation({
